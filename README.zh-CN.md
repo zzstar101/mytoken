@@ -152,7 +152,7 @@ Linux 是 `~/.config/<编辑器>/User/globalStorage`（或 `$XDG_CONFIG_HOME/…
 ### Linux（安装脚本）
 
 ```sh
-v=0.1.0 arch=amd64   # or arm64
+v=0.1.3 arch=amd64   # or arm64
 curl -fLO https://github.com/zzstar101/mytoken/releases/download/v$v/mytoken-$v-linux-$arch.tar.gz
 curl -fLO https://github.com/zzstar101/mytoken/releases/download/v$v/install.sh
 sh install.sh mytoken-$v-linux-$arch.tar.gz
