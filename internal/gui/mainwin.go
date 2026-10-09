@@ -168,7 +168,7 @@ func (s *State) spanSwitch(c *ui.Context, pal palette) {
 		labels[i] = tr(k)
 	}
 	if segmented(c, pal, &s.span, labels...) {
-		s.loadOverview()
+		s.setSpan()
 	}
 }
 

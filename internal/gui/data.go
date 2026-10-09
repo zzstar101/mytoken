@@ -68,6 +68,16 @@ type Overview struct {
 
 // loadOverview queries everything for span s.
 func loadOverview(ctx context.Context, q query.Service, s Span, now time.Time) (Overview, error) {
+	o, err := loadSpan(ctx, q, s, now)
+	if err != nil {
+		return o, err
+	}
+	return o.with(loadShared(ctx, q, now)), nil
+}
+
+// loadSpan queries the part of the overview that depends on the span: the
+// totals, the trend and the breakdowns. It stops early once ctx is done.
+func loadSpan(ctx context.Context, q query.Service, s Span, now time.Time) (Overview, error) {
 	r := rangeOf(s, now)
 	f := query.Filter{Range: r}
 	o := Overview{Span: s, Loaded: now}
@@ -89,15 +99,39 @@ func loadOverview(ctx context.Context, q query.Service, s Span, now time.Time) (
 	if o.Daily, err = q.Daily(ctx, query.Filter{Range: dr}); err != nil {
 		return o, err
 	}
+	for _, by := range []struct {
+		get func(context.Context, query.Filter) ([]query.Bucket, error)
+		out *[]query.Bucket
+	}{{q.ByModel, &o.Models}, {q.ByProvider, &o.Providers}, {q.ByHarness, &o.Harnesses}, {q.ByProject, &o.Projects}} {
+		if err = ctx.Err(); err != nil {
+			return o, err
+		}
+		*by.out, _ = by.get(ctx, f)
+	}
+	return o, ctx.Err()
+}
+
+// shared is the part of the overview that is the same for every span: the
+// last 24 hours, the year's heatmap and the recent sessions.
+type shared struct {
+	Hourly []query.Point
+	Heat   []query.Point
+	Active []query.SessionRow
+}
+
+func loadShared(ctx context.Context, q query.Service, now time.Time) shared {
+	var sh shared
 	hr := now.Truncate(time.Hour).Add(time.Hour)
-	o.Hourly, _ = q.Hourly(ctx, query.Filter{Range: query.Range{From: hr.Add(-24 * time.Hour), To: hr}})
-	o.Heat, _ = q.Daily(ctx, query.Filter{Range: query.Range{From: heatStart(now), To: day.To}})
-	o.Models, _ = q.ByModel(ctx, f)
-	o.Providers, _ = q.ByProvider(ctx, f)
-	o.Harnesses, _ = q.ByHarness(ctx, f)
-	o.Projects, _ = q.ByProject(ctx, f)
-	o.Active, _, _ = q.Sessions(ctx, query.Filter{}, query.SortRecent, 6, 0)
-	return o, nil
+	sh.Hourly, _ = q.Hourly(ctx, query.Filter{Range: query.Range{From: hr.Add(-24 * time.Hour), To: hr}})
+	sh.Heat, _ = q.Daily(ctx, query.Filter{Range: query.Range{From: heatStart(now), To: rangeOf(SpanToday, now).To}})
+	sh.Active, _, _ = q.Sessions(ctx, query.Filter{}, query.SortRecent, 6, 0)
+	return sh
+}
+
+// with returns o with the span-independent parts filled in from sh.
+func (o Overview) with(sh shared) Overview {
+	o.Hourly, o.Heat, o.Active = sh.Hourly, sh.Heat, sh.Active
+	return o
 }
 
 // heatStart is the Monday 52 weeks before this week's Monday: up to 53 columns;
