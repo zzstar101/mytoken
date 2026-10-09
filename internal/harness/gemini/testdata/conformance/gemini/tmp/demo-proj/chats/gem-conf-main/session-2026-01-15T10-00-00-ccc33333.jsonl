@@ -1,0 +1,5 @@
+{"sessionId":"gem-conf-sub","projectHash":"conf-main-hash","startTime":"2026-01-15T10:00:00Z","lastUpdated":"2026-01-15T10:02:00Z","kind":"subagent","directories":["/Users/dev/confproj"],"summary":"Subagent exploring token accounting"}
+{"id":"gs-u1","timestamp":"2026-01-15T10:00:10Z","type":"user","content":"Explore the token accounting edge cases"}
+{"id":"gs-a1","timestamp":"2026-01-15T10:00:40Z","type":"gemini","model":"gemini-2.5-pro","content":[{"text":"Reasoning trace SENTINEL_PRIVATE_TEXT"}],"tokens":{"input":500,"output":200,"thoughts":60,"tool":25}}
+{"id":"gs-a2","timestamp":"2026-01-15T10:01:00Z","type":"gemini","model":"gemini-2.5-pro","content":[{"text":"Done."}],"tokens":{"input":300,"cached":50,"output":80,"thoughts":10,"total":390}}
+{"id":"gs-a3","timestamp":"2026-01-15T10:01:30Z","type":"gemini","model":"gemini-2.5-pro","content":[{"text":"Retried without usage metadata."}]}

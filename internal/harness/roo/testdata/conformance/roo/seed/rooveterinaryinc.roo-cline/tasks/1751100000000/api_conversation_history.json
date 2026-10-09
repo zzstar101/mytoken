@@ -1,0 +1,29 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Plan the planner refactor\n\n# Current Workspace Directory (/Users/demo/roo-planner) Files\n\n\n# Current Mode\n<slug>code</slug>\n<environment_details>\n<model>claude-opus-4-1</model>\n</environment_details>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll start by mapping the current cache keys."
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "The cache only holds widget keys. SENTINEL_PRIVATE_TEXT must never leave the log."
+      }
+    ]
+  }
+]

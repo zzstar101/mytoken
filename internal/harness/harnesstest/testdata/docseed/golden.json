@@ -1,0 +1,109 @@
+{
+  "harness": "fake-doc",
+  "sources": [
+    {
+      "path": "tasks/task.json",
+      "kind": "json"
+    }
+  ],
+  "events": [
+    {
+      "harness": "fake-doc",
+      "dedupKey": "doc:1",
+      "sessionId": "doc-a",
+      "projectPath": "\u003cROOT\u003e/tasks",
+      "timestamp": "2026-03-01T10:00:00Z",
+      "model": "gpt-5-codex",
+      "provider": "openai",
+      "tokens": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 5,
+        "cacheWrite": 0,
+        "reasoning": 3
+      }
+    },
+    {
+      "harness": "fake-doc",
+      "dedupKey": "doc:2",
+      "sessionId": "doc-a",
+      "projectPath": "\u003cROOT\u003e/tasks",
+      "timestamp": "2026-03-01T10:01:00Z",
+      "model": "gpt-5-codex",
+      "provider": "openai",
+      "tokens": {
+        "input": 200,
+        "output": 40,
+        "cacheRead": 10,
+        "cacheWrite": 4,
+        "reasoning": 6
+      }
+    },
+    {
+      "harness": "fake-doc",
+      "dedupKey": "doc:4",
+      "sessionId": "doc-b",
+      "projectPath": "\u003cROOT\u003e/tasks",
+      "timestamp": "2026-03-01T11:00:00Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 50,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 2,
+        "reasoning": 1
+      }
+    },
+    {
+      "harness": "fake-doc",
+      "dedupKey": "doc:5",
+      "sessionId": "doc-b",
+      "projectPath": "\u003cROOT\u003e/tasks",
+      "timestamp": "2026-03-01T11:05:00Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 60,
+        "output": 12,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "fake-doc",
+      "dedupKey": "doc:6",
+      "sessionId": "doc-a",
+      "projectPath": "\u003cROOT\u003e/tasks",
+      "timestamp": "2026-03-01T10:05:00Z",
+      "model": "gpt-5-codex",
+      "provider": "openai",
+      "tokens": {
+        "input": 30,
+        "output": 8,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "fake-doc",
+      "sessionId": "doc-a",
+      "title": "rewrite the task file",
+      "project": "\u003cROOT\u003e/tasks",
+      "startedAt": "2026-03-01T10:00:00Z",
+      "updatedAt": "2026-03-01T10:05:00Z"
+    },
+    {
+      "harness": "fake-doc",
+      "sessionId": "doc-b",
+      "title": "look up the config",
+      "project": "\u003cROOT\u003e/tasks",
+      "startedAt": "2026-03-01T11:00:00Z",
+      "updatedAt": "2026-03-01T11:05:00Z"
+    }
+  ]
+}

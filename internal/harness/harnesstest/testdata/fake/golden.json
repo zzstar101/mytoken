@@ -1,0 +1,106 @@
+{
+  "harness": "fake",
+  "sources": [
+    {
+      "path": "a.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "b.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "fake",
+      "dedupKey": "a-1",
+      "sessionId": "s-a",
+      "timestamp": "2026-01-02T03:04:05Z",
+      "model": "fake-1",
+      "provider": "fake",
+      "tokens": {
+        "input": 10,
+        "output": 4,
+        "cacheRead": 2,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "fake",
+      "dedupKey": "a-2",
+      "sessionId": "s-a",
+      "timestamp": "2026-01-02T03:05:00Z",
+      "model": "fake-1",
+      "provider": "fake",
+      "tokens": {
+        "input": 3,
+        "output": 1,
+        "cacheRead": 0,
+        "cacheWrite": 5,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "fake",
+      "dedupKey": "a-3",
+      "sessionId": "s-a",
+      "timestamp": "2026-01-02T03:06:00Z",
+      "model": "fake-2",
+      "provider": "fake",
+      "tokens": {
+        "input": 7,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 1
+      }
+    },
+    {
+      "harness": "fake",
+      "dedupKey": "b-1",
+      "sessionId": "s-b",
+      "timestamp": "2026-01-03T10:00:00Z",
+      "model": "fake-1",
+      "provider": "fake",
+      "tokens": {
+        "input": 20,
+        "output": 9,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "fake",
+      "dedupKey": "b-2",
+      "sessionId": "s-b",
+      "timestamp": "2026-01-03T10:01:00Z",
+      "model": "fake-1",
+      "provider": "fake",
+      "tokens": {
+        "input": 4,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "fake",
+      "sessionId": "s-a",
+      "title": "first prompt",
+      "startedAt": "2026-01-02T03:04:05Z",
+      "updatedAt": "2026-01-02T03:06:00Z"
+    },
+    {
+      "harness": "fake",
+      "sessionId": "s-b",
+      "title": "second prompt",
+      "startedAt": "2026-01-03T10:00:00Z",
+      "updatedAt": "2026-01-03T10:01:00Z"
+    }
+  ]
+}

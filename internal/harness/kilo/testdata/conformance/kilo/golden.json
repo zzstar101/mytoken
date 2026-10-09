@@ -1,0 +1,166 @@
+{
+  "harness": "kilo",
+  "sources": [
+    {
+      "path": "kilocode.kilo-code/tasks/1751200000000/ui_messages.json",
+      "kind": "json"
+    },
+    {
+      "path": "kilocode.kilo-code/tasks/1751200009000/ui_messages.json",
+      "kind": "json"
+    }
+  ],
+  "events": [
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200000000:1772532010000",
+      "sessionId": "1751200000000",
+      "projectPath": "/Users/demo/kilo-registry",
+      "timestamp": "2026-03-03T10:00:10Z",
+      "model": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 700,
+        "output": 300,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 0
+      },
+      "costUsd": 0.031
+    },
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200000000:1772532015000",
+      "sessionId": "1751200000000",
+      "projectPath": "/Users/demo/kilo-registry",
+      "timestamp": "2026-03-03T10:00:15Z",
+      "model": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 0,
+        "output": 210,
+        "cacheRead": 900,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0192
+    },
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200000000:1772532035000",
+      "sessionId": "1751200000000",
+      "projectPath": "/Users/demo/kilo-registry",
+      "timestamp": "2026-03-03T10:00:35Z",
+      "model": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 640,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0051
+    },
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200009000:1772535601000",
+      "sessionId": "1751200009000",
+      "parentId": "1751200000000",
+      "projectPath": "/Users/demo/kilo-lookup",
+      "timestamp": "2026-03-03T11:00:01Z",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "tokens": {
+        "input": 1500,
+        "output": 260,
+        "cacheRead": 300,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "costUsd": 0.03
+    },
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200009000:1772535608000",
+      "sessionId": "1751200009000",
+      "parentId": "1751200000000",
+      "projectPath": "/Users/demo/kilo-lookup",
+      "timestamp": "2026-03-03T11:00:08Z",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "tokens": {
+        "input": 300,
+        "output": 40,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.002
+    },
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200009000:1772535609000",
+      "sessionId": "1751200009000",
+      "parentId": "1751200000000",
+      "projectPath": "/Users/demo/kilo-lookup",
+      "timestamp": "2026-03-03T11:00:09Z",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "tokens": {
+        "input": 0,
+        "output": 30,
+        "cacheRead": 250,
+        "cacheWrite": 250,
+        "reasoning": 0
+      },
+      "costUsd": 0.0147
+    },
+    {
+      "harness": "kilo",
+      "dedupKey": "kilo:1751200009000:subagents:1772535605000",
+      "sessionId": "1751200009000:subagents",
+      "parentId": "1751200009000",
+      "projectPath": "/Users/demo/kilo-lookup",
+      "timestamp": "2026-03-03T11:00:05Z",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "tokens": {
+        "input": 600,
+        "output": 120,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.004
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "kilo",
+      "sessionId": "1751200000000",
+      "title": "Split the tool registry",
+      "project": "/Users/demo/kilo-registry",
+      "startedAt": "2026-03-03T10:00:00Z",
+      "updatedAt": "2026-03-03T10:00:40Z"
+    },
+    {
+      "harness": "kilo",
+      "sessionId": "1751200009000",
+      "parentId": "1751200000000",
+      "title": "Wire the new registry lookup",
+      "project": "/Users/demo/kilo-lookup",
+      "startedAt": "2026-03-03T11:00:00Z",
+      "updatedAt": "2026-03-03T11:00:15Z"
+    },
+    {
+      "harness": "kilo",
+      "sessionId": "1751200009000:subagents",
+      "parentId": "1751200009000",
+      "title": "Subagents",
+      "project": "/Users/demo/kilo-lookup",
+      "startedAt": "2026-03-03T11:00:05Z",
+      "updatedAt": "2026-03-03T11:00:05Z"
+    }
+  ]
+}

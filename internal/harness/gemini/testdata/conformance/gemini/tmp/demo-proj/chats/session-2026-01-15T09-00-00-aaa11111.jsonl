@@ -1,0 +1,8 @@
+{"sessionId":"gem-conf-main","projectHash":"conf-main-hash","startTime":"2026-01-15T09:00:00Z","lastUpdated":"2026-01-15T09:05:00Z","kind":"main","summary":"Conformance fixture for the gemini parser"}
+{"id":"gm-u1","timestamp":"2026-01-15T09:00:05Z","type":"user","content":"Add a gemini conformance fixture"}
+{"id":"gm-a1","timestamp":"2026-01-15T09:00:30Z","type":"gemini","model":"gemini-2.5-pro","content":[{"text":"Plan recorded. SENTINEL_PRIVATE_TEXT"}],"tokens":{"input":1200,"cached":400,"output":300,"thoughts":80,"tool":0,"total":1580}}
+{"$patch":{"id":"gm-a1","content":[{"text":"Tool output SENTINEL_PRIVATE_TEXT"}]}}
+{"$set":{"lastUpdated":"2026-01-15T09:05:30Z"}}
+{"id":"gm-a2","timestamp":"2026-01-15T09:04:10Z","type":"gemini","model":"gemini-2.5-pro","content":[{"text":"Waiting for the next step."}]}
+{"$rewindTo":"gm-u1"}
+{"id":"gm-a3","timestamp":"2026-01-15T09:04:20Z","type":"gemini","model":"gemini-2.5-pro","tokens":{"input":0,"output":0,"cached":0,"thoughts":0,"tool":0}}

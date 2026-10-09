@@ -1,0 +1,11 @@
+{
+  "id": "1751200009000",
+  "rootTaskId": "1751200000000",
+  "parentTaskId": "1751200000000",
+  "number": 2,
+  "ts": 1772535600000,
+  "task": "Wire the new registry lookup",
+  "workspace": "/Users/demo/kilo-lookup",
+  "mode": "code",
+  "status": "completed"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "1751000009000",
+  "rootTaskId": "1751000000000",
+  "parentTaskId": "1751000000000",
+  "number": 2,
+  "ts": 1772362800000,
+  "task": "Add the retry wrapper",
+  "workspace": "/Users/demo/cline-retry",
+  "mode": "code",
+  "status": "completed"
+}

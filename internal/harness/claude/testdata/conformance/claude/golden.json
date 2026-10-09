@@ -1,0 +1,100 @@
+{
+  "harness": "claude-code",
+  "sources": [
+    {
+      "path": "-Users-demo-proj/sess-a.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "-Users-demo-proj/sess-a/subagents/agent-1.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "claude-code",
+      "dedupKey": "claude:msg_10:req-10",
+      "sessionId": "agent-1",
+      "parentId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:06:30Z",
+      "model": "claude-haiku-4-5",
+      "tokens": {
+        "input": 12,
+        "output": 3,
+        "cacheRead": 0,
+        "cacheWrite": 4,
+        "reasoning": 3
+      },
+      "requestId": "req-10"
+    },
+    {
+      "harness": "claude-code",
+      "dedupKey": "claude:msg_1:req-1",
+      "sessionId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:04:06Z",
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "input": 100,
+        "output": 32,
+        "cacheRead": 10,
+        "cacheWrite": 5,
+        "reasoning": 8
+      },
+      "requestId": "req-1"
+    },
+    {
+      "harness": "claude-code",
+      "dedupKey": "claude:msg_2:req-2",
+      "sessionId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:05:00Z",
+      "model": "claude-opus-4-1",
+      "tokens": {
+        "input": 200,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "req-2"
+    },
+    {
+      "harness": "claude-code",
+      "dedupKey": "claude:msg_9:req-9",
+      "sessionId": "agent-1",
+      "parentId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:06:05Z",
+      "model": "claude-haiku-4-5",
+      "tokens": {
+        "input": 50,
+        "output": 20,
+        "cacheRead": 3,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "req-9"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "claude-code",
+      "sessionId": "agent-1",
+      "parentId": "sess-a",
+      "title": "look up the config",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-01-02T03:06:00Z",
+      "updatedAt": "2026-01-02T03:06:30Z"
+    },
+    {
+      "harness": "claude-code",
+      "sessionId": "sess-a",
+      "title": "fix the failing harness test",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-01-02T03:04:05Z",
+      "updatedAt": "2026-01-02T03:05:10Z"
+    }
+  ]
+}

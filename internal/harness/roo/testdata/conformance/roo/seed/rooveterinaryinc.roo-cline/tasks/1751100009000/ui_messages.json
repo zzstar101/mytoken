@@ -1,0 +1,45 @@
+[
+  {
+    "ts": 1772449200000,
+    "type": "say",
+    "say": "task",
+    "text": "Execute the migration steps"
+  },
+  {
+    "ts": 1772449201000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 1850, \"tokensOut\": 260, \"cacheWrites\": 50, \"cacheReads\": 300, \"cost\": 0.03, \"apiProtocol\": \"openai\"}"
+  },
+  {
+    "ts": 1772449205000,
+    "type": "say",
+    "say": "subagent_usage",
+    "text": "{\"source\": \"subagents\", \"tokensIn\": 600, \"tokensOut\": 120, \"cacheWrites\": 0, \"cacheReads\": 0, \"cost\": 0.004, \"apiProtocol\": \"openai\", \"note\": \"SENTINEL_PRIVATE_TEXT appears in the subagent note\"}"
+  },
+  {
+    "ts": 1772449208000,
+    "type": "say",
+    "say": "deleted_api_reqs",
+    "text": "{\"tokensIn\": 300, \"tokensOut\": 40, \"cacheWrites\": 0, \"cacheReads\": 0, \"cost\": 0.002, \"apiProtocol\": \"openai\"}"
+  },
+  {
+    "ts": 1772449209000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 100, \"tokensOut\": 55, \"cacheWrites\": 80, \"cacheReads\": 50, \"cost\": 0.0147, \"apiProtocol\": \"openai\"}",
+    "apiProtocol": "openai"
+  },
+  {
+    "ts": 1772449212000,
+    "type": "say",
+    "say": "text",
+    "text": "Retries are in place. SENTINEL_PRIVATE_TEXT stays in the log."
+  },
+  {
+    "ts": 1772449215000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"apiProtocol\": \"openai\"}"
+  }
+]

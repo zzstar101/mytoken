@@ -1,0 +1,45 @@
+[
+  {
+    "ts": 1772535600000,
+    "type": "say",
+    "say": "task",
+    "text": "Wire the new registry lookup"
+  },
+  {
+    "ts": 1772535601000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 1850, \"tokensOut\": 260, \"cacheWrites\": 50, \"cacheReads\": 300, \"cost\": 0.03, \"apiProtocol\": \"openai\"}"
+  },
+  {
+    "ts": 1772535605000,
+    "type": "say",
+    "say": "subagent_usage",
+    "text": "{\"source\": \"subagents\", \"tokensIn\": 600, \"tokensOut\": 120, \"cacheWrites\": 0, \"cacheReads\": 0, \"cost\": 0.004, \"apiProtocol\": \"openai\", \"note\": \"SENTINEL_PRIVATE_TEXT appears in the subagent note\"}"
+  },
+  {
+    "ts": 1772535608000,
+    "type": "say",
+    "say": "deleted_api_reqs",
+    "text": "{\"tokensIn\": 300, \"tokensOut\": 40, \"cacheWrites\": 0, \"cacheReads\": 0, \"cost\": 0.002, \"apiProtocol\": \"openai\"}"
+  },
+  {
+    "ts": 1772535609000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 400, \"tokensOut\": 30, \"cacheWrites\": 250, \"cacheReads\": 250, \"cost\": 0.0147, \"apiProtocol\": \"openai\"}",
+    "apiProtocol": "openai"
+  },
+  {
+    "ts": 1772535612000,
+    "type": "say",
+    "say": "text",
+    "text": "Retries are in place. SENTINEL_PRIVATE_TEXT stays in the log."
+  },
+  {
+    "ts": 1772535615000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"apiProtocol\": \"openai\"}"
+  }
+]

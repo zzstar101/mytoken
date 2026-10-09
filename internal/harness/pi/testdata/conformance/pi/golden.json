@@ -1,0 +1,105 @@
+{
+  "harness": "pi",
+  "sources": [
+    {
+      "path": "--home-user-fixture-alpha--/2026-01-02T03-04-05-000Z_01a00000-0000-7000-8000-000000000001.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "--home-user-fixture-alpha--/2026-01-02T03-04-05-000Z_01a00000-0000-7000-8000-000000000001/01b00000-0000-7000-8000-000000000002/run-0/session.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "pi",
+      "dedupKey": "resp_fixture_0001",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:06Z",
+      "model": "deepseek-flash",
+      "provider": "deepseek-official",
+      "tokens": {
+        "input": 1000,
+        "output": 200,
+        "cacheRead": 800,
+        "cacheWrite": 120,
+        "reasoning": 0
+      },
+      "requestId": "resp_fixture_0001"
+    },
+    {
+      "harness": "pi",
+      "dedupKey": "resp_fixture_0002",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:07Z",
+      "model": "gemini-3.1-pro-preview",
+      "provider": "gemini",
+      "tokens": {
+        "input": 300,
+        "output": 90,
+        "cacheRead": 100,
+        "cacheWrite": 10,
+        "reasoning": 40
+      },
+      "costUsd": 0.25,
+      "requestId": "resp_fixture_0002"
+    },
+    {
+      "harness": "pi",
+      "dedupKey": "resp_fixture_0003",
+      "sessionId": "01b00000-0000-7000-8000-000000000002",
+      "parentId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:05:01Z",
+      "model": "deepseek-flash",
+      "provider": "deepseek-official",
+      "tokens": {
+        "input": 400,
+        "output": 80,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 25
+      },
+      "requestId": "resp_fixture_0003"
+    },
+    {
+      "harness": "pi",
+      "dedupKey": "resp_fixture_0004",
+      "sessionId": "01b00000-0000-7000-8000-000000000002",
+      "parentId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:05:02Z",
+      "model": "deepseek-flash",
+      "provider": "deepseek-official",
+      "tokens": {
+        "input": 150,
+        "output": 60,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "requestId": "resp_fixture_0004"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "pi",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "title": "fixture: recompute the pi harness totals after a compaction",
+      "project": "/home/user/fixture-alpha",
+      "startedAt": "2026-01-02T03:04:05Z",
+      "updatedAt": "2026-01-02T03:04:09Z"
+    },
+    {
+      "harness": "pi",
+      "sessionId": "01b00000-0000-7000-8000-000000000002",
+      "parentId": "01a00000-0000-7000-8000-000000000001",
+      "title": "fixture subagent: summarize the failing conformance check",
+      "project": "/home/user/fixture-alpha",
+      "startedAt": "2026-01-02T03:05:00Z",
+      "updatedAt": "2026-01-02T03:05:03Z"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "files_in_context": [
+    {
+      "path": "src/cache.ts",
+      "record_state": "active",
+      "record_source": "read_tool"
+    },
+    {
+      "path": "src/widget.ts",
+      "record_state": "active",
+      "record_source": "read_tool"
+    }
+  ],
+  "model_usage": [
+    {
+      "ts": 0,
+      "model_id": "gpt-5",
+      "model_provider_id": "openai",
+      "mode": "act"
+    }
+  ],
+  "environment_history": []
+}

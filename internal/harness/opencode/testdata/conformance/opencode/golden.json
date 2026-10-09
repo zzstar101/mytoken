@@ -1,0 +1,135 @@
+{
+  "harness": "opencode",
+  "sources": [
+    {
+      "path": "opencode.db",
+      "kind": "sqlite"
+    }
+  ],
+  "events": [
+    {
+      "harness": "opencode",
+      "dedupKey": "opencode:msg_c1",
+      "sessionId": "ses_conf_main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2025-03-19T16:00:10Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 1000,
+        "output": 200,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 50
+      },
+      "costUsd": 0.0123
+    },
+    {
+      "harness": "opencode",
+      "dedupKey": "opencode:msg_c3",
+      "sessionId": "ses_conf_sub",
+      "parentId": "ses_conf_main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2025-03-19T16:00:30Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 300,
+        "output": 40,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "reasoning": 10
+      },
+      "costUsd": 0.004
+    },
+    {
+      "harness": "opencode",
+      "dedupKey": "opencode:msg_c4",
+      "sessionId": "ses_conf_main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2025-03-19T16:00:40Z",
+      "model": "kimi-k2",
+      "provider": "moonshot",
+      "tokens": {
+        "input": 500,
+        "output": 80,
+        "cacheRead": 0,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "costUsd": 0.002
+    },
+    {
+      "harness": "opencode",
+      "dedupKey": "opencode:msg_c5",
+      "sessionId": "ses_conf_main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2025-03-19T16:01:00Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 700,
+        "output": 120,
+        "cacheRead": 200,
+        "cacheWrite": 0,
+        "reasoning": 30
+      },
+      "costUsd": 0.008
+    },
+    {
+      "harness": "opencode",
+      "dedupKey": "opencode:msg_c6",
+      "sessionId": "ses_conf_sub",
+      "parentId": "ses_conf_main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2025-03-19T16:01:10Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 150,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 25,
+        "reasoning": 5
+      },
+      "costUsd": 0.0015
+    },
+    {
+      "harness": "opencode",
+      "dedupKey": "opencode:msg_c7",
+      "sessionId": "ses_conf_sub",
+      "parentId": "ses_conf_main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2025-03-19T16:01:20Z",
+      "model": "kimi-k2",
+      "provider": "moonshot",
+      "tokens": {
+        "input": 400,
+        "output": 60,
+        "cacheRead": 120,
+        "cacheWrite": 0,
+        "reasoning": 15
+      },
+      "costUsd": 0.003
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "opencode",
+      "sessionId": "ses_conf_main",
+      "title": "Refactor the conformance harness",
+      "project": "/Users/dev/confproj",
+      "startedAt": "2025-03-19T16:00:00Z",
+      "updatedAt": "2025-03-19T16:05:00Z"
+    },
+    {
+      "harness": "opencode",
+      "sessionId": "ses_conf_sub",
+      "parentId": "ses_conf_main",
+      "title": "Explore the token mapping",
+      "project": "/Users/dev/confproj",
+      "startedAt": "2025-03-19T16:01:40Z",
+      "updatedAt": "2025-03-19T16:04:10Z"
+    }
+  ]
+}

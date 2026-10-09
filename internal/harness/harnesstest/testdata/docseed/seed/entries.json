@@ -1,0 +1,69 @@
+[
+  {
+    "id": "doc:1",
+    "sessionId": "doc-a",
+    "ts": "2026-03-01T10:00:00Z",
+    "model": "gpt-5-codex",
+    "provider": "openai",
+    "prompt": "rewrite the task file",
+    "input": 100,
+    "output": 20,
+    "cacheRead": 5,
+    "cacheWrite": 0,
+    "reasoning": 3
+  },
+  {
+    "id": "doc:2",
+    "sessionId": "doc-a",
+    "ts": "2026-03-01T10:01:00Z",
+    "model": "gpt-5-codex",
+    "provider": "openai",
+    "text": "assistant reply SENTINEL_PRIVATE_TEXT",
+    "input": 200,
+    "output": 40,
+    "cacheRead": 10,
+    "cacheWrite": 4,
+    "reasoning": 6
+  },
+  {
+    "id": "",
+    "sessionId": "doc-a",
+    "ts": "2026-03-01T10:02:00Z",
+    "model": "gpt-5-codex",
+    "provider": "openai",
+    "text": "tool output SENTINEL_PRIVATE_TEXT",
+    "input": 0,
+    "output": 0
+  },
+  {
+    "id": "doc:4",
+    "sessionId": "doc-b",
+    "ts": "2026-03-01T11:00:00Z",
+    "model": "claude-sonnet-4-5",
+    "provider": "anthropic",
+    "prompt": "look up the config",
+    "input": 50,
+    "output": 10,
+    "cacheRead": 0,
+    "cacheWrite": 2,
+    "reasoning": 1
+  },
+  {
+    "id": "doc:5",
+    "sessionId": "doc-b",
+    "ts": "2026-03-01T11:05:00Z",
+    "model": "claude-sonnet-4-5",
+    "provider": "anthropic",
+    "input": 60,
+    "output": 12
+  },
+  {
+    "id": "doc:6",
+    "sessionId": "doc-a",
+    "ts": "2026-03-01T10:05:00Z",
+    "model": "gpt-5-codex",
+    "provider": "openai",
+    "input": 30,
+    "output": 8
+  }
+]

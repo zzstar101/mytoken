@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "session_id": "0c1a2b3c-1111-4222-8333-444455556001",
+  "source": "cli",
+  "started_at": "2026-03-01T12:00:00Z",
+  "ended_at": "2026-03-01T12:00:00Z",
+  "status": "completed",
+  "provider": "cline-pass",
+  "model": "cline-pass/glm-5.2",
+  "cwd": "/Users/demo/cline-cli",
+  "workspace_root": "/Users/demo/cline-cli",
+  "prompt": "Summarise the cache change",
+  "metadata": {
+    "title": "CLI cache summary"
+  }
+}

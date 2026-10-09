@@ -1,0 +1,37 @@
+{
+  "sessionId": "gem-conf-legacy",
+  "projectHash": "2de817e15536cd4764f12c514531ddd0af411c2c82647f2ccf57dd04235e31dd",
+  "startTime": "2026-01-15T11:00:00Z",
+  "lastUpdated": "2026-01-15T11:02:00Z",
+  "kind": "main",
+  "summary": "Legacy json recording",
+  "messages": [
+    {
+      "id": "gl-u1",
+      "timestamp": "2026-01-15T11:00:10Z",
+      "type": "user",
+      "content": "Compare the legacy json recording path"
+    },
+    {
+      "id": "gl-a1",
+      "timestamp": "2026-01-15T11:00:40Z",
+      "type": "gemini",
+      "model": "gemini-2.5-flash",
+      "content": [{"text": "Legacy path works. SENTINEL_PRIVATE_TEXT"}],
+      "tokens": {"input": 700, "cached": 200, "output": 120, "thoughts": 40, "total": 860}
+    },
+    {
+      "id": "gl-a2",
+      "timestamp": "2026-01-15T11:01:00Z",
+      "type": "gemini",
+      "model": "gemini-2.5-flash",
+      "content": [{"text": "No usage recorded for this retry."}]
+    },
+    {
+      "id": "gl-u2",
+      "timestamp": "2026-01-15T11:01:30Z",
+      "type": "user",
+      "content": "Thanks"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "1751200000000",
+  "rootTaskId": "1751200000000",
+  "parentTaskId": "",
+  "number": 1,
+  "ts": 1772532000000,
+  "task": "Split the tool registry",
+  "workspace": "/Users/demo/kilo-registry",
+  "mode": "code",
+  "status": "completed"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "1751000000000",
+  "rootTaskId": "1751000000000",
+  "parentTaskId": "",
+  "number": 1,
+  "ts": 1772359200000,
+  "task": "Refactor the widget cache",
+  "workspace": "/Users/demo/cline-cache",
+  "mode": "code",
+  "status": "completed"
+}

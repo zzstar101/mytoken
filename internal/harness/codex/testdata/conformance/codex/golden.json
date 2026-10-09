@@ -1,0 +1,83 @@
+{
+  "harness": "codex",
+  "sources": [
+    {
+      "path": "sessions/2026/01/02/rollout-2026-01-02T03-04-05-sess-a.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "sessions/2026/01/02/rollout-2026-01-02T03-06-00-agent-1.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "codex",
+      "dedupKey": "codex:sess-a:100-40-0-20-5-120",
+      "sessionId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:04:20Z",
+      "model": "gpt-5-codex",
+      "provider": "openai",
+      "tokens": {
+        "input": 60,
+        "output": 15,
+        "cacheRead": 40,
+        "cacheWrite": 0,
+        "reasoning": 5
+      }
+    },
+    {
+      "harness": "codex",
+      "dedupKey": "codex:sess-a:180-60-0-50-9-230",
+      "sessionId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:05:00Z",
+      "model": "gpt-5-codex",
+      "provider": "openai",
+      "tokens": {
+        "input": 60,
+        "output": 26,
+        "cacheRead": 20,
+        "cacheWrite": 0,
+        "reasoning": 4
+      }
+    },
+    {
+      "harness": "codex",
+      "dedupKey": "codex:sess-a:50-10-0-15-2-65",
+      "sessionId": "agent-1",
+      "parentId": "sess-a",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-01-02T03:06:20Z",
+      "model": "gpt-5-mini",
+      "provider": "openai",
+      "tokens": {
+        "input": 40,
+        "output": 13,
+        "cacheRead": 10,
+        "cacheWrite": 0,
+        "reasoning": 2
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "codex",
+      "sessionId": "agent-1",
+      "parentId": "sess-a",
+      "title": "look up the config",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-01-02T03:06:00Z",
+      "updatedAt": "2026-01-02T03:06:30Z"
+    },
+    {
+      "harness": "codex",
+      "sessionId": "sess-a",
+      "title": "write the parser tests",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-01-02T03:04:05Z",
+      "updatedAt": "2026-01-02T03:05:05Z"
+    }
+  ]
+}

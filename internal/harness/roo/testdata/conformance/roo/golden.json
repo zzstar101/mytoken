@@ -1,0 +1,166 @@
+{
+  "harness": "roo",
+  "sources": [
+    {
+      "path": "rooveterinaryinc.roo-cline/tasks/1751100000000/ui_messages.json",
+      "kind": "json"
+    },
+    {
+      "path": "rooveterinaryinc.roo-cline/tasks/1751100009000/ui_messages.json",
+      "kind": "json"
+    }
+  ],
+  "events": [
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100000000:1772445610000",
+      "sessionId": "1751100000000",
+      "projectPath": "/Users/demo/roo-planner",
+      "timestamp": "2026-03-02T10:00:10Z",
+      "model": "claude-opus-4-1",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 700,
+        "output": 300,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 0
+      },
+      "costUsd": 0.031
+    },
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100000000:1772445615000",
+      "sessionId": "1751100000000",
+      "projectPath": "/Users/demo/roo-planner",
+      "timestamp": "2026-03-02T10:00:15Z",
+      "model": "claude-opus-4-1",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 0,
+        "output": 210,
+        "cacheRead": 900,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0192
+    },
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100000000:1772445635000",
+      "sessionId": "1751100000000",
+      "projectPath": "/Users/demo/roo-planner",
+      "timestamp": "2026-03-02T10:00:35Z",
+      "model": "claude-opus-4-1",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 640,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0051
+    },
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100009000:1772449201000",
+      "sessionId": "1751100009000",
+      "parentId": "1751100000000",
+      "projectPath": "/Users/demo/roo-executor",
+      "timestamp": "2026-03-02T11:00:01Z",
+      "model": "gemini-2.5-pro",
+      "provider": "openai",
+      "tokens": {
+        "input": 1500,
+        "output": 260,
+        "cacheRead": 300,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "costUsd": 0.03
+    },
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100009000:1772449208000",
+      "sessionId": "1751100009000",
+      "parentId": "1751100000000",
+      "projectPath": "/Users/demo/roo-executor",
+      "timestamp": "2026-03-02T11:00:08Z",
+      "model": "gemini-2.5-pro",
+      "provider": "openai",
+      "tokens": {
+        "input": 300,
+        "output": 40,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.002
+    },
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100009000:1772449209000",
+      "sessionId": "1751100009000",
+      "parentId": "1751100000000",
+      "projectPath": "/Users/demo/roo-executor",
+      "timestamp": "2026-03-02T11:00:09Z",
+      "model": "gemini-2.5-pro",
+      "provider": "openai",
+      "tokens": {
+        "input": 0,
+        "output": 55,
+        "cacheRead": 50,
+        "cacheWrite": 80,
+        "reasoning": 0
+      },
+      "costUsd": 0.0147
+    },
+    {
+      "harness": "roo",
+      "dedupKey": "roo:1751100009000:subagents:1772449205000",
+      "sessionId": "1751100009000:subagents",
+      "parentId": "1751100009000",
+      "projectPath": "/Users/demo/roo-executor",
+      "timestamp": "2026-03-02T11:00:05Z",
+      "model": "gemini-2.5-pro",
+      "provider": "openai",
+      "tokens": {
+        "input": 600,
+        "output": 120,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.004
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "roo",
+      "sessionId": "1751100000000",
+      "title": "Plan the planner refactor",
+      "project": "/Users/demo/roo-planner",
+      "startedAt": "2026-03-02T10:00:00Z",
+      "updatedAt": "2026-03-02T10:00:40Z"
+    },
+    {
+      "harness": "roo",
+      "sessionId": "1751100009000",
+      "parentId": "1751100000000",
+      "title": "Execute the migration steps",
+      "project": "/Users/demo/roo-executor",
+      "startedAt": "2026-03-02T11:00:00Z",
+      "updatedAt": "2026-03-02T11:00:15Z"
+    },
+    {
+      "harness": "roo",
+      "sessionId": "1751100009000:subagents",
+      "parentId": "1751100009000",
+      "title": "Subagents",
+      "project": "/Users/demo/roo-executor",
+      "startedAt": "2026-03-02T11:00:05Z",
+      "updatedAt": "2026-03-02T11:00:05Z"
+    }
+  ]
+}

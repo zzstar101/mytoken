@@ -1,0 +1,100 @@
+{
+  "harness": "crush",
+  "sources": [
+    {
+      "path": "crush.db",
+      "kind": "sqlite"
+    }
+  ],
+  "events": [
+    {
+      "harness": "crush",
+      "dedupKey": "crush:sess-a-root-cache:1200:300",
+      "sessionId": "sess-a-root-cache",
+      "projectPath": "\u003cROOT\u003e",
+      "timestamp": "2026-03-01T10:00:10Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 1200,
+        "output": 300,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.031
+    },
+    {
+      "harness": "crush",
+      "dedupKey": "crush:sess-b-child-retry:1850:260",
+      "sessionId": "sess-b-child-retry",
+      "parentId": "sess-a-root-cache",
+      "projectPath": "\u003cROOT\u003e",
+      "timestamp": "2026-03-01T11:00:15Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 1850,
+        "output": 260,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.03
+    },
+    {
+      "harness": "crush",
+      "dedupKey": "crush:sess-c-summarizer:640:90",
+      "sessionId": "sess-c-summarizer",
+      "parentId": "sess-b-child-retry",
+      "projectPath": "\u003cROOT\u003e",
+      "timestamp": "2026-03-01T12:00:05Z",
+      "model": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 640,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0051
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "crush",
+      "sessionId": "sess-a-root-cache",
+      "title": "Refactor the widget cache",
+      "project": "\u003cROOT\u003e",
+      "startedAt": "2026-03-01T10:00:00Z",
+      "updatedAt": "2026-03-01T10:00:10Z"
+    },
+    {
+      "harness": "crush",
+      "sessionId": "sess-b-child-retry",
+      "parentId": "sess-a-root-cache",
+      "title": "Add the retry wrapper",
+      "project": "\u003cROOT\u003e",
+      "startedAt": "2026-03-01T11:00:00Z",
+      "updatedAt": "2026-03-01T11:00:15Z"
+    },
+    {
+      "harness": "crush",
+      "sessionId": "sess-c-summarizer",
+      "parentId": "sess-b-child-retry",
+      "title": "Summarize the migration",
+      "project": "\u003cROOT\u003e",
+      "startedAt": "2026-03-01T12:00:00Z",
+      "updatedAt": "2026-03-01T12:00:05Z"
+    },
+    {
+      "harness": "crush",
+      "sessionId": "sess-z-scratch",
+      "title": "Scratch notes",
+      "project": "\u003cROOT\u003e",
+      "startedAt": "2026-03-01T10:20:00Z",
+      "updatedAt": "2026-03-01T10:20:00Z"
+    }
+  ]
+}

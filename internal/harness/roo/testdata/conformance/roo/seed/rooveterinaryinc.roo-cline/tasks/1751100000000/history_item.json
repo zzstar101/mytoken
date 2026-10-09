@@ -1,0 +1,11 @@
+{
+  "id": "1751100000000",
+  "rootTaskId": "1751100000000",
+  "parentTaskId": "",
+  "number": 1,
+  "ts": 1772445600000,
+  "task": "Plan the planner refactor",
+  "workspace": "/Users/demo/roo-planner",
+  "mode": "code",
+  "status": "completed"
+}

@@ -1,0 +1,2 @@
+{"type":"session","version":3,"id":"session-01a00000-0000-7000-8000-000000000001","createdAt":1767323045000,"cwd":"/home/user/fixture-alpha"}
+{"type":"assistant/message","seq":1,"time":1767323046000,"data":{"usage":{"inputTokens":1,"outputTokens":1,"totalTokens":2},"message":{"id":"msg-stale-v3","role":"assistant","source":{"kind":"model","provider":"deepseek-official","model":"deepseek-flash"}}}}

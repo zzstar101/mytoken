@@ -1,0 +1,66 @@
+THIRD PARTY NOTICES
+===================
+
+MyToken itself is licensed under the MIT License (see LICENSE,
+Copyright (c) 2026 zzstar101).
+
+This file lists third-party projects whose code has been ported, adapted or
+vendored into this repository, together with the copyright notice and license
+text each one requires. Adding an entry here is mandatory whenever code (not
+just a log format) is copied or adapted from another project — see
+docs/HARNESS.md §7.
+
+AS OF 0.1.x THIS REPOSITORY CONTAINS NO PORTED THIRD-PARTY CODE: the harness
+parsers are written from the observed log formats, and the section below is a
+FORMAT TEMPLATE (nothing in it is a real, filled-in entry yet). Delete the
+template text when the first real entry is added. Entries are kept in the order
+they were added.
+
+
+================================================================================
+TEMPLATE — copy this block per upstream project (not an entry yet)
+================================================================================
+
+  Upstream:   <repository URL>
+  License:    MIT
+  Used in:    <files/packages that contain ported or adapted code>
+  Ported by:  <who>, <when>
+
+  Copyright (c) <year> <upstream copyright holder>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+
+================================================================================
+KNOWN UPSTREAM, NOT YET PORTED — codeburn
+================================================================================
+
+  Upstream:   https://github.com/getagentseal/codeburn
+  License:    MIT
+  Copyright:  Copyright (c) 2026 AgentSeal
+  Status:     NOT INCLUDED YET. No source file in this repository is copied or
+              adapted from codeburn at 0.1.x, so no notice is owed today.
+
+  Planned port (0.2–0.5, when the corresponding harnesses are added): codeburn's
+  supervisor/provider log readers under src/providers/<tool>.ts correspond to
+  MyToken's internal/harness/<tool>/ packages. The FIRST such port must turn
+  this block into a full entry above: fill in the template with the upstream
+  URL, the copyright line above, the concrete files under internal/harness/ that
+  contain ported or adapted code, the porter and the date, and keep the MIT text
+  verbatim. Owner: the author of that port (see docs/HARNESS.md §7).

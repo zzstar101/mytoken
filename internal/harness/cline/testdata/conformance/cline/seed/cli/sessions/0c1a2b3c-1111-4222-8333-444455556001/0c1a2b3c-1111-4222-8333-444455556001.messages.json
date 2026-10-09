@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "updated_at": 1772366403000,
+  "agent": "lead",
+  "sessionId": "0c1a2b3c-1111-4222-8333-444455556001",
+  "origin": {
+    "source": "cli",
+    "mode": "headless",
+    "sessionId": "0c1a2b3c-1111-4222-8333-444455556001"
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "user",
+      "ts": 1772366400000,
+      "content": [
+        {
+          "type": "text",
+          "text": "Summarise the cache change"
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "role": "assistant",
+      "ts": 1772366401000,
+      "modelInfo": {
+        "id": "cline-pass/glm-5.2",
+        "provider": "cline-pass"
+      },
+      "metrics": {
+        "inputTokens": 7507,
+        "outputTokens": 131,
+        "cacheReadTokens": 50,
+        "cacheWriteTokens": 0,
+        "cost": 0.0110232
+      }
+    },
+    {
+      "id": "m3",
+      "role": "assistant",
+      "ts": 1772366402000,
+      "metrics": {
+        "inputTokens": 8200,
+        "outputTokens": 200,
+        "cacheReadTokens": 100,
+        "cacheWriteTokens": 400,
+        "cost": 0.02
+      }
+    },
+    {
+      "id": "m4",
+      "role": "assistant",
+      "ts": 1772366403000,
+      "content": [
+        {
+          "type": "text",
+          "text": "Done. SENTINEL_PRIVATE_TEXT was echoed here."
+        }
+      ]
+    }
+  ]
+}

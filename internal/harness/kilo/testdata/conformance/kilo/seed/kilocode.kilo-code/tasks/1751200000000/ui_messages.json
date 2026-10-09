@@ -1,0 +1,61 @@
+[
+  {
+    "ts": 1772532000000,
+    "type": "say",
+    "say": "task",
+    "text": "Split the tool registry"
+  },
+  {
+    "ts": 1772532001000,
+    "type": "say",
+    "say": "text",
+    "text": "I'll start by mapping the current cache keys."
+  },
+  {
+    "ts": 1772532010000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 1200, \"tokensOut\": 300, \"cacheWrites\": 100, \"cacheReads\": 400, \"cost\": 0.031, \"apiProtocol\": \"anthropic\"}",
+    "modelInfo": {
+      "modelId": "claude-haiku-4-5",
+      "providerId": "anthropic",
+      "mode": "act"
+    }
+  },
+  {
+    "ts": 1772532015000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 800, \"tokensOut\": 210, \"cacheWrites\": 0, \"cacheReads\": 900, \"cost\": 0.0192}"
+  },
+  {
+    "ts": 1772532020000,
+    "type": "say",
+    "say": "text",
+    "text": "The cache only holds widget keys. SENTINEL_PRIVATE_TEXT must never leave the log."
+  },
+  {
+    "ts": 1772532025000,
+    "type": "say",
+    "say": "tool",
+    "text": "read_file src/cache.ts -> export class Cache {} SENTINEL_PRIVATE_TEXT"
+  },
+  {
+    "ts": 1772532030000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"apiProtocol\": \"anthropic\"}"
+  },
+  {
+    "ts": 1772532035000,
+    "type": "say",
+    "say": "api_req_started",
+    "text": "{\"tokensIn\": 640, \"tokensOut\": 90, \"cacheWrites\": 0, \"cacheReads\": 0, \"cost\": 0.0051, \"apiProtocol\": \"anthropic\"}"
+  },
+  {
+    "ts": 1772532040000,
+    "type": "say",
+    "say": "reasoning",
+    "text": "Considering the TTL change. SENTINEL_PRIVATE_TEXT is reasoning text."
+  }
+]

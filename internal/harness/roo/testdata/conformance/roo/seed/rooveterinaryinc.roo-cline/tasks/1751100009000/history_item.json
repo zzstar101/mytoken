@@ -1,0 +1,11 @@
+{
+  "id": "1751100009000",
+  "rootTaskId": "1751100000000",
+  "parentTaskId": "1751100000000",
+  "number": 2,
+  "ts": 1772449200000,
+  "task": "Execute the migration steps",
+  "workspace": "/Users/demo/roo-executor",
+  "mode": "code",
+  "status": "completed"
+}

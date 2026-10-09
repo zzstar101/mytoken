@@ -1,0 +1,212 @@
+{
+  "harness": "cline",
+  "sources": [
+    {
+      "path": "cli/sessions/0c1a2b3c-1111-4222-8333-444455556001/0c1a2b3c-1111-4222-8333-444455556001.messages.json",
+      "kind": "json"
+    },
+    {
+      "path": "saoudrizwan.claude-dev/tasks/1751000000000/ui_messages.json",
+      "kind": "json"
+    },
+    {
+      "path": "saoudrizwan.claude-dev/tasks/1751000009000/ui_messages.json",
+      "kind": "json"
+    }
+  ],
+  "events": [
+    {
+      "harness": "cline",
+      "dedupKey": "cline-cli:0c1a2b3c-1111-4222-8333-444455556001:m2",
+      "sessionId": "0c1a2b3c-1111-4222-8333-444455556001",
+      "projectPath": "/Users/demo/cline-cli",
+      "timestamp": "2026-03-01T12:00:01Z",
+      "model": "cline-pass/glm-5.2",
+      "provider": "cline-pass",
+      "tokens": {
+        "input": 7457,
+        "output": 131,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0110232
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline-cli:0c1a2b3c-1111-4222-8333-444455556001:m3",
+      "sessionId": "0c1a2b3c-1111-4222-8333-444455556001",
+      "projectPath": "/Users/demo/cline-cli",
+      "timestamp": "2026-03-01T12:00:02Z",
+      "model": "cline-pass/glm-5.2",
+      "provider": "cline-pass",
+      "tokens": {
+        "input": 7700,
+        "output": 200,
+        "cacheRead": 100,
+        "cacheWrite": 400,
+        "reasoning": 0
+      },
+      "costUsd": 0.02
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000000000:1772359210000",
+      "sessionId": "1751000000000",
+      "projectPath": "/Users/demo/cline-cache",
+      "timestamp": "2026-03-01T10:00:10Z",
+      "model": "claude-sonnet-4-5-20250929",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 1200,
+        "output": 300,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 0
+      },
+      "costUsd": 0.031
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000000000:1772359215000",
+      "sessionId": "1751000000000",
+      "projectPath": "/Users/demo/cline-cache",
+      "timestamp": "2026-03-01T10:00:15Z",
+      "model": "claude-sonnet-4-5-20250929",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 800,
+        "output": 210,
+        "cacheRead": 900,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0192
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000000000:1772359235000",
+      "sessionId": "1751000000000",
+      "projectPath": "/Users/demo/cline-cache",
+      "timestamp": "2026-03-01T10:00:35Z",
+      "model": "claude-sonnet-4-5-20250929",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 640,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0051
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000009000:1772362801000",
+      "sessionId": "1751000009000",
+      "parentId": "1751000000000",
+      "projectPath": "/Users/demo/cline-retry",
+      "timestamp": "2026-03-01T11:00:01Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 1500,
+        "output": 260,
+        "cacheRead": 300,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "costUsd": 0.03
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000009000:1772362808000",
+      "sessionId": "1751000009000",
+      "parentId": "1751000000000",
+      "projectPath": "/Users/demo/cline-retry",
+      "timestamp": "2026-03-01T11:00:08Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 300,
+        "output": 40,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.002
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000009000:1772362809000",
+      "sessionId": "1751000009000",
+      "parentId": "1751000000000",
+      "projectPath": "/Users/demo/cline-retry",
+      "timestamp": "2026-03-01T11:00:09Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 0,
+        "output": 60,
+        "cacheRead": 250,
+        "cacheWrite": 150,
+        "reasoning": 0
+      },
+      "costUsd": 0.0147
+    },
+    {
+      "harness": "cline",
+      "dedupKey": "cline:1751000009000:subagents:1772362805000",
+      "sessionId": "1751000009000:subagents",
+      "parentId": "1751000009000",
+      "projectPath": "/Users/demo/cline-retry",
+      "timestamp": "2026-03-01T11:00:05Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 600,
+        "output": 120,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.004
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "cline",
+      "sessionId": "0c1a2b3c-1111-4222-8333-444455556001",
+      "title": "CLI cache summary",
+      "project": "/Users/demo/cline-cli",
+      "startedAt": "2026-03-01T12:00:00Z",
+      "updatedAt": "2026-03-01T12:00:03Z"
+    },
+    {
+      "harness": "cline",
+      "sessionId": "1751000000000",
+      "title": "Refactor the widget cache",
+      "project": "/Users/demo/cline-cache",
+      "startedAt": "2026-03-01T10:00:00Z",
+      "updatedAt": "2026-03-01T10:00:40Z"
+    },
+    {
+      "harness": "cline",
+      "sessionId": "1751000009000",
+      "parentId": "1751000000000",
+      "title": "Add the retry wrapper",
+      "project": "/Users/demo/cline-retry",
+      "startedAt": "2026-03-01T11:00:00Z",
+      "updatedAt": "2026-03-01T11:00:15Z"
+    },
+    {
+      "harness": "cline",
+      "sessionId": "1751000009000:subagents",
+      "parentId": "1751000009000",
+      "title": "Subagents",
+      "project": "/Users/demo/cline-retry",
+      "startedAt": "2026-03-01T11:00:05Z",
+      "updatedAt": "2026-03-01T11:00:05Z"
+    }
+  ]
+}

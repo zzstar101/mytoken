@@ -1,0 +1,108 @@
+{
+  "harness": "gemini",
+  "sources": [
+    {
+      "path": "tmp/2de817e15536cd4764f12c514531ddd0af411c2c82647f2ccf57dd04235e31dd/chats/session-2026-01-15T11-00-00-bbb22222.json",
+      "kind": "json"
+    },
+    {
+      "path": "tmp/demo-proj/chats/gem-conf-main/session-2026-01-15T10-00-00-ccc33333.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "tmp/demo-proj/chats/session-2026-01-15T09-00-00-aaa11111.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "gemini",
+      "dedupKey": "gemini:gem-conf-legacy:gl-a1",
+      "sessionId": "gem-conf-legacy",
+      "projectPath": "/Users/dev/hashed-proj",
+      "timestamp": "2026-01-15T11:00:40Z",
+      "model": "gemini-2.5-flash",
+      "tokens": {
+        "input": 500,
+        "output": 120,
+        "cacheRead": 200,
+        "cacheWrite": 0,
+        "reasoning": 40
+      }
+    },
+    {
+      "harness": "gemini",
+      "dedupKey": "gemini:gem-conf-main:gm-a1",
+      "sessionId": "gem-conf-main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2026-01-15T09:00:30Z",
+      "model": "gemini-2.5-pro",
+      "tokens": {
+        "input": 800,
+        "output": 300,
+        "cacheRead": 400,
+        "cacheWrite": 0,
+        "reasoning": 80
+      }
+    },
+    {
+      "harness": "gemini",
+      "dedupKey": "gemini:gem-conf-sub:gs-a1",
+      "sessionId": "gem-conf-sub",
+      "parentId": "gem-conf-main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2026-01-15T10:00:40Z",
+      "model": "gemini-2.5-pro",
+      "tokens": {
+        "input": 525,
+        "output": 200,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 60
+      }
+    },
+    {
+      "harness": "gemini",
+      "dedupKey": "gemini:gem-conf-sub:gs-a2",
+      "sessionId": "gem-conf-sub",
+      "parentId": "gem-conf-main",
+      "projectPath": "/Users/dev/confproj",
+      "timestamp": "2026-01-15T10:01:00Z",
+      "model": "gemini-2.5-pro",
+      "tokens": {
+        "input": 250,
+        "output": 80,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "reasoning": 10
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "gemini",
+      "sessionId": "gem-conf-legacy",
+      "title": "Compare the legacy json recording path",
+      "project": "/Users/dev/hashed-proj",
+      "startedAt": "2026-01-15T11:00:00Z",
+      "updatedAt": "2026-01-15T11:02:00Z"
+    },
+    {
+      "harness": "gemini",
+      "sessionId": "gem-conf-main",
+      "title": "Add a gemini conformance fixture",
+      "project": "/Users/dev/confproj",
+      "startedAt": "2026-01-15T09:00:00Z",
+      "updatedAt": "2026-01-15T09:05:30Z"
+    },
+    {
+      "harness": "gemini",
+      "sessionId": "gem-conf-sub",
+      "parentId": "gem-conf-main",
+      "title": "Explore the token accounting edge cases",
+      "project": "/Users/dev/confproj",
+      "startedAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-01-15T10:02:00Z"
+    }
+  ]
+}

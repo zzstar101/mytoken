@@ -1,0 +1,3 @@
+{"ts":"2026-01-02T03:04:05.000Z","id":"a-1","sessionId":"s-a","model":"fake-1","provider":"fake","prompt":"first prompt","input":10,"output":4,"cacheRead":2,"text":"assistant reply SENTINEL_PRIVATE_TEXT"}
+{"ts":"2026-01-02T03:05:00.000Z","id":"a-2","sessionId":"s-a","model":"fake-1","provider":"fake","input":3,"output":1,"cacheWrite":5,"text":"more private text: SENTINEL_PRIVATE_TEXT"}
+{"ts":"2026-01-02T03:06:00.000Z","id":"a-3","sessionId":"s-a","model":"fake-2","provider":"fake","input":7,"output":2,"reasoning":1,"text":"third reply"}

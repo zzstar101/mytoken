@@ -1,0 +1,29 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Split the tool registry\n\n# Current Workspace Directory (/Users/demo/kilo-registry) Files\n\n\n# Current Mode\n<slug>code</slug>\n<environment_details>\n<model>claude-haiku-4-5</model>\n</environment_details>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll start by mapping the current cache keys."
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "The cache only holds widget keys. SENTINEL_PRIVATE_TEXT must never leave the log."
+      }
+    ]
+  }
+]

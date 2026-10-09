@@ -1,0 +1,2 @@
+{"ts":"2026-01-03T10:00:00.000Z","id":"b-1","sessionId":"s-b","model":"fake-1","provider":"fake","prompt":"second prompt","input":20,"output":9,"text":"SENTINEL_PRIVATE_TEXT lives in b too"}
+{"ts":"2026-01-03T10:01:00.000Z","id":"b-2","sessionId":"s-b","model":"fake-1","provider":"fake","input":4,"output":2,"text":"short reply"}

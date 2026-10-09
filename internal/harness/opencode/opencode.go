@@ -250,10 +250,50 @@ func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Curs
 // sqlite
 // ---------------------------------------------------------------------------
 
-// dbState is the incremental watermark persisted in Cursor.Extra.
+// dbState is the incremental watermark persisted in Cursor.Extra. Each message
+// generation keeps its own watermark: readMessages walks the tables in
+// sequence, so one shared watermark let the newest v1 row hide older v2 rows,
+// which were then skipped by every later scan too.
 type dbState struct {
+	V1 tableWatermark `json:"m"`
+	V2 tableWatermark `json:"sm"`
+}
+
+// tableWatermark is the (time_updated, id) resume point of a single table.
+type tableWatermark struct {
 	Updated int64  `json:"u"`
 	ID      string `json:"i"`
+}
+
+// UnmarshalJSON also accepts the legacy single-watermark cursor
+// ({"u":…,"i":…}). That watermark was advanced by both tables, so it is only
+// trustworthy for the v1 `message` table; the v2 `session_message` table is
+// replayed from the beginning once, and the dedup keys keep the re-read
+// idempotent for consumers that merge by DedupKey.
+func (s *dbState) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		M  *tableWatermark `json:"m"`
+		SM *tableWatermark `json:"sm"`
+		U  *int64          `json:"u"`
+		I  *string         `json:"i"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	*s = dbState{}
+	if wire.M != nil {
+		s.V1 = *wire.M
+	}
+	if wire.SM != nil {
+		s.V2 = *wire.SM
+	}
+	if wire.U != nil {
+		s.V1.Updated = *wire.U
+	}
+	if wire.I != nil {
+		s.V1.ID = *wire.I
+	}
+	return nil
 }
 
 // dbSignature combines the main database file with its write-ahead log, which
@@ -340,9 +380,8 @@ func (p *Parser) parseDB(ctx context.Context, src harness.Source, cur harness.Cu
 	if cur.Extra != "" {
 		_ = json.Unmarshal([]byte(cur.Extra), &state)
 	}
-	if max, ok := maxUpdated(ctx, db, tables); !ok || state.Updated > max || state.Updated < 0 {
-		state = dbState{}
-	}
+	state.V1 = resetWatermark(ctx, db, tables, "message", state.V1)
+	state.V2 = resetWatermark(ctx, db, tables, "session_message", state.V2)
 
 	sessions := loadSessions(ctx, db, tables)
 	for _, id := range sortedKeys(sessions) {
@@ -485,33 +524,43 @@ func mergeSession(a, b sessionInfo) sessionInfo {
 	return a
 }
 
-// maxUpdated reports the newest message watermark present in the database.
-func maxUpdated(ctx context.Context, db *sql.DB, tables map[string]map[string]bool) (int64, bool) {
-	var max int64
-	found := false
-	for _, name := range []string{"message", "session_message"} {
-		cols, ok := tables[name]
-		if !ok || !cols["time_updated"] {
-			continue
-		}
-		var v sql.NullInt64
-		if err := db.QueryRowContext(ctx, "SELECT COALESCE(MAX(time_updated),0) FROM "+quoteIdent(name)).Scan(&v); err != nil {
-			continue
-		}
-		found = true
-		if v.Int64 > max {
-			max = v.Int64
-		}
+// resetWatermark drops a watermark that can no longer be valid: a negative
+// value, one newer than the table's own newest row (the database was replaced
+// or rewound behind it), or a watermark carried over for a table that is now
+// absent.
+func resetWatermark(ctx context.Context, db *sql.DB, tables map[string]map[string]bool, name string, wm tableWatermark) tableWatermark {
+	if wm.Updated < 0 {
+		return tableWatermark{}
 	}
-	return max, found
+	max, ok := maxTableUpdated(ctx, db, tables, name)
+	if !ok || wm.Updated > max {
+		return tableWatermark{}
+	}
+	return wm
 }
 
-// readMessages walks both message generations from the persisted watermark,
-// advancing it as rows are consumed.
+// maxTableUpdated reports the newest time_updated present in one table.
+func maxTableUpdated(ctx context.Context, db *sql.DB, tables map[string]map[string]bool, name string) (int64, bool) {
+	cols, ok := tables[name]
+	if !ok || !cols["time_updated"] {
+		return 0, false
+	}
+	var v sql.NullInt64
+	if err := db.QueryRowContext(ctx, "SELECT COALESCE(MAX(time_updated),0) FROM "+quoteIdent(name)).Scan(&v); err != nil {
+		return 0, false
+	}
+	return v.Int64, true
+}
+
+// readMessages walks both message generations, each from its own persisted
+// watermark and advancing only that watermark.
 func readMessages(ctx context.Context, db *sql.DB, tables map[string]map[string]bool, acc *accumulator, sessions map[string]sessionInfo, state *dbState) {
-	queries := []struct{ table, filter string }{
-		{"message", "json_valid(data) AND json_extract(data,'$.role')='assistant' AND json_extract(data,'$.tokens') IS NOT NULL"},
-		{"session_message", "json_valid(data) AND type='assistant' AND json_extract(data,'$.tokens') IS NOT NULL"},
+	queries := []struct {
+		table, filter string
+		wm            *tableWatermark
+	}{
+		{"message", "json_valid(data) AND json_extract(data,'$.role')='assistant' AND json_extract(data,'$.tokens') IS NOT NULL", &state.V1},
+		{"session_message", "json_valid(data) AND type='assistant' AND json_extract(data,'$.tokens') IS NOT NULL", &state.V2},
 	}
 	for _, q := range queries {
 		cols, ok := tables[q.table]
@@ -532,7 +581,7 @@ func readMessages(ctx context.Context, db *sql.DB, tables map[string]map[string]
 			" WHERE " + q.filter +
 			" AND (time_updated > ? OR (time_updated = ? AND id > ?))" +
 			" ORDER BY time_updated, id"
-		rows, err := db.QueryContext(ctx, sqlText, state.Updated, state.Updated, state.ID)
+		rows, err := db.QueryContext(ctx, sqlText, q.wm.Updated, q.wm.Updated, q.wm.ID)
 		if err != nil {
 			continue
 		}
@@ -553,8 +602,8 @@ func readMessages(ctx context.Context, db *sql.DB, tables map[string]map[string]
 			}
 			info := sessions[sid]
 			acc.emit("opencode:"+id, payload, sid, info.ParentID, firstNonEmpty(info.Directory, payload.Path.Root), updated)
-			if updated > state.Updated || (updated == state.Updated && id > state.ID) {
-				state.Updated, state.ID = updated, id
+			if updated > q.wm.Updated || (updated == q.wm.Updated && id > q.wm.ID) {
+				q.wm.Updated, q.wm.ID = updated, id
 			}
 		}
 		rows.Close()

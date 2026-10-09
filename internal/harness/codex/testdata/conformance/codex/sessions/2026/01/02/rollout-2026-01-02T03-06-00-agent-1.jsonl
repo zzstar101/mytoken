@@ -1,0 +1,5 @@
+{"timestamp":"2026-01-02T03:06:00.000Z","type":"session_meta","payload":{"id":"agent-1","cwd":"/Users/demo/proj","model_provider":"openai","source":{"subagent":{"thread_spawn":{"parent_thread_id":"sess-a"}}}}}
+{"timestamp":"2026-01-02T03:06:02.000Z","type":"event_msg","payload":{"type":"user_message","message":"look up the config"}}
+{"timestamp":"2026-01-02T03:06:04.000Z","type":"turn_context","payload":{"cwd":"/Users/demo/proj","model":"gpt-5-mini"}}
+{"timestamp":"2026-01-02T03:06:20.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":50,"cached_input_tokens":10,"output_tokens":15,"reasoning_output_tokens":2,"total_tokens":65},"last_token_usage":{"input_tokens":50,"cached_input_tokens":10,"output_tokens":15,"reasoning_output_tokens":2,"total_tokens":65}}}}
+{"timestamp":"2026-01-02T03:06:30.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"cmd\":\"cat config SENTINEL_PRIVATE_TEXT\"}"}}

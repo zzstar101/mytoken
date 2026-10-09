@@ -15,20 +15,24 @@ import (
 )
 
 // Fixtures live at the repository root (testdata/crush) like the other harness
-// packages; a package-local testdata directory is preferred when one exists.
+// packages; a package-local testdata file is preferred when one exists.
 const fixtureRoot = "../../../testdata/crush"
 
 func fixture(t *testing.T, parts ...string) string {
 	t.Helper()
-	if local := filepath.Join(append([]string{"testdata"}, parts...)...); exists(local) {
+	// Only a package-local file may shadow the repository fixture. Checking for a
+	// file (not just an existing path) keeps directories such as
+	// testdata/conformance from resolving fixture(t) to the package-local
+	// testdata directory, which contains no crush.db.
+	if local := filepath.Join(append([]string{"testdata"}, parts...)...); isFile(local) {
 		return local
 	}
 	return filepath.Join(append([]string{fixtureRoot}, parts...)...)
 }
 
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+func isFile(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir()
 }
 
 // isolate points the global registry lookups at throwaway directories so a
