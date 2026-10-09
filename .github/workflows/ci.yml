@@ -37,6 +37,8 @@ jobs:
         run: go vet ./...
       - name: go test
         run: go test ./...
+      - name: 200K query benchmarks
+        run: go test ./internal/query -run='^$' -bench=BenchmarkService -benchtime=1x -benchmem
 
   gofmt:
     name: gofmt

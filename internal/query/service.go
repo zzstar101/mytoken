@@ -28,7 +28,12 @@ type data struct {
 	meta   map[sessionKey]model.SessionMeta
 }
 
-func (s *service) load(ctx context.Context, f Filter) (data, error) {
+type loadMode struct {
+	hourly    bool
+	sessionID string
+}
+
+func (s *service) load(ctx context.Context, f Filter, mode ...loadMode) (data, error) {
 	d := data{meta: map[sessionKey]model.SessionMeta{}}
 	tx, e := s.st.DB().BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if e != nil {
@@ -73,24 +78,59 @@ func (s *service) load(ctx context.Context, f Filter) (data, error) {
 	aliasLookup := aliasMap(aliases)
 	models := f.Models
 	f.Models = nil
-	where, args := filterSQL(f)
-	rows, e = tx.QueryContext(ctx, `SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced FROM events`+where+" ORDER BY timestamp,harness,dedup_key", args...)
-	if e != nil {
-		return d, e
-	}
-	for rows.Next() {
-		var v AttributedEvent
-		var at int64
-		var cost sql.NullFloat64
-		if e = rows.Scan(&v.Harness, &v.DedupKey, &v.SessionID, &v.ParentID, &v.ProjectPath, &at, &v.Model, &v.Provider, &v.BaseURL, &v.Tokens.Input, &v.Tokens.Output, &v.Tokens.CacheRead, &v.Tokens.CacheWrite, &v.Tokens.Reasoning, &cost, &v.ResolvedProvider, &v.Attrib, &v.Cost, &v.Priced); e != nil {
-			rows.Close()
+	var loaded []AttributedEvent
+	if len(mode) == 0 || mode[0].hourly {
+		var err error
+		loaded, err = scanUsage(ctx, tx, f, len(mode) > 0)
+		if err != nil {
+			return d, err
+		}
+	} else {
+		// Limit detail I/O to this session and descendants (including grandchildren).
+		ids := []string{mode[0].sessionID}
+		seen := map[string]bool{mode[0].sessionID: true}
+		for i := 0; i < len(ids); i++ {
+			for k, m := range d.meta {
+				if m.ParentID == ids[i] && k.h == f.Harnesses[0] && !seen[k.id] {
+					ids = append(ids, k.id)
+					seen[k.id] = true
+				}
+			}
+		}
+		// Drive the fact lookup through dimension IDs. A view predicate on
+		// harness alone otherwise tempts SQLite into scanning its dedup index.
+		where := " WHERE rowid IN (SELECT rowid FROM event_data WHERE dimension_id IN (SELECT id FROM event_dimensions WHERE harness=? AND session_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",") + ")))"
+		args := []any{f.Harnesses[0]}
+		for _, id := range ids {
+			args = append(args, id)
+		}
+		rows, e = tx.QueryContext(ctx, `SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced FROM events`+where+" ORDER BY timestamp,harness,dedup_key", args...)
+		if e != nil {
 			return d, e
 		}
-		v.Timestamp = time.Unix(0, at).UTC()
-		if cost.Valid {
-			x := cost.Float64
-			v.CostUSD = &x
+		for rows.Next() {
+			var v AttributedEvent
+			var at int64
+			var cost sql.NullFloat64
+			if e = rows.Scan(&v.Harness, &v.DedupKey, &v.SessionID, &v.ParentID, &v.ProjectPath, &at, &v.Model, &v.Provider, &v.BaseURL, &v.Tokens.Input, &v.Tokens.Output, &v.Tokens.CacheRead, &v.Tokens.CacheWrite, &v.Tokens.Reasoning, &cost, &v.ResolvedProvider, &v.Attrib, &v.Cost, &v.Priced); e != nil {
+				rows.Close()
+				return d, e
+			}
+			v.Timestamp = time.Unix(0, at).UTC()
+			if cost.Valid {
+				x := cost.Float64
+				v.CostUSD = &x
+			}
+			eventSource(&v)
+			loaded = append(loaded, v)
 		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return d, e
+		}
+	}
+	for _, v := range loaded {
 		if target, ok := aliasLookup[[2]string{v.ResolvedProvider, v.Model}]; ok {
 			v.Model = target
 		} else if target, ok := aliasLookup[[2]string{"", v.Model}]; ok {
@@ -109,11 +149,6 @@ func (s *service) load(ctx context.Context, f Filter) (data, error) {
 			}
 		}
 		d.events = append(d.events, v)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return d, e
 	}
 	return d, tx.Commit()
 }
@@ -174,12 +209,11 @@ func (s *service) Totals(ctx context.Context, f Filter) (Totals, error) {
 	sessions := map[sessionKey]bool{}
 	for _, v := range d.events {
 		out.Tokens = out.Tokens.Add(v.Tokens)
-		if v.Priced {
-			out.CostUSD += v.Cost
-		} else {
-			out.Unpriced++
-		}
-		out.Requests++
+		out.CostUSD += v.Cost
+		out.CostLogUSD += v.costLog
+		out.CostEstimateUSD += v.costEstimate
+		out.Unpriced += v.unpriced
+		out.Requests += v.requests
 		sessions[d.root(sessionKey{v.Harness, v.SessionID})] = true
 	}
 	out.Sessions = int64(len(sessions))
@@ -209,10 +243,15 @@ func step(t time.Time, hourly bool) time.Time {
 	return t.AddDate(0, 0, 1)
 }
 func (s *service) series(ctx context.Context, f Filter, hourly bool) ([]Point, error) {
-	d, e := s.load(ctx, f)
+	var mode []loadMode
+	if hourly {
+		mode = []loadMode{{hourly: true}}
+	}
+	d, e := s.load(ctx, f, mode...)
 	if e != nil {
 		return nil, e
 	}
+	sort.Slice(d.events, func(i, j int) bool { return d.events[i].Timestamp.Before(d.events[j].Timestamp) })
 	from, to := f.Range.From, f.Range.To
 	if from.IsZero() {
 		if len(d.events) == 0 {
@@ -238,9 +277,7 @@ func (s *service) series(ctx context.Context, f Filter, hourly bool) ([]Point, e
 	for _, v := range d.events {
 		if i, ok := indices[floor(v.Timestamp, hourly).UnixNano()]; ok {
 			out[i].Tokens = out[i].Tokens.Add(v.Tokens)
-			if v.Priced {
-				out[i].CostUSD += v.Cost
-			}
+			out[i].CostUSD += v.Cost
 		}
 	}
 	return out, nil
@@ -287,12 +324,11 @@ func (s *service) buckets(ctx context.Context, f Filter, kind string) ([]Bucket,
 			seen[key] = map[sessionKey]bool{}
 		}
 		b.Tokens = b.Tokens.Add(v.Tokens)
-		if v.Priced {
-			b.CostUSD += v.Cost
-		} else {
-			b.Unpriced++
-		}
-		b.Requests++
+		b.CostUSD += v.Cost
+		b.CostLogUSD += v.costLog
+		b.CostEstimateUSD += v.costEstimate
+		b.Unpriced += v.unpriced
+		b.Requests += v.requests
 		seen[key][d.root(sessionKey{v.Harness, v.SessionID})] = true
 	}
 	out := make([]Bucket, 0, len(groups))
@@ -332,16 +368,13 @@ func (d data) rows() map[sessionKey]*SessionRow {
 				break
 			}
 			r.Tokens = r.Tokens.Add(e.Tokens)
-			if e.Priced {
-				r.CostUSD += e.Cost
-			} else {
-				r.Unpriced++
-			}
-			r.Requests++
-			if e.Timestamp.After(r.UpdatedAt) {
+			r.CostUSD += e.Cost
+			r.Unpriced += e.unpriced
+			r.Requests += e.requests
+			if e.DedupKey != "" && e.Timestamp.After(r.UpdatedAt) {
 				r.UpdatedAt = e.Timestamp
 			}
-			if r.StartedAt.IsZero() || e.Timestamp.Before(r.StartedAt) {
+			if e.DedupKey != "" && (r.StartedAt.IsZero() || e.Timestamp.Before(r.StartedAt)) {
 				r.StartedAt = e.Timestamp
 			}
 			pk := [2]string{e.ResolvedProvider, e.Model}
@@ -351,12 +384,9 @@ func (d data) rows() map[sessionKey]*SessionRow {
 				breakdowns[k][pk] = b
 			}
 			b.Tokens = b.Tokens.Add(e.Tokens)
-			if e.Priced {
-				b.CostUSD += e.Cost
-			} else {
-				b.Unpriced++
-			}
-			b.Requests++
+			b.CostUSD += e.Cost
+			b.Unpriced += e.unpriced
+			b.Requests += e.requests
 			if r.ParentID == "" {
 				break
 			}
@@ -429,7 +459,7 @@ func sortRows(rows []SessionRow, order string) {
 	})
 }
 func (s *service) Session(ctx context.Context, h model.Harness, id string) (SessionRow, []SessionRow, []AttributedEvent, error) {
-	d, e := s.load(ctx, Filter{Harnesses: []model.Harness{h}})
+	d, e := s.load(ctx, Filter{Harnesses: []model.Harness{h}}, loadMode{sessionID: id})
 	if e != nil {
 		return SessionRow{}, nil, nil, e
 	}

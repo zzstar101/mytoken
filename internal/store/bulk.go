@@ -5,10 +5,8 @@ import (
 	"errors"
 )
 
-const eventIndexes = `CREATE INDEX IF NOT EXISTS events_time ON events(timestamp);
-CREATE INDEX IF NOT EXISTS events_session ON events(harness,session_id,timestamp);
-CREATE INDEX IF NOT EXISTS events_provider_time ON events(resolved_provider,timestamp);
-CREATE INDEX IF NOT EXISTS events_model_time ON events(model,timestamp);`
+const eventIndexes = `CREATE INDEX IF NOT EXISTS events_time ON event_data(timestamp);
+CREATE INDEX IF NOT EXISTS events_session ON event_data(dimension_id,timestamp);`
 
 // DeferEmptyIndexes postpones secondary-index construction on a fresh index.
 // The caller must invoke the returned function, including on scan cancellation.

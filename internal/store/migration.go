@@ -51,13 +51,33 @@ func (s *Store) migrate() error {
 				}
 			}
 		}
-		if _, err = tx.Exec("CREATE INDEX IF NOT EXISTS " + table + "_raw_project ON " + table + "(raw_project)"); err != nil {
-			return err
+		if table == "sessions" {
+			if _, err = tx.Exec("CREATE INDEX IF NOT EXISTS " + table + "_raw_project ON " + table + "(raw_project)"); err != nil {
+				return err
+			}
 		}
+	}
+	compacted, err := migrateCompact(tx)
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(eventIndexes); err != nil {
+		return err
+	}
+	if err = migrateDaily(tx); err != nil {
+		return err
 	}
 	if err = tx.Commit(); err != nil {
 		return err
 	}
+	if compacted {
+		if _, err = s.db.Exec("VACUUM"); err != nil {
+			return err
+		}
+	}
 	s.projects = newProjectResolver()
+	if err = s.EnsureLocalDays(context.Background()); err != nil {
+		return err
+	}
 	return s.NormalizeProjects(context.Background())
 }

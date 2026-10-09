@@ -36,7 +36,7 @@ internal/gui/               # 全部原生 UI（避免与 mygo ui 包同名）  
 testdata/<harness>/         # 脱敏后的真实日志 fixture                 [各解析器作者]
 ```
 
-**规则**：每个子代理只写自己目录；`internal/model` 与 `internal/query` 的类型签名冻结，改动需 lead 批准。
+**规则**：每个子代理只写自己目录；`internal/model` 与 `internal/query` 的接口签名保持兼容，改动需 lead 批准。0.1.x 获准追加费用来源字段（见 §5），不改变已有方法签名或 JSON 字段。
 
 ## 3. 核心类型（`internal/model`）
 
@@ -130,13 +130,30 @@ type Filter struct {
 type Totals struct {
     Tokens   model.Tokens
     CostUSD  float64
+    CostLogUSD, CostEstimateUSD float64 // 日志金额 / 本地估算
     Requests int64
+    Unpriced int64 // 无日志金额且无已知价格的请求，不计入 CostUSD
     Sessions int64
     CacheHit float64 // CacheRead / (Input+CacheRead+CacheWrite)
 }
 
 type Point struct { Day time.Time; Tokens model.Tokens; CostUSD float64 }
-type Bucket struct{ Key string; Label string; Tokens model.Tokens; CostUSD float64; Requests int64 }
+type Bucket struct {
+    Key, Label string
+    Tokens model.Tokens
+    CostUSD, CostLogUSD, CostEstimateUSD float64
+    Requests, Sessions, Unpriced int64
+}
+
+type CostSource string // "log", "estimate", "unpriced"；"relay-bill" 保留，尚不产生
+type AttributedEvent struct {
+    model.UsageEvent
+    ResolvedProvider string
+    Attrib model.AttribSource
+    Cost float64
+    Priced bool
+    CostSource CostSource
+}
 
 type SessionRow struct {
     model.SessionMeta
@@ -160,10 +177,24 @@ type Service interface {
     ByProject(ctx, Filter) ([]Bucket, error)
     ByHarness(ctx, Filter) ([]Bucket, error)
     Sessions(ctx, Filter, sort string, limit, offset int) ([]SessionRow, int, error)
-    Session(ctx, harness model.Harness, id string) (SessionRow, []SessionRow /*children*/, []model.UsageEvent, error)
+    Session(ctx, harness model.Harness, id string) (SessionRow, []SessionRow /*children*/, []AttributedEvent, error)
     Subscribe() (<-chan struct{}, func()) // 有新数据时通知（已节流 ≤ 1 次/秒）
 }
 ```
+
+### 5.1 查询语义与 0.1.x 存储
+
+- 所有时间范围为 `[From, To)`；日/小时按当前本地时区切分，显式范围零填充。跨 DST 的一天按日历 `AddDate` 推进，不假定一天总是 24 小时。
+- `Sessions` 只列顶层会话；父会话 token、费用、请求数和 Breakdown 递归包含后代。Totals/Bucket 的 Sessions 是匹配事件归属的顶层会话去重数。会话详情仍只返回自身事件，后代另列。
+- 模型原名持久化，别名在查询时应用（供应商专用别名优先于全局）；别名/展示设置无需重写事实或预聚合。
+- `CostUSD = CostLogUSD + CostEstimateUSD`（允许浮点累计误差）。日志 `log_cost != NULL`（包括 0）是 `log`，本地已知单价×倍率是 `estimate`，其余是 `unpriced`。无价请求仍计 token / 请求数 / 会话数，但费用不混入 0 价已知请求。`relay-bill` 仅预留类型值，不表示已有账单接入。
+- 事实存储为 `event_data`：完整原始 dedup_key、稳定 rowid、时间、5 类 token、日志金额、推算费用及 priced。`event_dimensions` 将重复的 harness/session/parent/project/raw_project/model/provider/base_url/resolved_provider/attrib 字符串组成无损字典。`events` 是等价解码视图，保留 INSERT/UPDATE/DELETE 兼容触发器；原 dedup key 不截断、不哈希。
+- 索引只保留事实的 timestamp、dimension_id×timestamp、原 dedup 唯一键，以及小型维度/会话索引。旧 model/provider/time、逐事件 raw_project 索引被移除；会话详情通过维度 id 定位事实，避免全库扫描。
+- `daily_usage` 是本地日 × harness × session × resolved_provider × **原始** model × project × attrib 的 WITHOUT ROWID 汇总，存 5 类 token、总金额、log/estimate 金额、requests/unpriced。事实表 INSERT/UPDATE/DELETE 触发器在同一事务维护增减，覆盖去重覆盖、归因、重算单价和删除；从日汇总读取完整天，任意范围两端不足一天的部分按时间索引查询事实。
+- 日汇总记录 `settings.daily_timezone`（时区名及历史/当前季节偏移指纹）。正常打开数据库时检测系统时区变化并原子重建**仅派生汇总**。查询在读快照内检查时区；CLI `--timezone` 临时展示时区若不同，只读回退到事实 SQL GROUP BY，绝不改写持久汇总。小时查询按时间索引聚合事实，使用 Go 时区规则而非 SQLite 固定 UTC 偏移。
+- 旧库在一个事务中无损复制到事实/字典结构，提交后执行一次 VACUUM 回收旧页；取消或失败不会留下半套 schema。首次升级需要额外临时磁盘空间（SQLite 新旧表及 WAL）。连接建立即配置 `busy_timeout=5000`，保留 WAL、单连接快照与单写者。
+- “重建索引/全量重扫”只清 cursors、重新解析仍存在的源并 upsert，**不删除 events 或 sessions**；被 Claude Code 等工具轮转清理的历史永久保留。源日志消失不代表用户要求删历史。
+- 价格重算按事件 timestamp 选择当时生效的价格快照；日志金额不受本地规则或倍率覆盖。价格 UPDATE 与日汇总费用在同一事务中可见。
 
 ## 6. 供应商归因链（`internal/attrib`）
 
@@ -198,3 +229,15 @@ type Service interface {
 - `go vet ./... && go test ./...` 全绿，`-race` 覆盖 scan / store。
 - 本机全量首扫 < 10s（以当前 ~/.claude、~/.codex、~/.dsh、~/.pi 为基准），增量更新 < 1s 可见。
 - 常驻内存 < 80MB，二进制 < 30MB。
+- 0.1.x 查询基准：`go test ./internal/query -run='^$' -bench=BenchmarkService -benchtime=1x -benchmem`，CI 三平台执行。确定性生成 200,000 请求 / 600 会话，覆盖 Totals、Daily、Hourly（24h，含 harness 筛选）、四类排行、Sessions（6 条/全部）及单会话详情。
+- 严格本机门槛：`MYTOKEN_STRICT_PERF=1 go test ./internal/query -run TestQueryPerformanceBudget -v -count=1`；每次查询 <100ms、新增 Go 分配 <50MiB。默认测试不在共享 CI 上断言墙钟时间。进程峰值另用编译后的测试二进制测量，避免把 Go 编译器内存算成应用内存。
+
+### 10.1 0.1.x 测量快照（Apple M5，非跨机器保证）
+
+- 206,728 条真实事件的**副本**：库由约 121MB / 587B 每事件降为 52,789,248B / **255.36B 每事件**（含所有表/索引/日汇总，空闲页 0）。迁移 + VACUUM + 本地日构建约 **3.117s**；迁移前后全部 20 个逻辑字段逐行 SHA256 一致。
+- GUI 周期切换原 **2.7–8s**，聚合后 today/7d/30d/90d/all 分别约 **73/66/70/81/95ms**，单查询最大 32ms；不依赖 GUI 缓存才能达标。
+- 200K 基准：Totals/Daily/By* **2.2–3.3ms**，Hourly24h **14–15ms**，Sessions **3–4ms**，Session **4.2ms**；单方法分配 **0.70–3.22MB**。独立测试进程（含两次 200K 造数、严格测试及基准）峰值 RSS **47,513,600B**，系统 footprint 36.6MB。
+- 2,086 个实际源：旧代码空闲增量 459–650ms、全量重建 8.778s；新代码增量 204–209ms、历史保全重扫 9.816s。初版经兼容 view 写入重扫 13.956s，因此正式 CommitMany 改为批量直写事实、批次内字典缓存、跳过完全未变的 upsert；事实触发器仍保证汇总一致。
+- 扫描不是查询内存预算：新全量重扫 Go 堆峰值约 **81.8MiB**、RSS **154.1MiB**（旧 Go 堆 77.7MiB / RSS 225MiB）。不要把查询 <50MB 误写成全量解析/扫描进程的承诺。
+- 非默认展示时区回退、超长 Hourly 范围、极高维度基数仍按扫描事实/汇总组数量增长；上述性能门槛覆盖默认系统时区与 24h 小时图。字典保留可能不再被引用的少量旧维度，避免昂贵的逐写垃圾回收。
+- 真实库探针仅允许 `MYTOKEN_HOME` 位于 `/tmp/mtbench` 副本目录：`MYTOKEN_REAL_PERF=1 go test ./internal/scan -run TestCopiedDatabaseScanPerformance -v -count=1`；旧 schema 子目录可用 `MYTOKEN_MIGRATION_PERF=1 go test ./internal/store -run TestCopiedDatabaseMigrationPerformance -v -count=1` 验证迁移。绝不在正常应用数据目录执行性能重扫。

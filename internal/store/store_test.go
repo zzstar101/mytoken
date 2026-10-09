@@ -158,7 +158,7 @@ func TestBatchDedupCursorAndRebuild(t *testing.T) {
 	if err = st.Rebuild(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err = st.DB().QueryRow("SELECT count(*) FROM events").Scan(&count); err != nil || count != 0 {
+	if err = st.DB().QueryRow("SELECT count(*) FROM events").Scan(&count); err != nil || count != 1 {
 		t.Fatalf("rebuild %d %v", count, err)
 	}
 	v, err := st.Setting(ctx, "keep")

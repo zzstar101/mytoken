@@ -42,7 +42,7 @@ func TestDeferredIndexesRestoreAfterCancellation(t *testing.T) {
 	if err := restore(); err != nil {
 		t.Fatal(err)
 	}
-	count(4)
+	count(2)
 	var cacheSize int
 	if err := st.DB().QueryRow("PRAGMA cache_size").Scan(&cacheSize); err != nil || cacheSize != -8192 {
 		t.Fatalf("cache_size=%d err=%v", cacheSize, err)
@@ -52,7 +52,7 @@ func TestDeferredIndexesRestoreAfterCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	count(4)
+	count(2)
 	if err := restore(); err != nil {
 		t.Fatal(err)
 	}

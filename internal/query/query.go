@@ -1,6 +1,6 @@
 // Package query is the read API shared by the UI and the CLI (docs/SPEC.md §5).
-// The types and the Service interface are frozen; astra implements Service
-// (see NewService in service.go) on top of internal/store.
+// Service remains source-compatible; 0.1.x adds cost provenance fields.
+// NewService implements the API on top of internal/store.
 package query
 
 import (
@@ -26,10 +26,12 @@ type Filter struct {
 
 // Totals is the aggregate over a filter.
 type Totals struct {
-	Tokens   model.Tokens `json:"tokens"`
-	CostUSD  float64      `json:"costUsd"`
-	Requests int64        `json:"requests"`
-	Sessions int64        `json:"sessions"`
+	Tokens          model.Tokens `json:"tokens"`
+	CostUSD         float64      `json:"costUsd"`
+	CostLogUSD      float64      `json:"costLogUsd"`
+	CostEstimateUSD float64      `json:"costEstimateUsd"`
+	Requests        int64        `json:"requests"`
+	Sessions        int64        `json:"sessions"`
 	// Unpriced counts requests with neither a log cost nor a known price;
 	// CostUSD excludes them. The UI shows "—" when Unpriced == Requests.
 	Unpriced int64 `json:"unpriced"`
@@ -47,13 +49,15 @@ type Point struct {
 
 // Bucket is one row of a ranking. Key is the stable id, Label the display name.
 type Bucket struct {
-	Key      string       `json:"key"`
-	Label    string       `json:"label"`
-	Tokens   model.Tokens `json:"tokens"`
-	CostUSD  float64      `json:"costUsd"`
-	Requests int64        `json:"requests"`
-	Sessions int64        `json:"sessions"`
-	Unpriced int64        `json:"unpriced"` // see Totals.Unpriced
+	Key             string       `json:"key"`
+	Label           string       `json:"label"`
+	Tokens          model.Tokens `json:"tokens"`
+	CostUSD         float64      `json:"costUsd"`
+	CostLogUSD      float64      `json:"costLogUsd"`
+	CostEstimateUSD float64      `json:"costEstimateUsd"`
+	Requests        int64        `json:"requests"`
+	Sessions        int64        `json:"sessions"`
+	Unpriced        int64        `json:"unpriced"` // see Totals.Unpriced
 }
 
 // ProviderModel is a session's usage split by provider × model.
@@ -79,13 +83,27 @@ type SessionRow struct {
 	Breakdown []ProviderModel `json:"breakdown"` // sorted by Tokens.Total() desc
 }
 
+// CostSource identifies monetary provenance, independently of provider attribution.
+// relay-bill is reserved for authoritative relay billing integrations.
+type CostSource string
+
+const (
+	CostSourceLog       CostSource = "log"
+	CostSourceEstimate  CostSource = "estimate"
+	CostSourceUnpriced  CostSource = "unpriced"
+	CostSourceRelayBill CostSource = "relay-bill"
+)
+
 // AttributedEvent is a usage event with its resolved provider and cost.
 type AttributedEvent struct {
 	model.UsageEvent
-	ResolvedProvider string             `json:"resolvedProvider"`
-	Attrib           model.AttribSource `json:"attrib"`
-	Cost             float64            `json:"cost"`
-	Priced           bool               `json:"priced"` // false: no log cost and no known price
+	CostSource            CostSource `json:"costSource"`
+	requests, unpriced    int64
+	costLog, costEstimate float64
+	ResolvedProvider      string             `json:"resolvedProvider"`
+	Attrib                model.AttribSource `json:"attrib"`
+	Cost                  float64            `json:"cost"`
+	Priced                bool               `json:"priced"` // false: no log cost and no known price
 }
 
 // Session sort keys.

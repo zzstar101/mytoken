@@ -27,12 +27,13 @@ type Resolution struct {
 	Priced   bool
 }
 type Store struct {
-	db          *sql.DB
-	writer      sync.Mutex
-	mu          sync.Mutex
-	subscribers map[chan struct{}]struct{}
-	projects    *projectResolver
-	closed      bool
+	db            *sql.DB
+	writer        sync.Mutex
+	mu            sync.Mutex
+	subscribers   map[chan struct{}]struct{}
+	projects      *projectResolver
+	closed        bool
+	aggregateZone string
 }
 
 func Open(path string) (*Store, error) {
@@ -43,7 +44,7 @@ func Open(path string) (*Store, error) {
 	}
 	dsn := path
 	if path != ":memory:" {
-		dsn = sqlitedsn.URI(path, "")
+		dsn = sqlitedsn.URI(path, "_pragma=busy_timeout(5000)")
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -58,10 +59,6 @@ func Open(path string) (*Store, error) {
  harness TEXT NOT NULL,dedup_key TEXT NOT NULL,session_id TEXT NOT NULL,parent_id TEXT NOT NULL DEFAULT '',project TEXT NOT NULL DEFAULT '',timestamp INTEGER NOT NULL,
  model TEXT NOT NULL,provider TEXT NOT NULL DEFAULT '',base_url TEXT NOT NULL DEFAULT '',input INTEGER NOT NULL,output INTEGER NOT NULL,cache_read INTEGER NOT NULL,cache_write INTEGER NOT NULL,reasoning INTEGER NOT NULL,
  log_cost REAL,resolved_provider TEXT NOT NULL,attrib TEXT NOT NULL,cost REAL NOT NULL,PRIMARY KEY(harness,dedup_key));
- CREATE INDEX IF NOT EXISTS events_time ON events(timestamp);
- CREATE INDEX IF NOT EXISTS events_session ON events(harness,session_id,timestamp);
- CREATE INDEX IF NOT EXISTS events_provider_time ON events(resolved_provider,timestamp);
- CREATE INDEX IF NOT EXISTS events_model_time ON events(model,timestamp);
  CREATE TABLE IF NOT EXISTS sessions(harness TEXT NOT NULL,session_id TEXT NOT NULL,parent_id TEXT NOT NULL DEFAULT '',title TEXT NOT NULL DEFAULT '',project TEXT NOT NULL DEFAULT '',started_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,PRIMARY KEY(harness,session_id));
  CREATE INDEX IF NOT EXISTS sessions_parent ON sessions(harness,parent_id);
  CREATE TABLE IF NOT EXISTS cursors(harness TEXT NOT NULL,path TEXT NOT NULL,cursor TEXT NOT NULL,PRIMARY KEY(harness,path));
@@ -181,15 +178,34 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 		return errors.New("resolution count differs from event count")
 	}
 	var err error
-	const suffix = ` ON CONFLICT(harness,dedup_key) DO UPDATE SET session_id=excluded.session_id,parent_id=excluded.parent_id,project=excluded.project,timestamp=excluded.timestamp,model=excluded.model,provider=excluded.provider,base_url=excluded.base_url,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,resolved_provider=excluded.resolved_provider,attrib=excluded.attrib,cost=excluded.cost,priced=excluded.priced,raw_project=excluded.raw_project WHERE events.session_id=excluded.session_id OR (events.parent_id!='' AND excluded.parent_id='')`
-	const row = `(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+
+	const row = `(?,?,?,?,?,?,?,?,?,?,?,?)`
+	const suffix = ` ON CONFLICT(harness,dedup_key) DO UPDATE SET dimension_id=excluded.dimension_id,timestamp=excluded.timestamp,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,cost=excluded.cost,priced=excluded.priced WHERE (event_data.dimension_id,event_data.timestamp,event_data.input,event_data.output,event_data.cache_read,event_data.cache_write,event_data.reasoning,event_data.log_cost,event_data.cost,event_data.priced) IS NOT (excluded.dimension_id,excluded.timestamp,excluded.input,excluded.output,excluded.cache_read,excluded.cache_write,excluded.reasoning,excluded.log_cost,excluded.cost,excluded.priced) AND (SELECT old.session_id=new.session_id OR (old.parent_id!='' AND new.parent_id='') FROM event_dimensions old JOIN event_dimensions new ON new.id=excluded.dimension_id WHERE old.id=event_data.dimension_id)`
 	const batchSize = 128
 	var values []any
+	// Resolve each distinct dimension tuple once per parser batch, rather than
+	// doing two dictionary lookups per event through the compatibility view.
+	dimensions := map[[10]string]int64{}
+	dimensionID := func(key [10]string) (int64, error) {
+		if id, ok := dimensions[key]; ok {
+			return id, nil
+		}
+		stmt, err := prepare(`INSERT INTO event_dimensions(` + dimensionColumns + `) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(` + dimensionColumns + `) DO UPDATE SET id=id RETURNING id`)
+		if err != nil {
+			return 0, err
+		}
+		var id int64
+		err = stmt.QueryRowContext(ctx, key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7], key[8], key[9]).Scan(&id)
+		if err == nil {
+			dimensions[key] = id
+		}
+		return id, err
+	}
 	flush := func() error {
 		if len(values) == 0 {
 			return nil
 		}
-		query := `INSERT INTO events(harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced,raw_project) VALUES ` + strings.TrimSuffix(strings.Repeat(row+",", len(values)/20), ",") + suffix
+		query := `INSERT INTO event_data(` + factColumns + `) VALUES ` + strings.TrimSuffix(strings.Repeat(row+",", len(values)/12), ",") + suffix
 		stmt, e := prepare(query)
 		if e == nil {
 			_, e = stmt.ExecContext(ctx, values...)
@@ -262,8 +278,12 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 			r.Cost = *e.CostUSD
 			r.Priced = true
 		}
-		values = append(values, e.Harness, e.DedupKey, e.SessionID, e.ParentID, s.projects.resolve(e.ProjectPath), stamp(e.Timestamp), e.Model, e.Provider, e.BaseURL, e.Tokens.Input, e.Tokens.Output, e.Tokens.CacheRead, e.Tokens.CacheWrite, e.Tokens.Reasoning, e.CostUSD, r.Provider, r.Attrib, r.Cost, r.Priced, e.ProjectPath)
-		if len(values) == batchSize*20 {
+		id, err := dimensionID([10]string{string(e.Harness), e.SessionID, e.ParentID, s.projects.resolve(e.ProjectPath), e.Model, e.Provider, e.BaseURL, r.Provider, string(r.Attrib), e.ProjectPath})
+		if err != nil {
+			return err
+		}
+		values = append(values, e.Harness, e.DedupKey, id, stamp(e.Timestamp), e.Tokens.Input, e.Tokens.Output, e.Tokens.CacheRead, e.Tokens.CacheWrite, e.Tokens.Reasoning, e.CostUSD, r.Cost, r.Priced)
+		if len(values) == batchSize*12 {
 			if err = flush(); err != nil {
 				return err
 			}
@@ -296,7 +316,8 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 	return err
 }
 
-// Rebuild removes derived events, sessions and cursors, retaining settings and observed configuration history.
+// Rebuild resets checkpoints for a full replay, preserving historical events whose
+// source logs may have been rotated away. Replayed events are idempotent upserts.
 func (s *Store) Rebuild(ctx context.Context) error {
 	s.writer.Lock()
 	defer s.writer.Unlock()
@@ -305,7 +326,7 @@ func (s *Store) Rebuild(ctx context.Context) error {
 		return e
 	}
 	defer tx.Rollback()
-	if _, e = tx.ExecContext(ctx, "DELETE FROM events; DELETE FROM sessions; DELETE FROM cursors;"); e != nil {
+	if _, e = tx.ExecContext(ctx, "DELETE FROM cursors;"); e != nil {
 		return e
 	}
 	if e = tx.Commit(); e == nil {
