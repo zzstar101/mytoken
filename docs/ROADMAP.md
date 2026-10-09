@@ -98,18 +98,20 @@ CI 在三个平台上跑 200K 事件的查询基准（`internal/query/bench_test
 
 ### 0.2 —— 对账 v1
 
-- 自动识别站点类型：先试 `/v1/sub2api/billing`，再试 `/api/status`，都不是则手填倍率。
-- **new-api**（逐条对账）：
+> 状态：主体已完成，接口契约见 [RELAY.md](RELAY.md)。尚未在真实中转站上端到端验证（需要用户自己开启）；「手填倍率」沿用定价设置里的供应商倍率。
+
+- ✅ 自动识别站点类型：先试 `/v1/sub2api/billing`，再试 `/api/status`，都不是则手填倍率。
+- ✅ **new-api**（逐条对账）：
   - `GET /api/pricing` —— `model_ratio`、`completion_ratio`、`cache_ratio`、`create_cache_ratio`、`model_price`、`group_ratio`
   - `GET /api/usage/token/` —— Key 余额 / 额度
   - `GET /api/log/token` —— 该 Key 最近的请求日志（最多 1000 条，需轮询并本地持久化），按 `request_id` / 时间 + token 与本地事件配对
   - 额度换算：`quota / 500000 = USD`
-- **sub2api**（按天对账）：
+- ✅ **sub2api**（按天对账）：
   - `GET /v1/sub2api/billing` —— 分组 / 用户 / 实际倍率，高峰时段与高峰倍率
   - `GET /v1/usage` —— 余额、今日 token（含缓存）、1–90 天日用量
-- **官方 API 余额与花费**：OpenRouter、DeepSeek、SiliconFlow、Moonshot、z.ai、MiniMax，与中转站走同一套对账框架，同样逐个开启。
-- **对账视图**：应扣 vs 实扣、差额拆解、来源标签。
-- harness 第 1 批。WorkBuddy / CodeBuddy 优先复用 claude parser 读 `projects/**/*.jsonl`；WorkBuddy 的 `workbuddy.db` → `session_usage.credit_json`（每请求积分）作为 harness 自带账单。
+- ✅ **官方 API 余额与花费**：OpenRouter、DeepSeek、SiliconFlow、Moonshot、z.ai、MiniMax，与中转站走同一套对账框架，同样逐个开启。
+- ✅ **对账视图**：应扣 vs 实扣、差额拆解、来源标签。
+- ✅ harness 第 1 批（12 个）。WorkBuddy 的日志实际是 CodeBuddy 格式，不是 Claude 格式，所以单独写了读取器（CodeBuddy 复用它）；每请求积分直接取日志里的 `rawUsage.credit` 作为 harness 自带账单（比 `workbuddy.db` 的 `credit_json` 更完整）。
 
 ### 0.3 —— 缓存账本
 
