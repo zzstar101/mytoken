@@ -203,9 +203,12 @@ terminal. The full reference is in [docs/CLI.md](docs/CLI.md).
 ```sh
 mytoken stats                                  # last 7 days, per session
 mytoken stats --since 30d --by model           # 30 days, grouped by model
-mytoken stats --since 2026-10-01 --by provider # since a date, grouped by provider
-mytoken stats --json                           # machine-readable output
-mytoken sessions --limit 20                    # session list, most recent first
+mytoken stats --last week --by day --timezone Asia/Shanghai
+mytoken stats --since 2026-10-01 --until 2026-11-01 --by provider
+mytoken stats --by model --no-cost             # leave costs out
+mytoken stats --since 90d --format csv > usage.csv   # CSV export (--json also works)
+mytoken sessions --last 7d --limit 20          # session list, most recent first
+mytoken stats --since 30d --offline            # never touch the network
 mytoken scan                                   # re-index now
 mytoken doctor                                 # check sources, paths and versions
 mytoken prices list                            # the active price table
@@ -214,8 +217,12 @@ mytoken prices import-ccswitch                 # import cc-switch pricing
 mytoken version
 ```
 
-`--by` accepts `session`, `provider`, `model`, `project`, `day` or `harness`, and `--since` accepts a
-duration (`7d`, `30d`) or a date (`YYYY-MM-DD`). `mytoken help` lists everything.
+`--by` accepts `session`, `provider`, `model`, `project`, `day` or `harness`. `stats` and `sessions`
+share the range flags `--since`/`--until` (a duration like `7d`, or a date) and `--last` (`today`,
+`week`, `month`, or `30d`), plus `--timezone`, `--offline`, `--no-cost` and
+`--format table|json|csv` (`--json` is short for `--format json`); `--since` and `--last` cannot be
+combined. `mytoken help` lists every command, and each flag is documented in
+[docs/CLI.md](docs/CLI.md).
 
 ## Building from source
 

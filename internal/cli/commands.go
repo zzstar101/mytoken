@@ -24,8 +24,8 @@ var Version = "dev"
 
 const usage = `Usage: mytoken <command> [options]
   scan
-  stats [--json] [--since Nd|YYYY-MM-DD] [--by session|provider|model|project|day|harness]
-  sessions [--limit N] [--json]
+  stats [options] [--by session|provider|model|project|day|harness]
+  sessions [--limit N] [options]
   doctor [--json]
   version
   help
@@ -33,6 +33,19 @@ const usage = `Usage: mytoken <command> [options]
   prices set --provider NAME [--model NAME] [--multiplier N] [--input N]
              [--output N] [--cache-read N] [--cache-write N]
 
+options for stats and sessions:
+  --since DATE|DUR    range start (stats default 7d; sessions default all time)
+  --until DATE|DUR    range end, not included
+  --last WINDOW       today|week|month or 7d/2w/3m/12h/30s (ends now);
+                      exclusive with --since/--until
+  --timezone TZ       IANA zone for date parsing and --by day (default local)
+  --offline           never use the network (default: refresh prices first)
+  --no-cost           leave out cost columns and costUsd fields
+  --format FMT        table (default), json or csv
+  --json              alias for --format json
+
+DATE is YYYY-MM-DD, YYYYMMDD or RFC3339. DUR is Ns, Nh, Nd, Nw or Nm
+(Nm is a calendar month; minutes are written 90s).
 stats defaults: --since 7d --by session
 sessions defaults: --limit 50 (0 means all); most recently updated first.
 Exit status: 0 success, 1 operational error, 2 invalid arguments.
@@ -42,21 +55,31 @@ func runSessions(ctx context.Context, args []string, out, errout io.Writer) int 
 	fs := flag.NewFlagSet("sessions", flag.ContinueOnError)
 	fs.SetOutput(errout)
 	limit := fs.Int("limit", 50, "maximum sessions (0 for all)")
-	js := fs.Bool("json", false, "JSON output")
-	if err := fs.Parse(args); err != nil {
+	var cf commonFlags
+	addCommonFlags(fs, &cf, "")
+	if err := cf.parse(fs, args); err != nil {
 		return 2
 	}
 	if fs.NArg() != 0 || *limit < 0 {
-		fmt.Fprintln(errout, "usage: mytoken sessions [--limit N] [--json]; N must be nonnegative")
+		fmt.Fprintln(errout, "usage: mytoken sessions [--limit N] [--since DATE|DUR] [--until DATE|DUR] [--last WINDOW] [--timezone TZ] [--offline] [--no-cost] [--format table|json|csv]; N must be nonnegative")
 		return 2
 	}
-	a, err := app.OpenLocal()
+	opts, err := cf.resolve(time.Now())
+	if err != nil {
+		fmt.Fprintln(errout, err)
+		return 2
+	}
+	return runInLocation(opts.loc, func() int { return sessionsCommand(ctx, opts, *limit, out, errout) })
+}
+
+func sessionsCommand(ctx context.Context, opts options, limit int, out, errout io.Writer) int {
+	a, err := openApp(opts.offline)
 	if err != nil {
 		fmt.Fprintln(errout, err)
 		return 1
 	}
 	defer a.Close()
-	rows, total, err := a.Query.Sessions(ctx, query.Filter{}, query.SortRecent, *limit, 0)
+	rows, total, err := a.Query.Sessions(ctx, query.Filter{Range: opts.rng}, query.SortRecent, limit, 0)
 	if err != nil {
 		fmt.Fprintln(errout, err)
 		return 1
@@ -64,18 +87,20 @@ func runSessions(ctx context.Context, args []string, out, errout io.Writer) int 
 	if rows == nil {
 		rows = []query.SessionRow{}
 	}
-	if *js {
-		err = json.NewEncoder(out).Encode(struct {
-			Total    int                `json:"total"`
-			Sessions []query.SessionRow `json:"sessions"`
-		}{total, rows})
-	} else {
-		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(w, "HARNESS\tSESSION\tUPDATED\tREQUESTS\tTOKENS\tCOST USD\tTITLE")
-		for _, v := range rows {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d\t%.4f\t%s\n", v.Harness, v.SessionID, v.UpdatedAt.Format(time.RFC3339), v.Requests, v.Tokens.Total(), v.CostUSD, v.Title)
+	switch opts.format {
+	case formatJSON:
+		var payload any = sessionsReport{Total: total, Sessions: rows}
+		if opts.noCost {
+			if payload, err = stripCost(payload); err != nil {
+				fmt.Fprintln(errout, err)
+				return 1
+			}
 		}
-		err = w.Flush()
+		err = json.NewEncoder(out).Encode(payload)
+	case formatCSV:
+		err = writeSessionsCSV(out, rows, opts.noCost)
+	default:
+		err = writeSessionsTable(out, rows, opts.noCost)
 	}
 	if err != nil {
 		fmt.Fprintln(errout, err)

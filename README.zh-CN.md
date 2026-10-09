@@ -186,9 +186,12 @@ go install github.com/zzstar101/mytoken@latest
 ```sh
 mytoken stats                                  # 最近 7 天，按会话
 mytoken stats --since 30d --by model           # 最近 30 天，按模型分组
-mytoken stats --since 2026-10-01 --by provider # 指定日期起，按供应商分组
-mytoken stats --json                           # 机器可读输出
-mytoken sessions --limit 20                    # 会话列表，按最近更新排序
+mytoken stats --last week --by day --timezone Asia/Shanghai
+mytoken stats --since 2026-10-01 --until 2026-11-01 --by provider
+mytoken stats --by model --no-cost             # 不显示费用
+mytoken stats --since 90d --format csv > usage.csv   # 导出 CSV（也支持 --json）
+mytoken sessions --last 7d --limit 20          # 会话列表，按最近更新排序
+mytoken stats --since 30d --offline            # 完全不联网
 mytoken scan                                   # 立刻重新索引
 mytoken doctor                                 # 检查数据源、路径与版本
 mytoken prices list                            # 当前生效的价格表
@@ -197,8 +200,11 @@ mytoken prices import-ccswitch                 # 导入 cc-switch 的价格
 mytoken version
 ```
 
-`--by` 支持 `session`、`provider`、`model`、`project`、`day`、`harness`；`--since` 支持时长（`7d`、
-`30d`）或日期（`YYYY-MM-DD`）。`mytoken help` 会列出所有命令。
+`--by` 支持 `session`、`provider`、`model`、`project`、`day`、`harness`。`stats` 与 `sessions`
+共用时间范围参数 `--since`/`--until`（时长如 `7d`，或日期）和 `--last`（`today`、`week`、
+`month`，或 `30d`），以及 `--timezone`、`--offline`、`--no-cost`、`--format table|json|csv`
+（`--json` 是 `--format json` 的简写）；`--since` 与 `--last` 不能同时使用。`mytoken help`
+会列出所有命令，每个参数的含义见 [docs/CLI.md](docs/CLI.md)。
 
 ## 从源码构建
 
