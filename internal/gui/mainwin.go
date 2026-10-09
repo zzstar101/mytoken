@@ -202,15 +202,15 @@ func (s *State) overviewPage(c *ui.Context, pal palette) {
 					})
 				}).Grow(1).Basis(0)
 				card(c, pal, tr("topModels"), nil, func() {
-					s.bucketList(c, pal, topN(ov.Models, 6, "…"), 6, true)
+					s.bucketList(c, pal, topN(ov.Models, 6, "…"), 6, true, false)
 				}).Width(330).Shrink(0)
 			})
 			ui.Row(c).Gap(12).AlignItems(ui.Stretch).Children(func() {
 				card(c, pal, tr("byHarness"), nil, func() {
-					s.bucketList(c, pal, ov.Harnesses, 6, false)
+					s.bucketList(c, pal, ov.Harnesses, 6, false, true)
 				}).Grow(1).Basis(0)
 				card(c, pal, tr("byProvider"), nil, func() {
-					s.bucketList(c, pal, topN(ov.Providers, 5, "…"), 6, false)
+					s.bucketList(c, pal, topN(ov.Providers, 5, "…"), 6, false, false)
 				}).Grow(1).Basis(0)
 			})
 			s.recentCard(c, pal, ov.Active)
@@ -312,7 +312,7 @@ func (s *State) kpis(c *ui.Context, pal palette, ov Overview) {
 }
 
 // bucketList shows ranked buckets with a share bar each.
-func (s *State) bucketList(c *ui.Context, pal palette, bs []query.Bucket, max int, showCost bool) {
+func (s *State) bucketList(c *ui.Context, pal palette, bs []query.Bucket, max int, showCost, harnesses bool) {
 	if len(bs) == 0 {
 		ui.Text(c, tr("noData")).FontSize(12).TextColor(pal.muted)
 		return
@@ -333,12 +333,16 @@ func (s *State) bucketList(c *ui.Context, pal palette, bs []query.Bucket, max in
 				break
 			}
 			col := bandAt(i)
-			if h := model.Harness(b.Key); h.DisplayName() != b.Key {
-				col = harnessColor(h)
+			if harnesses {
+				col = harnessColor(model.Harness(b.Key))
 			}
 			ui.Column(c.Key(b.Key)).Gap(5).Children(func() {
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-					dot(c, col, 8)
+					if harnesses {
+						harnessMark(c, model.Harness(b.Key), 15)
+					} else {
+						dot(c, col, 8)
+					}
 					label := b.Label
 					if label == "" {
 						label = b.Key

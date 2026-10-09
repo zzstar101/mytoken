@@ -66,11 +66,7 @@ func (s *State) sessionRow(c *ui.Context, pal palette, r query.SessionRow, selec
 		row.Background(pal.hover)
 	}
 	row.Children(func() {
-		ui.Box(c).Size(30, 30).Radius(9).Center().Shrink(0).Background(col.Alpha(0.16)).Children(func() {
-			name := r.Harness.DisplayName()
-			mark := []rune(name)[:1]
-			ui.Text(c, string(mark)).FontSize(13).FontWeight(800).TextColor(col)
-		})
+		harnessBadge(c, r.Harness, 30)
 		ui.Column(c).Grow(1).Basis(0).Gap(3).Children(func() {
 			title := r.Title
 			if title == "" {
@@ -116,6 +112,7 @@ func (s *State) detailView(c *ui.Context, pal palette) {
 			// Header.
 			pane(c, pal).Padding(18).Gap(10).Children(func() {
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					harnessBadge(c, r.Harness, 24)
 					chip(c, r.Harness.DisplayName(), col)
 					if r.Children > 0 {
 						chip(c, trf("childrenN", r.Children), Taki)

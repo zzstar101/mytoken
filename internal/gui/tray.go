@@ -46,7 +46,7 @@ func (s *State) TrayView(c *ui.Context) {
 				// Top models today.
 				ui.Column(c).Gap(6).Children(func() {
 					ui.Text(c, tr("topModels")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
-					s.bucketList(c, pal, t.Models, 3, true)
+					s.bucketList(c, pal, t.Models, 3, true, false)
 				})
 				// Active sessions.
 				if len(t.Active) > 0 {

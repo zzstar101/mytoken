@@ -5,6 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zzstar/mytoken/internal/harness"
+	"github.com/zzstar/mytoken/internal/model"
 	"github.com/zzstar/mytoken/internal/query"
 )
 
@@ -45,6 +46,9 @@ func (s *State) rankingPage(c *ui.Context, pal palette) {
 							ui.Box(c).Size(26, 26).Radius(13).Center().Background(col).Children(func() {
 								ui.Textf(c, "%d", i+1).FontSize(13).FontWeight(800).TextColor(ui.RGB(255, 255, 255))
 							})
+							if s.rankTab == 2 {
+								harnessMark(c, model.Harness(b.Key), 18)
+							}
 							if i == 0 {
 								ui.Icon(c, icSparkle).FontSize(14).TextColor(Soyo)
 							}
@@ -101,7 +105,11 @@ func (s *State) rankTable(c *ui.Context, pal palette, bs []query.Bucket) {
 					label = b.Key
 				}
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-					dot(c, bandAt(i), 8)
+					if s.rankTab == 2 {
+						harnessMark(c, model.Harness(b.Key), 15)
+					} else {
+						dot(c, bandAt(i), 8)
+					}
 					ui.Text(c, label).FontSize(13).FontWeight(600).TextColor(pal.ink).SingleLine().Ellipsis("…")
 				})
 				classBar(c, pal, b.Tokens, 4)
@@ -194,7 +202,7 @@ func (s *State) settingsPage(c *ui.Context, pal palette) {
 				for _, p := range harness.All() {
 					h := p.Harness()
 					ui.Row(c.Key(string(h))).Gap(10).Padding(6, 0).AlignItems(ui.Center).Children(func() {
-						dot(c, harnessColor(h), 9)
+						harnessMark(c, h, 16)
 						ui.Text(c, h.DisplayName()).FontSize(13).FontWeight(650).TextColor(pal.ink).Width(130)
 						ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
 							for _, r := range p.Roots() {
