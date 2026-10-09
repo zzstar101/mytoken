@@ -1,0 +1,2 @@
+{"type":"user","isMeta":false,"message":{"role":"user","content":"Second session prompt"},"sessionId":"sess-2","cwd":"/Users/demo/other-proj","timestamp":"2026-02-03T04:05:06.000Z","uuid":"v-1"}
+{"type":"assistant","isSidechain":false,"message":{"id":"msg_demo_5","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"placeholder"}],"usage":{"input_tokens":5,"output_tokens":5}},"requestId":"req_demo_5","uuid":"v-2","sessionId":"sess-2","cwd":"/Users/demo/other-proj","timestamp":"2026-02-03T04:05:07.000Z"}

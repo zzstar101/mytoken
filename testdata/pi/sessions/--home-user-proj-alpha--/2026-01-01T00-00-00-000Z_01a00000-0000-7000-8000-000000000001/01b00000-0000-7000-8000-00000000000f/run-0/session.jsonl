@@ -1,0 +1,3 @@
+{"type":"session","version":3,"id":"01b00000-0000-7000-8000-00000000000f","timestamp":"2026-01-01T00:01:00.000Z","cwd":"/home/user/proj-alpha"}
+{"type":"message","id":"r1","parentId":null,"timestamp":"2026-01-01T00:01:01.000Z","message":{"role":"user","timestamp":1767225661000,"content":[{"type":"text","text":"PLACEHOLDER_SUBAGENT_TASK"}]}}
+{"type":"message","id":"r2","parentId":null,"timestamp":"2026-01-01T00:01:02.000Z","message":{"role":"assistant","timestamp":1767225662000,"provider":"mini","model":"gpt-5-mini","responseId":"gen_0004","api":"openai-completions","stopReason":"stop","usage":{"input":400,"output":80,"cacheRead":0,"cacheWrite":0,"totalTokens":480,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}}}}

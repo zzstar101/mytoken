@@ -1,0 +1,4 @@
+/mytoken
+/dist/
+*.test
+.DS_Store
