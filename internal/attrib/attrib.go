@@ -10,25 +10,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/zzstar101/mytoken/internal/model"
-	"github.com/zzstar101/mytoken/internal/sqlitedsn"
+	"github.com/zzstar101/mytoken/internal/source"
 	"github.com/zzstar101/mytoken/internal/store"
 )
 
-type matchKey struct {
-	app, model                 string
-	input, output, read, write int64
-}
-type match struct {
-	at       int64
-	provider string
-}
 type config struct {
 	from           int64
 	base, provider string
@@ -39,18 +29,19 @@ type Rule struct {
 	From, To time.Time
 	Provider string `json:"provider"`
 }
+
+// Resolver attributes an event to a provider. Provider data comes from
+// optional sources (cc-switch, local harness configs) consulted in priority
+// order; with no source at all it still resolves from user rules, the log
+// itself and the model name.
 type Resolver struct {
-	st           *store.Store
-	home, ccPath string
-	mu           sync.RWMutex
-	refresh      sync.Mutex
-	cc           *sql.DB
-	matches      map[matchKey][]match
-	configs      map[model.Harness][]config
-	rules        []Rule
-	hosts        map[string]string
-	ccSize       int64
-	ccMod        time.Time
+	st      *store.Store
+	sources []source.Source
+	mu      sync.RWMutex
+	refresh sync.Mutex
+	configs map[model.Harness][]config
+	rules   []Rule
+	hosts   map[string]string
 }
 
 func New(st *store.Store) (*Resolver, error) {
@@ -61,7 +52,13 @@ func New(st *store.Store) (*Resolver, error) {
 	return NewWithPaths(st, home, filepath.Join(home, ".cc-switch", "cc-switch.db"))
 }
 func NewWithPaths(st *store.Store, home, ccPath string) (*Resolver, error) {
-	r := &Resolver{st: st, home: home, ccPath: ccPath, matches: map[matchKey][]match{}, configs: map[model.Harness][]config{}, hosts: map[string]string{}}
+	return NewWithSources(st, source.NewCCSwitch(ccPath), source.NewHarnessConfig(home))
+}
+
+// NewWithSources builds a resolver over explicit provider sources, in priority
+// order. Tests and future embedders use it to inject paths.
+func NewWithSources(st *store.Store, sources ...source.Source) (*Resolver, error) {
+	r := &Resolver{st: st, sources: sources, configs: map[model.Harness][]config{}, hosts: map[string]string{}}
 	if e := r.Refresh(context.Background()); e != nil {
 		return nil, e
 	}
@@ -105,24 +102,23 @@ func (r *Resolver) migrateGenericProviders(ctx context.Context) error {
 	return r.st.SetSetting(ctx, "attribution.generic-host.v1", "1")
 }
 
+// Sources returns the configured provider sources in priority order.
+func (r *Resolver) Sources() []source.Source {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return append([]source.Source{}, r.sources...)
+}
+
 func (r *Resolver) Close() error {
 	r.refresh.Lock()
 	defer r.refresh.Unlock()
-	if r.cc != nil {
-		return r.cc.Close()
+	var first error
+	for _, s := range r.sources {
+		if e := s.Close(); e != nil && first == nil {
+			first = e
+		}
 	}
-	return nil
-}
-func appType(h model.Harness) string {
-	switch h {
-	case model.ClaudeCode:
-		return "claude"
-	case model.Codex:
-		return "codex"
-	case model.Gemini:
-		return "gemini"
-	}
-	return string(h)
+	return first
 }
 func (r *Resolver) Resolve(_ context.Context, e model.UsageEvent) (string, model.AttribSource) {
 	r.mu.RLock()
@@ -135,21 +131,15 @@ func (r *Resolver) Resolve(_ context.Context, e model.UsageEvent) (string, model
 	if provider := displayProvider(e.Provider, e.BaseURL); provider != "" {
 		return provider, model.AttribLog
 	}
-	key := matchKey{appType(e.Harness), e.Model, e.Tokens.Input, e.Tokens.Output + e.Tokens.Reasoning, e.Tokens.CacheRead, e.Tokens.CacheWrite}
-	best := int64(121)
-	provider := ""
-	for _, m := range r.matches[key] {
-		d := e.Timestamp.Unix() - m.at
-		if d < 0 {
-			d = -d
+	// Request-level sources (cc-switch's proxy log) come next, in priority order.
+	for _, s := range r.sources {
+		m, ok := s.(source.Matcher)
+		if !ok {
+			continue
 		}
-		if d < best {
-			provider = m.provider
-			best = d
+		if provider, ok := m.Match(e); ok {
+			return displayProvider(provider, e.BaseURL), model.AttribCCSwitch
 		}
-	}
-	if provider != "" {
-		return displayProvider(provider, e.BaseURL), model.AttribCCSwitch
 	}
 	configs := r.configs[e.Harness]
 	at := e.Timestamp.UnixNano()
@@ -229,26 +219,12 @@ func (r *Resolver) Refresh(ctx context.Context) error {
 	if raw, e := r.st.Setting(ctx, "attribution.hosts"); e == nil && raw != "" {
 		_ = json.Unmarshal([]byte(raw), &r.hosts)
 	}
-	r.loadCC(ctx)
-	for h, v := range r.currentConfigs() {
-		v.base = sanitizedURL(v.base)
-		if v.base != "" {
-			host := ProviderForURL(v.base)
-			if custom, ok := r.hosts[host]; ok {
-				host = custom
-			}
-			v.provider = host
-		}
-		if v.provider == "" {
-			continue
-		}
-		var base, provider string
-		e := r.st.DB().QueryRowContext(ctx, "SELECT base_url,provider FROM provider_configs WHERE harness=? ORDER BY from_time DESC LIMIT 1", h).Scan(&base, &provider)
-		if e != nil && !errors.Is(e, sql.ErrNoRows) {
+	for _, s := range r.sources {
+		if e := s.Load(ctx); e != nil {
 			return e
 		}
-		if base != v.base || provider != v.provider {
-			if e = r.st.Exec(ctx, "INSERT INTO provider_configs VALUES(?,?,?,?)", h, time.Now().UnixNano(), v.base, v.provider); e != nil {
+		if c, ok := s.(source.Configs); ok {
+			if e := r.backfillConfigs(ctx, c.CurrentConfigs()); e != nil {
 				return e
 			}
 		}
@@ -273,121 +249,47 @@ func (r *Resolver) Refresh(ctx context.Context) error {
 	r.configs = configs
 	return nil
 }
-func (r *Resolver) currentConfigs() map[model.Harness]config {
-	out := map[model.Harness]config{}
-	if raw, e := os.ReadFile(filepath.Join(r.home, ".claude", "settings.json")); e == nil {
-		var v struct {
-			Env map[string]string `json:"env"`
-		}
-		if json.Unmarshal(raw, &v) == nil {
-			out[model.ClaudeCode] = config{base: v.Env["ANTHROPIC_BASE_URL"]}
-			if out[model.ClaudeCode].base == "" {
-				out[model.ClaudeCode] = config{provider: "anthropic"}
+
+// backfillConfigs appends a source's current selections to the provider_configs
+// timeline: a selection that predates the timeline anchors it at time 0, a live
+// one only when it differs from the latest entry.
+func (r *Resolver) backfillConfigs(ctx context.Context, list []source.CurrentConfig) error {
+	for _, v := range list {
+		base, provider := v.Base, v.Provider
+		if base != "" {
+			base = sanitizedURL(base)
+			if base != "" {
+				host := ProviderForURL(base)
+				if custom, ok := r.hosts[host]; ok {
+					host = custom
+				}
+				provider = host
 			}
 		}
-	}
-	if raw, e := os.ReadFile(filepath.Join(r.home, ".codex", "config.toml")); e == nil {
-		var v struct {
-			ModelProvider string `toml:"model_provider"`
-			BaseURL       string `toml:"base_url"`
-			Providers     map[string]struct {
-				BaseURL string `toml:"base_url"`
-			} `toml:"model_providers"`
-		}
-		if toml.Unmarshal(raw, &v) == nil {
-			base := v.BaseURL
-			if p, ok := v.Providers[v.ModelProvider]; ok && p.BaseURL != "" {
-				base = p.BaseURL
-			}
-			provider := v.ModelProvider
-			if provider == "" {
-				provider = "openai"
-			}
-			out[model.Codex] = config{base: base, provider: provider}
-		}
-	}
-	return out
-}
-func (r *Resolver) loadCC(ctx context.Context) {
-	fi, e := os.Stat(r.ccPath)
-	if e != nil {
-		return
-	}
-	wal, _ := os.Stat(r.ccPath + "-wal")
-	size := fi.Size()
-	mod := fi.ModTime()
-	if wal != nil {
-		size += wal.Size()
-		if wal.ModTime().After(mod) {
-			mod = wal.ModTime()
-		}
-	}
-	if r.cc != nil && r.ccSize == size && r.ccMod.Equal(mod) {
-		return
-	}
-	if r.cc == nil {
-		r.cc, e = sql.Open("sqlite", sqlitedsn.URI(r.ccPath, "mode=ro"))
-		if e != nil {
-			return
-		}
-		r.cc.SetMaxOpenConns(1)
-	}
-	rows, e := r.cc.QueryContext(ctx, `SELECT l.app_type,l.model,COALESCE(l.request_model,''),COALESCE(l.input_tokens,0),COALESCE(l.output_tokens,0),COALESCE(l.cache_read_tokens,0),COALESCE(l.cache_creation_tokens,0),l.created_at,p.name FROM proxy_request_logs l JOIN providers p ON p.id=l.provider_id AND p.app_type=l.app_type WHERE l.data_source='proxy' OR (l.provider_id IS NOT NULL AND l.provider_id!='')`)
-	if e != nil {
-		return
-	}
-	matches := map[matchKey][]match{}
-	for rows.Next() {
-		var k matchKey
-		var request string
-		var m match
-		if rows.Scan(&k.app, &k.model, &request, &k.input, &k.output, &k.read, &k.write, &m.at, &m.provider) != nil {
+		if provider == "" {
 			continue
 		}
-		if m.at > 1e12 {
-			m.at /= 1000
+		if v.SeedAtZero {
+			if e := r.st.Exec(ctx, `INSERT INTO provider_configs(harness,from_time,base_url,provider) SELECT ?,0,'',? WHERE NOT EXISTS(SELECT 1 FROM provider_configs WHERE harness=?)`, v.Harness, provider, v.Harness); e != nil {
+				return e
+			}
+			continue
 		}
-		matches[k] = append(matches[k], m)
-		if request != "" && request != k.model {
-			k.model = request
-			matches[k] = append(matches[k], m)
+		var oldBase, oldProvider string
+		e := r.st.DB().QueryRowContext(ctx, "SELECT base_url,provider FROM provider_configs WHERE harness=? ORDER BY from_time DESC LIMIT 1", v.Harness).Scan(&oldBase, &oldProvider)
+		if e != nil && !errors.Is(e, sql.ErrNoRows) {
+			return e
 		}
-	}
-	err := rows.Err()
-	rows.Close()
-	if err != nil {
-		return
-	}
-	for k := range matches {
-		sort.Slice(matches[k], func(i, j int) bool { return matches[k][i].at < matches[k][j].at })
-	}
-	r.matches = matches
-	r.ccSize = size
-	r.ccMod = mod
-	// Backfill only from cc-switch's current selection, never today's raw config.
-	rows, e = r.cc.QueryContext(ctx, "SELECT app_type,name FROM providers WHERE is_current=1 ORDER BY id")
-	if e != nil {
-		return
-	}
-	type current struct{ app, name string }
-	var curr []current
-	for rows.Next() {
-		var v current
-		if rows.Scan(&v.app, &v.name) == nil {
-			curr = append(curr, v)
+		if oldBase != base || oldProvider != provider {
+			if e = r.st.Exec(ctx, "INSERT INTO provider_configs VALUES(?,?,?,?)", v.Harness, time.Now().UnixNano(), base, provider); e != nil {
+				return e
+			}
 		}
 	}
-	rows.Close()
-	for _, v := range curr {
-		h := model.Harness(v.app)
-		if v.app == "claude" {
-			h = model.ClaudeCode
-		}
-		_ = r.st.Exec(ctx, `INSERT INTO provider_configs(harness,from_time,base_url,provider) SELECT ?,0,'',? WHERE NOT EXISTS(SELECT 1 FROM provider_configs WHERE harness=?)`, h, v.name, h)
-	}
+	return nil
 }
 func (r *Resolver) String() string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return fmt.Sprintf("attribution: %d matching keys", len(r.matches))
+	return fmt.Sprintf("attribution: %d sources, %d rules", len(r.sources), len(r.rules))
 }

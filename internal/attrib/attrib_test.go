@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/source"
 	"github.com/zzstar101/mytoken/internal/store"
 	_ "modernc.org/sqlite"
 	"os"
@@ -100,5 +101,44 @@ func TestConfigTimelineAndMissingCCSwitch(t *testing.T) {
 	}
 	if _, e = os.Stat(filepath.Join(dir, "missing.db")); !os.IsNotExist(e) {
 		t.Fatal("created cc-switch DB")
+	}
+}
+
+// A resolver with no provider source at all still attributes from user rules,
+// the log's own provider and the model name.
+func TestResolveWithoutSources(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "own.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	r, err := NewWithSources(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if len(r.Sources()) != 0 {
+		t.Fatalf("sources=%v", r.Sources())
+	}
+	ctx := context.Background()
+	if _, a := r.Resolve(ctx, model.UsageEvent{Provider: "Gateway", Model: "claude-sonnet-4"}); a != model.AttribLog {
+		t.Fatal(a)
+	}
+	p, a := r.Resolve(ctx, model.UsageEvent{Model: "claude-sonnet-4", Timestamp: time.Now()})
+	if p != "anthropic" || a != model.AttribInferred {
+		t.Fatalf("infer %q %q", p, a)
+	}
+	// A source that is present but empty behaves the same way.
+	r2, err := NewWithSources(st, source.NewCCSwitch(filepath.Join(dir, "absent.db")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r2.Close()
+	if p, a := r2.Resolve(ctx, model.UsageEvent{Model: "claude-sonnet-4", Timestamp: time.Now()}); p != "anthropic" || a != model.AttribInferred {
+		t.Fatalf("empty source %q %q", p, a)
+	}
+	if s := r2.Sources(); len(s) != 1 || s[0].Status().Exists {
+		t.Fatalf("status=%+v", s)
 	}
 }

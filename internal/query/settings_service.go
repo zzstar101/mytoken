@@ -3,12 +3,12 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/zzstar101/mytoken/internal/pricing"
+	"github.com/zzstar101/mytoken/internal/source"
 	"github.com/zzstar101/mytoken/internal/store"
 	"math"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -16,17 +16,22 @@ import (
 )
 
 type settingsService struct {
-	st     *store.Store
-	p      *pricing.Pricer
-	mu     sync.Mutex
-	ccPath string
+	st      *store.Store
+	p       *pricing.Pricer
+	mu      sync.Mutex
+	sources []source.Source
 }
 
 var _ Settings = (*settingsService)(nil)
 
 func NewSettings(st *store.Store, p *pricing.Pricer) Settings {
-	home, _ := os.UserHomeDir()
-	return &settingsService{st: st, p: p, ccPath: filepath.Join(home, ".cc-switch", "cc-switch.db")}
+	return NewSettingsWithSources(st, p, source.NewCCSwitch(source.CCSwitchPath()))
+}
+
+// NewSettingsWithSources is NewSettings with explicit provider sources; price
+// import uses whichever source implements source.Pricing.
+func NewSettingsWithSources(st *store.Store, p *pricing.Pricer, sources ...source.Source) Settings {
+	return &settingsService{st: st, p: p, sources: sources}
 }
 func readSetting[T any](ctx context.Context, st *store.Store, key string) ([]T, error) {
 	raw, err := st.Setting(ctx, key)
@@ -46,6 +51,15 @@ func pricingRules(rules []PriceRule) []pricing.Rule {
 	out := make([]pricing.Rule, len(rules))
 	for i, r := range rules {
 		out[i] = pricing.Rule{Provider: r.Provider, Model: r.Model, Multiplier: r.Multiplier, Input: r.Input, Output: r.Output, CacheRead: r.CacheRead, CacheWrite: r.CacheWrite, Source: r.Source, From: r.From}
+	}
+	return out
+}
+
+// fromPricingRules converts a provider source's rules into the stored contract.
+func fromPricingRules(rules []pricing.Rule) []PriceRule {
+	out := make([]PriceRule, len(rules))
+	for i, r := range rules {
+		out[i] = PriceRule{Provider: r.Provider, Model: r.Model, Multiplier: r.Multiplier, Input: r.Input, Output: r.Output, CacheRead: r.CacheRead, CacheWrite: r.CacheWrite, Source: r.Source, From: r.From}
 	}
 	return out
 }
@@ -170,9 +184,22 @@ func (s *settingsService) SetModelAliases(ctx context.Context, aliases []ModelAl
 func (s *settingsService) ImportCCSwitch(ctx context.Context) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rules, err := importCCSwitch(ctx, s.ccPath)
-	if err != nil {
-		return 0, err
+	var rules []PriceRule
+	found := false
+	for _, src := range s.sources {
+		p, ok := src.(source.Pricing)
+		if !ok {
+			continue
+		}
+		found = true
+		imported, err := p.PriceRules(ctx)
+		if err != nil {
+			return 0, err
+		}
+		rules = append(rules, fromPricingRules(imported)...)
+	}
+	if !found {
+		return 0, errors.New("no provider source can import prices")
 	}
 	old, err := s.PriceRules(ctx)
 	if err != nil {

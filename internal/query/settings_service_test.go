@@ -7,6 +7,7 @@ import (
 	"github.com/zzstar101/mytoken/internal/harness"
 	"github.com/zzstar101/mytoken/internal/model"
 	"github.com/zzstar101/mytoken/internal/pricing"
+	"github.com/zzstar101/mytoken/internal/source"
 	"github.com/zzstar101/mytoken/internal/store"
 	"path/filepath"
 	"strings"
@@ -40,8 +41,7 @@ func TestCCSwitchImport(t *testing.T) {
 			}
 			defer st.Close()
 			p := pricing.New("")
-			s := NewSettings(st, p).(*settingsService)
-			s.ccPath = path
+			s := NewSettingsWithSources(st, p, source.NewCCSwitch(path))
 			in := 7.0
 			if err = s.SetPriceRules(ctx, []PriceRule{{Model: "user", Input: &in, Source: "user"}, {Model: "old", Source: "cc-switch"}}); err != nil {
 				t.Fatal(err)
@@ -90,7 +90,11 @@ func TestCCSwitchImport(t *testing.T) {
 	}
 }
 func osStatMissingCCSwitch(ctx context.Context, path string) ([]PriceRule, error) {
-	return importCCSwitch(ctx, path)
+	rules, err := source.NewCCSwitch(path).PriceRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return fromPricingRules(rules), nil
 }
 
 // TestPriceRuleEffectiveFrom covers dated rules end to end: storage keeps them,

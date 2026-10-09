@@ -17,6 +17,7 @@ import (
 	"github.com/zzstar101/mytoken/internal/harness"
 	"github.com/zzstar101/mytoken/internal/paths"
 	"github.com/zzstar101/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/source"
 )
 
 // Version is set at build time with -ldflags -X.
@@ -127,6 +128,19 @@ type doctorReport struct {
 	PricingFetchedAt  *time.Time      `json:"pricingFetchedAt"`
 	PricingAgeSeconds *int64          `json:"pricingAgeSeconds"`
 	Harnesses         []doctorHarness `json:"harnesses"`
+	ProviderSources   []doctorSource  `json:"providerSources"`
+}
+
+// doctorSource is one provider source's health; credentials are never printed.
+type doctorSource struct {
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	Exists    bool   `json:"exists"`
+	ReadAt    string `json:"readAt,omitempty"`
+	Providers int    `json:"providers"`
+	Matches   int    `json:"matches"`
+	Error     string `json:"error,omitempty"`
+	Detail    string `json:"detail,omitempty"`
 }
 
 func runDoctor(ctx context.Context, args []string, out, errout io.Writer) int {
@@ -193,6 +207,19 @@ func runDoctor(ctx context.Context, args []string, out, errout io.Writer) int {
 		}
 		report.Harnesses = append(report.Harnesses, h)
 	}
+	for _, s := range a.Resolver.Sources() {
+		st := s.Status()
+		entry := doctorSource{Name: s.Name(), Path: st.Path, Exists: st.Exists, Providers: st.Providers, Matches: st.Matches, Error: st.Err, Detail: st.Detail}
+		if !st.ReadAt.IsZero() {
+			entry.ReadAt = st.ReadAt.UTC().Format(time.RFC3339)
+		}
+		if lister, ok := s.(source.Providers); ok {
+			if n := len(lister.Providers()); n > 0 {
+				entry.Providers = n
+			}
+		}
+		report.ProviderSources = append(report.ProviderSources, entry)
+	}
 	if *js {
 		err = json.NewEncoder(out).Encode(report)
 	} else {
@@ -211,6 +238,13 @@ func runDoctor(ctx context.Context, args []string, out, errout io.Writer) int {
 			}
 			if len(h.Roots) == 0 {
 				fmt.Fprintf(w, "%s\t%d\t%d\t-\tfalse\n", h.Harness, h.Sources, h.Events)
+			}
+		}
+		if len(report.ProviderSources) > 0 {
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "PROVIDER SOURCE\tEXISTS\tPROVIDERS\tMATCHES\tREAD AT\tERROR")
+			for _, s := range report.ProviderSources {
+				fmt.Fprintf(w, "%s\t%t\t%d\t%d\t%s\t%s\n", s.Name, s.Exists, s.Providers, s.Matches, s.ReadAt, s.Error)
 			}
 		}
 		err = w.Flush()
