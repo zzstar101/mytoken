@@ -283,6 +283,8 @@ func checkGolden(t *testing.T, c Case) {
 	if err != nil {
 		t.Fatalf("harnesstest: read golden %s: %v\n(run `go test ./internal/harness/%s -run Conformance -update`)", c.Golden, err, c.Name)
 	}
+	// A Windows checkout that converted line endings is still the same document.
+	want = bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n"))
 	if !bytes.Equal(want, got) {
 		t.Errorf("harnesstest: %s output does not match %s\n%s", c.Name, c.Golden, diffLines(want, got))
 	}

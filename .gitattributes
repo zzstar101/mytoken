@@ -1,0 +1,4 @@
+# Fixtures are compared byte for byte (conformance golden files) and parsed
+# at byte offsets: keep them exactly as committed, without CRLF conversion on
+# Windows checkouts.
+**/testdata/** -text
