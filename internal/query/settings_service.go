@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 type settingsService struct {
@@ -44,7 +45,7 @@ func (s *settingsService) ModelAliases(ctx context.Context) ([]ModelAlias, error
 func pricingRules(rules []PriceRule) []pricing.Rule {
 	out := make([]pricing.Rule, len(rules))
 	for i, r := range rules {
-		out[i] = pricing.Rule{Provider: r.Provider, Model: r.Model, Multiplier: r.Multiplier, Input: r.Input, Output: r.Output, CacheRead: r.CacheRead, CacheWrite: r.CacheWrite, Source: r.Source}
+		out[i] = pricing.Rule{Provider: r.Provider, Model: r.Model, Multiplier: r.Multiplier, Input: r.Input, Output: r.Output, CacheRead: r.CacheRead, CacheWrite: r.CacheWrite, Source: r.Source, From: r.From}
 	}
 	return out
 }
@@ -77,11 +78,14 @@ func (s *settingsService) SetPriceRules(ctx context.Context, rules []PriceRule) 
 }
 func (s *settingsService) setPriceRules(ctx context.Context, rules []PriceRule) error {
 	rules = append([]PriceRule{}, rules...)
-	seen := map[[3]string]bool{}
+	seen := map[[4]string]bool{}
 	for i := range rules {
 		r := &rules[i]
 		r.Provider = strings.TrimSpace(r.Provider)
 		r.Model = strings.TrimSpace(r.Model)
+		if !r.From.IsZero() {
+			r.From = r.From.UTC()
+		}
 		if r.Source == "" {
 			r.Source = "user"
 		}
@@ -99,7 +103,9 @@ func (s *settingsService) setPriceRules(ctx context.Context, rules []PriceRule) 
 				return fmt.Errorf("invalid token price")
 			}
 		}
-		key := [3]string{r.Provider, pricing.Normalize(r.Model), r.Source}
+		// Same selector and start instant is a duplicate; a later From makes it
+		// a separate, time-effective rule.
+		key := [4]string{r.Provider, pricing.Normalize(r.Model), r.Source, r.From.UTC().Format(time.RFC3339Nano)}
 		if seen[key] {
 			return fmt.Errorf("duplicate price rule for %q/%q", r.Provider, r.Model)
 		}

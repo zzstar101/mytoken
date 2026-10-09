@@ -3,12 +3,15 @@ package query
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"github.com/zzstar101/mytoken/internal/harness"
 	"github.com/zzstar101/mytoken/internal/model"
 	"github.com/zzstar101/mytoken/internal/pricing"
 	"github.com/zzstar101/mytoken/internal/store"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestCCSwitchImport(t *testing.T) {
@@ -63,6 +66,15 @@ func TestCCSwitchImport(t *testing.T) {
 			if err != nil || len(rules) != 4 {
 				t.Fatalf("rules=%+v err=%v", rules, err)
 			}
+			// Imported model rules carry no multiplier: the provider rule owns it.
+			for _, r := range rules {
+				if r.Model == "" {
+					continue
+				}
+				if r.Multiplier != 0 {
+					t.Fatalf("model rule %q/%q must leave the multiplier unset, got %v", r.Provider, r.Model, r.Multiplier)
+				}
+			}
 			e := model.UsageEvent{Model: "fixture", Provider: "Relay", Tokens: model.Tokens{Input: 1000000}}
 			if cost, ok := p.Evaluate(e); !ok || cost != 1 {
 				t.Fatal(cost, ok)
@@ -80,6 +92,122 @@ func TestCCSwitchImport(t *testing.T) {
 func osStatMissingCCSwitch(ctx context.Context, path string) ([]PriceRule, error) {
 	return importCCSwitch(ctx, path)
 }
+
+// TestPriceRuleEffectiveFrom covers dated rules end to end: storage keeps them,
+// and Evaluate picks the rule that was effective when the event happened.
+func TestPriceRuleEffectiveFrom(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	p := pricing.New("")
+	s := NewSettings(st, p)
+	cheap, pricey := 1.0, 2.0
+	from := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	if err = s.SetPriceRules(ctx, []PriceRule{
+		{Model: "dated", Input: &cheap, Output: &cheap, CacheRead: &cheap, CacheWrite: &cheap},
+		{Model: "dated", Input: &pricey, Output: &pricey, CacheRead: &pricey, CacheWrite: &pricey, From: from},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rules, err := s.PriceRules(ctx)
+	if err != nil || len(rules) != 2 {
+		t.Fatalf("rules=%+v err=%v", rules, err)
+	}
+	if !rules[1].From.Equal(from) {
+		t.Fatalf("from=%v", rules[1].From)
+	}
+	// A dated rule is stored with its "from"; only the zero value is omitted.
+	raw, err := st.Setting(ctx, "price-rules")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(raw, `"from":"2026-02-01T00:00:00Z"`) {
+		t.Fatalf("dated rule not stored: %s", raw)
+	}
+	// The same selector with the same start instant is still a duplicate.
+	if err = s.SetPriceRules(ctx, []PriceRule{{Model: "dated", Input: &cheap}, {Model: "dated", Input: &pricey, From: from}, {Model: "dated", Input: &pricey, From: from}}); err == nil {
+		t.Fatal("duplicate dated rule accepted")
+	}
+	before := model.UsageEvent{Model: "dated", Timestamp: from.Add(-time.Hour), Tokens: model.Tokens{Input: 1000000}}
+	if cost, ok := p.Evaluate(before); !ok || cost != 1 {
+		t.Fatal(cost, ok)
+	}
+	after := model.UsageEvent{Model: "dated", Timestamp: from, Tokens: model.Tokens{Input: 1000000}}
+	if cost, ok := p.Evaluate(after); !ok || cost != 2 {
+		t.Fatal(cost, ok)
+	}
+	// A provider multiplier applies whatever the model rule prices.
+	mult := 0.5
+	if err = s.SetPriceRules(ctx, []PriceRule{{Provider: "relay", Multiplier: mult}, {Model: "dated", Input: &pricey, Output: &pricey, CacheRead: &pricey, CacheWrite: &pricey, From: from}}); err != nil {
+		t.Fatal(err)
+	}
+	after.Provider = "relay"
+	if cost, ok := p.Evaluate(after); !ok || cost != 1 {
+		t.Fatal(cost, ok)
+	}
+}
+
+// TestPriceRulesReadOldFormat checks that rules written before From existed
+// load losslessly (zero From = always effective), that a model-level
+// multiplier set on its own still prices the same way it did, and that a
+// provider multiplier now takes precedence over that fallback.
+func TestPriceRulesReadOldFormat(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	p := pricing.New("")
+	s := NewSettings(st, p)
+	old := `[{"provider":"relay","multiplier":0.3,"source":"user"},{"model":"legacy","multiplier":0.5,"input":2,"output":3,"source":"user"}]`
+	if err = st.SetSetting(ctx, "price-rules", old); err != nil {
+		t.Fatal(err)
+	}
+	if err = LoadPricingSettings(ctx, st, p); err != nil {
+		t.Fatal(err)
+	}
+	rules, err := s.PriceRules(ctx)
+	if err != nil || len(rules) != 2 {
+		t.Fatalf("rules=%+v err=%v", rules, err)
+	}
+	for _, r := range rules {
+		if !r.From.IsZero() {
+			t.Fatalf("old rule gained a start time: %+v", r)
+		}
+	}
+	relay := model.UsageEvent{Model: "legacy", Provider: "relay", Tokens: model.Tokens{Input: 1000000}}
+	other := model.UsageEvent{Model: "legacy", Provider: "gateway", Tokens: model.Tokens{Input: 1000000}}
+	// Without a provider rule the model-level multiplier is the last fallback,
+	// so an old model-only config keeps computing exactly what it did before.
+	if cost, ok := p.Evaluate(other); !ok || cost != 2*0.5 {
+		t.Fatal(cost, ok)
+	}
+	// With one, the provider multiplier wins: 0.3, not the model's 0.5.
+	if cost, ok := p.Evaluate(relay); !ok || cost != 2*0.3 {
+		t.Fatal(cost, ok)
+	}
+	// Round-tripping keeps the stored shape readable by an older binary, and
+	// the always-effective rules carry no "from" field at all.
+	if err = s.SetPriceRules(ctx, rules); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := st.Setting(ctx, "price-rules")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(raw, `"from"`) {
+		t.Fatalf("zero From must be omitted: %s", raw)
+	}
+	var back []PriceRule
+	if err = json.Unmarshal([]byte(raw), &back); err != nil || len(back) != 2 || !back[0].From.IsZero() {
+		t.Fatalf("raw=%s err=%v", raw, err)
+	}
+}
+
 func TestSettingsRepriceAndAliases(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(filepath.Join(t.TempDir(), "index.db"))

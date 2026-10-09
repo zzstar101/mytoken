@@ -68,7 +68,9 @@ func importCCSwitch(ctx context.Context, path string) ([]PriceRule, error) {
 				return nil, fmt.Errorf("invalid cc-switch rate for %q: %q", name, v)
 			}
 		}
-		r := PriceRule{Model: name, Multiplier: 1, Input: &rates[0], Output: &rates[1], CacheRead: &rates[2], CacheWrite: &rates[3], Source: "cc-switch"}
+		// A model rule supplies unit prices only: its multiplier stays 0
+		// ("unset") so the provider's own multiplier still applies.
+		r := PriceRule{Model: name, Input: &rates[0], Output: &rates[1], CacheRead: &rates[2], CacheWrite: &rates[3], Source: "cc-switch"}
 		key := pricing.Normalize(name)
 		if !seen[key] {
 			models = append(models, r)
@@ -182,13 +184,13 @@ func importCCSwitch(ctx context.Context, path string) ([]PriceRule, error) {
 		return nil, err
 	}
 	out := append([]PriceRule{}, models...)
-	// Materialize provider/model selectors because rules choose a single specificity.
+	// Materialize provider/model selectors: the provider rule carries the
+	// multiplier, the model-scoped copy only narrows which prices apply.
 	for _, name := range names {
 		n := providers[name]
 		out = append(out, PriceRule{Provider: name, Multiplier: n, Source: "cc-switch"})
 		for _, m := range models {
 			m.Provider = name
-			m.Multiplier = n
 			out = append(out, m)
 		}
 	}

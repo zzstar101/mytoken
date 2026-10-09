@@ -80,7 +80,7 @@ type Pricer struct {
 	aliases               map[string]Price
 	attempted             time.Time
 	overrides             map[string]map[string]Price
-	rules                 map[[2]string]Rule
+	rules                 map[[2]string][]Rule
 	modelAliases          map[[2]string]string
 	multipliers           map[string]float64
 	dir                   string
@@ -197,11 +197,13 @@ func (p *Pricer) index() {
 	}
 }
 
-// HasPrice distinguishes unknown models from legitimately free models.
+// HasPrice distinguishes unknown models from legitimately free models. Rules
+// are selected as of now, matching Evaluate's fallback for events without a
+// timestamp.
 func (p *Pricer) HasPrice(provider, name string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	_, ok, _ := p.effective(provider, name)
+	_, ok, _ := p.effective(provider, name, time.Now())
 	return ok
 }
 func (p *Pricer) SetMultiplier(provider string, multiplier float64) {

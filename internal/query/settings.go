@@ -1,26 +1,41 @@
 package query
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // PriceRule adjusts computed costs (docs/SPEC.md §7). Rules never touch a
 // cost the log itself reported.
 //
 //   - Provider != "" && Model == "": Multiplier scales every computed cost of
-//     that provider (e.g. a relay selling at 0.3× list price).
+//     that provider (e.g. a relay selling at 0.3× list price); its rates are
+//     the last custom-price fallback for that provider's models.
 //   - Model != "": a custom per-1M-token price for that model (optionally only
-//     under Provider), used instead of the catalog price; Multiplier still applies.
+//     under Provider), used instead of the catalog price.
 //
-// The most specific rule wins: provider+model > model > provider.
+// Unit prices and multipliers are looked up separately:
+//
+//   - Prices walk provider+model → model → provider → catalog, class by class,
+//     so a narrower rule overrides one rate while a wider one fills the rest.
+//   - Multipliers prefer the provider-scoped rule: provider+model → provider →
+//     model → 1. So a model rule with Multiplier 0 — "unset" — never cancels a
+//     provider's multiplier.
+//
+// From is when the rule starts applying (zero = always). Several rules may
+// share (provider, model); the one with the latest From ≤ the event's
+// timestamp wins.
 type PriceRule struct {
 	Provider   string  `json:"provider,omitempty"`
 	Model      string  `json:"model,omitempty"`
-	Multiplier float64 `json:"multiplier"` // 0 is treated as 1
+	Multiplier float64 `json:"multiplier"` // 0 = 未设置，不覆盖别处的倍率
 	// Custom prices in USD per 1M tokens; nil = use the catalog's.
-	Input      *float64 `json:"input,omitempty"`
-	Output     *float64 `json:"output,omitempty"`
-	CacheRead  *float64 `json:"cacheRead,omitempty"`
-	CacheWrite *float64 `json:"cacheWrite,omitempty"`
-	Source     string   `json:"source,omitempty"` // "user" | "cc-switch"
+	Input      *float64  `json:"input,omitempty"`
+	Output     *float64  `json:"output,omitempty"`
+	CacheRead  *float64  `json:"cacheRead,omitempty"`
+	CacheWrite *float64  `json:"cacheWrite,omitempty"`
+	Source     string    `json:"source,omitempty"` // "user" | "cc-switch"
+	From       time.Time `json:"from,omitzero"`    // zero = always effective
 }
 
 // ModelAlias maps a model name as the harness logged it (often a user-defined
