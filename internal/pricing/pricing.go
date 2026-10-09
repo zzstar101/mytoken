@@ -201,7 +201,7 @@ func (p *Pricer) index() {
 func (p *Pricer) HasPrice(provider, name string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	_, ok, _ := p.effective(provider,name)
+	_, ok, _ := p.effective(provider, name)
 	return ok
 }
 func (p *Pricer) SetMultiplier(provider string, multiplier float64) {
@@ -221,8 +221,8 @@ func (p *Pricer) SetPrice(provider, name string, price Price) {
 	p.overrides[provider][Normalize(name)] = price
 }
 func (p *Pricer) Cost(e model.UsageEvent) float64 {
- cost,_:=p.Evaluate(e)
- return cost
+	cost, _ := p.Evaluate(e)
+	return cost
 }
 func (p *Pricer) fetch(ctx context.Context, url string) ([]byte, error) {
 	req, e := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
