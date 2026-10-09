@@ -1,6 +1,20 @@
-# MyToken!!!!!
+<p align="center">
+  <img src="docs/hero-zh.png" alt="MyToken!!!!! —— 你的 token 都花在哪了？" width="100%">
+</p>
 
-[English](README.md) | **简体中文**
+<h1 align="center">MyToken!!!!!</h1>
+
+<p align="center">
+  <a href="https://github.com/zzstar101/mytoken/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zzstar101/mytoken?style=flat-square&color=5AA9D6&label=release"></a>
+  <a href="https://github.com/zzstar101/mytoken/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/zzstar101/mytoken/ci.yml?branch=main&style=flat-square&label=CI"></a>
+  <a href="https://github.com/zzstar101/mytoken/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/zzstar101/mytoken/total?style=flat-square&color=FF7896"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-50C878?style=flat-square">
+  <a href="go.mod"><img alt="Go" src="https://img.shields.io/github/go-mod/go-version/zzstar101/mytoken?style=flat-square&color=F0B43C"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/zzstar101/mytoken?style=flat-square&color=7C6CD4"></a>
+</p>
+
+<p align="center"><a href="README.md">English</a> · <b>简体中文</b></p>
+<p align="center"><a href="#安装">安装</a> · <a href="#界面截图">截图</a> · <a href="#支持的-harness">支持的 harness</a> · <a href="docs/CLI.md">命令行</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">下载</a></p>
 
 **你的 token 都花在哪了？** MyToken!!!!! 读取 AI 编程 harness 已经写在磁盘上的会话日志，把每一次请求归到
 会话 × 供应商 × 模型，算出费用，然后在原生桌面应用里展示出来 —— 也可以用命令行直接拿到 JSON。
