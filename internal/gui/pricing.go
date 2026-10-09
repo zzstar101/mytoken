@@ -152,6 +152,7 @@ func (s *State) pricingCards(c *ui.Context, pal palette) {
 		return
 	}
 	if !s.pr.loaded {
+		s.pr.loaded = true // once: the load sets it again with the data
 		s.loadPricing()
 	}
 	p := &s.pr

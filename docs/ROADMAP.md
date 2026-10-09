@@ -59,14 +59,16 @@ CI 在三个平台上跑 200K 事件的查询基准（`internal/query/bench_test
 
 | 指标 | 预算 | 0.1.0 实测（206,615 条 / 627 会话） | 0.1.x 实测（206,728 条） |
 | --- | --- | --- | --- |
-| 托盘弹窗首帧 | < 50 ms | — | — |
+| 托盘弹窗首帧 | < 50 ms | — | 构建视图 0.07 ms（`internal/gui/perf_test.go`，数据常驻内存，打开即画缓存） |
 | `stats` / `statusline` | < 100 ms，峰值内存 < 50 MB | `stats` 1.08 s / 173 MB | 单查询 2–15 ms，基准进程 RSS 47.5 MB |
 | 概览切换周期 | — | 2.7–8.2 s | 全套 66–95 ms；切换只重查周期相关部分，约 20 ms |
 | 无新数据的增量扫描 | < 300 ms | 482 ms（墙钟 2.1 s）/ 115 MB | 204–209 ms |
 | 全量重扫 | 只跟踪 | 8.8 s / RSS 225 MB | 9.8 s / RSS 154 MB（保留历史 + 维护汇总表） |
-| 托盘常驻空闲 | < 60 MB，CPU ≈ 0 | — | — |
-| 数据库体积 | < 300 B / 条，另建按天预聚合表 | ≈ 590 B / 条（121 MB + 12 MB WAL） | 255 B / 条（含汇总表；旧库首次升级约 3 s） |
-| 二进制体积 | 只跟踪不卡 | 27 MB | — |
+| 托盘常驻空闲 | < 60 MB，CPU ≈ 0（待修订，见下） | agent 写日志时 CPU ≈ 93%、footprint 342 MB | 没有数据时 footprint 71 MB；真实数据 + agent 持续写日志时 CPU 8–14%、footprint 118–126 MB |
+| 数据库体积 | < 300 B / 条，另建按天预聚合表 | ≈ 590 B / 条（121 MB + 12 MB WAL） | 284 B / 条（含汇总表与请求 ID 等信号；旧库首次升级约 3 s） |
+| 二进制体积 | 只跟踪不卡 | 27 MB | 29.5 MB |
+
+托盘空闲 60 MB 的预算定得不现实：没有任何数据时，窗口系统、GPU 和 Go 运行时就占了约 71 MB footprint。建议改成「没有数据时 < 80 MB；20 万条数据时 < 130 MB，Go 堆存活 < 30 MB」。
 
 ### Harness
 
@@ -87,12 +89,12 @@ CI 在三个平台上跑 200K 事件的查询基准（`internal/query/bench_test
 
 - ✅ **修倍率 bug**：[`internal/pricing/rules.go`](../internal/pricing/rules.go) 的 `effective()` 在 `{provider,model}`、`{"",model}`、`{provider,""}` 中取第一条命中并用它的 `Multiplier`，导致模型价格规则（倍率 1）覆盖供应商倍率（例：网关 0.3 × sonnet $3/M，1M 输入算成 $3 而非 $0.9）。改为**价格按模型优先、倍率按供应商优先，分开查**；用户规则同样受影响。
 - ✅ **价格按时间存快照**：倍率会随高峰时段、站长调整而变，`PriceRule` 改为带生效时间的快照，历史请求按当时的价格计算。
-- **`ProviderSource` 抽象**：cc-switch 归因 / 价格导入改为可选数据源之一，为中转站数据源铺路。
+- ✅ **`ProviderSource` 抽象**（`internal/source`）：cc-switch 归因 / 价格导入改为可选数据源之一，为中转站数据源铺路。
 - ✅ **历史保全**：全量重扫不再执行 [`internal/store/store.go`](../internal/store/store.go) 中的 `DELETE FROM events; DELETE FROM sessions; DELETE FROM cursors;`；源日志消失后数据保留。
 - ✅ **数字来源标签**写进数据模型（费用拆成 `log` / `estimate` / `unpriced`，`relay-bill` 预留）。
-- ✅ **性能**：按天预聚合表、维度字典化、基准测试进 CI（托盘首帧和空闲内存还没测）。
+- ✅ **性能**：按天预聚合表、维度字典化、基准测试进 CI；GUI 只在窗口可见时刷新、两次刷新至少间隔 2 s；扫描器在 agent 持续写日志时也能触发、两次扫描至少间隔 2 s；Go 堆软上限 64 MiB。
 - ✅ **CLI 对齐**：补 `--until`、`--last`、`--timezone`、`--offline`、`--no-cost`，以及 CSV 导出（目前只有 `--since`）。
-- **新增 harness 流程标准化**：Parser 接口补 compact 边界、harness 自带账单两类信号；fixture + 基准模板。
+- ✅ **新增 harness 流程标准化**：事件补 `RequestID`、compact 边界、harness 自带账单（`Bill`）三类信号；`internal/harness/harnesstest` 一致性套件（golden / 增量 / 游标稳定 / 幂等 / 隐私 / 缺目录）覆盖现有 10 个 harness，接入规范见 [HARNESS.md](HARNESS.md)。顺带修了 Claude 游标空转重写、opencode 新旧两张表共用水位线漏行两个 parser bug。
 
 ### 0.2 —— 对账 v1
 

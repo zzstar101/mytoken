@@ -29,7 +29,15 @@ type Hooks struct {
 	Settings query.Settings
 	// Now is the clock (tests pin it).
 	Now func() time.Time
+	// Visible reports whether a window shows the state; nil means always.
+	// While none does, data changes only mark the views stale, and Shown
+	// reloads them: a tray-resident app does no work for nobody to see.
+	Visible func() bool
 }
+
+// reloadGap is the least time between two reloads for data changes: logs
+// written all the time by running agents must not keep the queries busy.
+const reloadGap = 2 * time.Second
 
 // State is the GUI's state, shared by the main window and the tray panel.
 // Its fields are only touched on the UI thread, through post.
@@ -66,6 +74,12 @@ type State struct {
 
 	rankTab int
 	pr      pricingState
+
+	// stale is set by data changes not reloaded yet; lastReload and
+	// waiting pace the reloads (see reloadGap).
+	stale      bool
+	lastReload time.Time
+	waiting    bool
 
 	mu     sync.Mutex
 	jobs   map[string]*job
@@ -111,15 +125,43 @@ func (s *State) Start() {
 	s.cancel = cancel
 	go func() {
 		for range ch {
-			s.post(func() { s.Reload() })
+			s.post(s.changed)
 		}
 	}()
 	// The day turns over, and the tray's last-24h moves on: refresh each minute.
 	go func() {
 		for range time.Tick(time.Minute) {
-			s.post(func() { s.Reload() })
+			s.post(s.changed)
 		}
 	}()
+}
+
+// changed marks the views stale and reloads them when one is shown, at most
+// once per reloadGap.
+func (s *State) changed() {
+	s.stale = true
+	s.refresh()
+}
+
+// Shown is called when a window showing the state appears: it shows what
+// it has at once, and reloads behind it what changed while hidden.
+func (s *State) Shown() { s.refresh() }
+
+func (s *State) refresh() {
+	if !s.stale || s.waiting || (s.Hooks.Visible != nil && !s.Hooks.Visible()) {
+		return
+	}
+	if wait := reloadGap - s.Hooks.Now().Sub(s.lastReload); wait > 0 && !s.lastReload.IsZero() {
+		s.waiting = true
+		time.AfterFunc(wait, func() {
+			s.post(func() {
+				s.waiting = false
+				s.refresh()
+			})
+		})
+		return
+	}
+	s.Reload()
 }
 
 // Stop stops listening for changes.
@@ -132,6 +174,8 @@ func (s *State) Stop() {
 // Reload reloads the data of every view; cached spans count as stale.
 func (s *State) Reload() {
 	s.gen++
+	s.stale = false
+	s.lastReload = s.Hooks.Now()
 	s.loadSpan(Span(s.span))
 	if Span(s.span) != SpanToday {
 		s.loadSpan(SpanToday)
@@ -141,8 +185,13 @@ func (s *State) Reload() {
 	if s.sel != "" {
 		s.loadDetail(s.detail.Row.Harness, s.detail.Row.SessionID)
 	}
+	// Pricing is only on the settings page: elsewhere, load it when shown.
 	if s.Hooks.Settings != nil {
-		s.loadPricing()
+		if s.page == "settings" || s.sync {
+			s.loadPricing()
+		} else {
+			s.pr.loaded = false
+		}
 	}
 }
 

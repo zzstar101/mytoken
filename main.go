@@ -15,7 +15,10 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/egoist/mygo"
@@ -26,6 +29,10 @@ import (
 	"github.com/zzstar101/mytoken/internal/gui"
 	"github.com/zzstar101/mytoken/internal/paths"
 )
+
+// memoryLimit is the GUI's soft Go heap limit. Live data is ~20 MB on a
+// 200K-event history; the rest of the process is the window system.
+const memoryLimit = 64 << 20
 
 func main() {
 	// `mygo build` cannot pass -ldflags, but it embeds mygo.json's version.
@@ -62,6 +69,18 @@ func main() {
 	}
 	defer a.Close()
 
+	// MYTOKEN_PPROF=127.0.0.1:6060 serves net/http/pprof, to measure the
+	// app against its CPU and memory budgets (docs/ROADMAP.md).
+	if addr := os.Getenv("MYTOKEN_PPROF"); addr != "" {
+		go func() { log.Printf("mytoken: pprof: %v", http.ListenAndServe(addr, nil)) }()
+	}
+	// The tray app lives all day while scans churn short-lived buffers; a
+	// soft heap limit makes the collector hand that memory back instead of
+	// letting the heap float at twice its live size. GOMEMLIMIT overrides.
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(memoryLimit)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
@@ -96,6 +115,9 @@ func main() {
 		Settings:       a.Settings,
 		OpenMain:       func() { main.Update(openMain) },
 		Quit:           func() { mygo.App.Quit() },
+		Visible: func() bool {
+			return main != nil && main.IsVisible() || panel != nil && panel.IsVisible()
+		},
 	}
 	if l := mygo.App.Locale(); os.Getenv("MYTOKEN_LANG") == "" && l != "" {
 		if strings.HasPrefix(strings.ToLower(l), "zh") {
@@ -144,6 +166,9 @@ func main() {
 			Content:         ui.View(func(c *ui.Context) { state.TrayView(c) }),
 		})
 		panel.OnBlur(func() { panel.Hide() })
+		// Hidden windows leave changes unloaded: catch up when one shows.
+		main.OnShow(state.Shown)
+		panel.OnShow(state.Shown)
 
 		state.Start()
 

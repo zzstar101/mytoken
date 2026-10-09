@@ -31,6 +31,10 @@ type Scanner struct {
 	workers     int
 	interval    time.Duration
 	debounce    time.Duration
+	// minGap is the least time from one watched-change scan to the next:
+	// agents append to their logs all the time, and each scan stats every
+	// source, so back-to-back scans would keep a core busy.
+	minGap time.Duration
 }
 
 func New(st *store.Store, resolver *attrib.Resolver, pricer *pricing.Pricer, parsers ...harness.Parser) *Scanner {
@@ -43,7 +47,7 @@ func New(st *store.Store, resolver *attrib.Resolver, pricer *pricing.Pricer, par
 	if workers > 4 {
 		workers = 4
 	}
-	return &Scanner{st: st, resolver: resolver, pricer: pricer, parsers: parsers, workers: workers, interval: 2 * time.Minute, debounce: 250 * time.Millisecond}
+	return &Scanner{st: st, resolver: resolver, pricer: pricer, parsers: parsers, workers: workers, interval: 2 * time.Minute, debounce: 250 * time.Millisecond, minGap: 2 * time.Second}
 }
 func (s *Scanner) Progress() (done, total int) {
 	s.mu.Lock()
@@ -285,6 +289,7 @@ func (s *Scanner) Run(ctx context.Context) error {
 	}
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
+	last := time.Now()
 	var timer *time.Timer
 	var debounced <-chan time.Time
 	defer func() {
@@ -303,29 +308,29 @@ func (s *Scanner) Run(ctx context.Context) error {
 			if ev.Has(fsnotify.Create) {
 				addRecursive(ev.Name)
 			}
+			// The first change arms the timer and later ones ride on it:
+			// re-arming on each would never scan while an agent writes on.
 			if timer == nil {
 				timer = time.NewTimer(s.debounce)
 				debounced = timer.C
-			} else {
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-				timer.Reset(s.debounce)
 			}
 		case _, ok := <-watcher.Errors:
 			if !ok {
 				return nil
 			}
 		case <-debounced:
+			if wait := s.minGap - time.Since(last); wait > 0 {
+				timer.Reset(wait)
+				continue
+			}
 			debounced = nil
 			timer = nil
 			_ = s.Scan(ctx)
+			last = time.Now()
 		case <-ticker.C:
 			watchRoots()
 			_ = s.Scan(ctx)
+			last = time.Now()
 		}
 	}
 }
