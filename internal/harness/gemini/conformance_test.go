@@ -30,10 +30,6 @@ import (
 // writes whole-line prefixes of every fixture file, and a pretty-printed
 // registry would be invalid JSON in the early steps, changing every project
 // path mid-run.
-//
-// A .zstd recording kind is documented in harness.Source but gemini.go never
-// accepts one (isChatFile only allows .json/.jsonl, kindOf maps everything else
-// to "json"), so this fixture cannot exercise it; see the task report.
 func TestConformance(t *testing.T) {
 	harnesstest.Run(t, conformanceCase())
 }

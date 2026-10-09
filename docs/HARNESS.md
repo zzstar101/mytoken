@@ -187,8 +187,8 @@ go test ./internal/harness/<name> -run '^$' -bench Conformance -benchtime 200x
   （store 用「非空覆盖 + min/max」合并，套件也按这个语义比较）。
 - 把累计 token 当单次用量：会话总量会被重复累加。
 - 忘记 `.zstd` / `.jsonl.zstd`：dsh 显式识别 `session.v3.jsonl.zstd`，不认就会漏日志。
-  注意 `Kind` 里有 `jsonl.zstd` 常量不代表某个 harness 真的会发现它：gemini 目前只接受
-  `.json` / `.jsonl`（`isChatFile`），压缩 chat 日志尚未实现，属已知缺口。
+  `Kind` 只描述 parser 实际会发现的格式：目前只有 dsh 写 zstd；gemini-cli 上游只写
+  `.jsonl`（旧版 `.json`），不压缩，gemini parser 只认这两种是对的。
 - 包内已有「本地 testdata 优先」的测试 helper（形如 `fixture(t, parts...)`，用
   `exists("testdata/"+parts)` 判断）时，新增 `testdata/conformance/` 会让 `testdata`
   变成目录，从而劫持无参调用、让既有测试读到空目录（crush 就踩过）。判断要改成
