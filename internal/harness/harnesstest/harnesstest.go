@@ -167,7 +167,7 @@ func Parse(t testing.TB, c Case, root string, cur map[string]harness.Cursor) (Sn
 	if err != nil {
 		t.Fatalf("harnesstest: Discover(%s): %v", root, err)
 	}
-	sort.Slice(srcs, func(i, j int) bool { return srcs[i].Path < srcs[j].Path })
+	sort.Slice(srcs, func(i, j int) bool { return filepath.ToSlash(srcs[i].Path) < filepath.ToSlash(srcs[j].Path) })
 	snap := Snapshot{Harness: string(p.Harness())}
 	next := make(map[string]harness.Cursor, len(srcs))
 	for _, src := range srcs {
@@ -195,7 +195,22 @@ func Parse(t testing.TB, c Case, root string, cur map[string]harness.Cursor) (Sn
 	if c.Rewrite != nil {
 		c.Rewrite(root, &snap)
 	}
+	for i := range snap.Events {
+		snap.Events[i].ProjectPath = slashRooted(snap.Events[i].ProjectPath)
+	}
+	for i := range snap.Sessions {
+		snap.Sessions[i].Project = slashRooted(snap.Sessions[i].Project)
+	}
 	return snap, next
+}
+
+// slashRooted writes a path under RootPlaceholder with forward slashes, so a
+// golden file is the same on Windows.
+func slashRooted(p string) string {
+	if rest, ok := strings.CutPrefix(p, RootPlaceholder); ok {
+		return RootPlaceholder + filepath.ToSlash(rest)
+	}
+	return p
 }
 
 // Marshal renders a snapshot as the golden file's bytes.
@@ -217,7 +232,7 @@ func Bench(b *testing.B, c Case) {
 	if err != nil {
 		b.Fatalf("harnesstest: Discover: %v", err)
 	}
-	sort.Slice(srcs, func(i, j int) bool { return srcs[i].Path < srcs[j].Path })
+	sort.Slice(srcs, func(i, j int) bool { return filepath.ToSlash(srcs[i].Path) < filepath.ToSlash(srcs[j].Path) })
 	var events int
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -696,7 +711,7 @@ func relPath(root, path string) string {
 	if err != nil || strings.HasPrefix(rel, "..") {
 		return path
 	}
-	return rel
+	return filepath.ToSlash(rel)
 }
 
 func contextAround(blob []byte, needle string) string {
