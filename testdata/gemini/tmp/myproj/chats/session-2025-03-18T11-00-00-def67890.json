@@ -1,0 +1,17 @@
+{
+  "sessionId": "gem-sess-stale",
+  "projectHash": "def678",
+  "startTime": "2025-03-18T11:00:00.000Z",
+  "lastUpdated": "2025-03-18T11:00:10.000Z",
+  "kind": "main",
+  "messages": [
+    {
+      "id": "g-stale-1",
+      "timestamp": "2025-03-18T11:00:10.000Z",
+      "type": "gemini",
+      "content": [{ "text": "stale legacy copy" }],
+      "tokens": { "input": 999, "output": 999 },
+      "model": "gemini-2.5-flash"
+    }
+  ]
+}

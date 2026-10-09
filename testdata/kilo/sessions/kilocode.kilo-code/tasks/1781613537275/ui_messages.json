@@ -1,0 +1,5 @@
+[
+  {"ts":1781613537275,"type":"say","say":"task","text":"Port the migration script"},
+  {"ts":1781613538300,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"azure/openai\",\"tokensIn\":6000,\"tokensOut\":400,\"cacheWrites\":50,\"cacheReads\":1500,\"cost\":0.02}"},
+  {"ts":1781613539450,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"openai\",\"tokensIn\":7200,\"tokensOut\":520,\"cacheWrites\":0,\"cacheReads\":1800,\"cost\":0.024}"}
+]

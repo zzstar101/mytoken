@@ -1,0 +1,3 @@
+[{"ts":1767225700000,"type":"say","say":"task","text":"Write the release notes"},
+{"ts":1767225710000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"bedrock/anthropic\",\"tokensIn\":2600,\"tokensOut\":310,\"cacheWrites\":60,\"cacheReads\":2100,\"cost\":0.0189}"},
+{"ts":1767225720000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"bedrock/anthropic\",\"tokensIn\":3100,\"tokensOut\":280,\"cacheWrites\":0,\"cacheReads\":2500,\"cost\":0.0203}"}]

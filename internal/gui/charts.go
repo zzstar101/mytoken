@@ -10,6 +10,13 @@ import (
 )
 
 // niceMax rounds v up to 1, 2, 2.5 or 5 times a power of ten.
+func costOfEvent(e query.AttributedEvent) string {
+	if !e.Priced {
+		return "—"
+	}
+	return fmtCost(e.Cost)
+}
+
 func niceMax(v float64) float64 {
 	if v <= 0 {
 		return 1
@@ -584,7 +591,7 @@ func timeline(c *ui.Context, pal palette, evs []query.AttributedEvent, models []
 			if l := attribLabel(e.Attrib); l != "" {
 				prov += " · " + l
 			}
-			rows = append([][2]string{{prov, e.Model}, {tr("cost"), fmtCost(e.Cost)}}, rows...)
+			rows = append([][2]string{{prov, e.Model}, {tr("cost"), costOfEvent(e)}}, rows...)
 			cols = append([]ui.Color{colOf(e.Model), ui.Transparent}, cols...)
 			_ = hy
 			tooltipBox(p, pal, r, x, plot.Y+plot.H/2, e.Timestamp.Local().Format("15:04:05"), rows, cols)

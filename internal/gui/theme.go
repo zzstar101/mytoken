@@ -57,6 +57,10 @@ func harnessColor(h model.Harness) ui.Color {
 		return ui.Hex("#3E8FB8")
 	case model.OpenCode, model.Crush:
 		return ui.Hex("#5F54B3")
+	case model.Roo:
+		return ui.Hex("#E0577A")
+	case model.Kilo:
+		return ui.Hex("#D99A2B")
 	}
 	return Anon
 }

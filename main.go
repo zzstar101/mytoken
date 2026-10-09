@@ -75,6 +75,7 @@ func main() {
 		OpenAtLogin:    mygo.App.OpenAtLogin,
 		SetOpenAtLogin: func(on bool) { _ = mygo.App.SetOpenAtLogin(on) },
 		DataDir:        dataDir,
+		Settings:       a.Settings,
 		OpenMain:       func() { main.Update(openMain) },
 		Quit:           func() { mygo.App.Quit() },
 	}

@@ -23,12 +23,14 @@ type Resolution struct {
 	Provider string
 	Attrib   model.AttribSource
 	Cost     float64
+	Priced   bool
 }
 type Store struct {
 	db          *sql.DB
 	writer      sync.Mutex
 	mu          sync.Mutex
 	subscribers map[chan struct{}]struct{}
+	projects    *projectResolver
 	closed      bool
 }
 
@@ -64,6 +66,10 @@ func Open(path string) (*Store, error) {
  CREATE TABLE IF NOT EXISTS cursors(harness TEXT NOT NULL,path TEXT NOT NULL,cursor TEXT NOT NULL,PRIMARY KEY(harness,path));
  CREATE TABLE IF NOT EXISTS provider_configs(harness TEXT NOT NULL,from_time INTEGER NOT NULL,base_url TEXT NOT NULL,provider TEXT NOT NULL,PRIMARY KEY(harness,from_time));
  CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err = st.migrate(); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -106,7 +112,7 @@ func stamp(t time.Time) int64 {
 	return t.UnixNano()
 }
 
-const sessionSQL = `INSERT INTO sessions(harness,session_id,parent_id,title,project,started_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(harness,session_id) DO UPDATE SET parent_id=CASE WHEN excluded.parent_id!='' THEN excluded.parent_id ELSE sessions.parent_id END,title=CASE WHEN excluded.title!='' THEN excluded.title ELSE sessions.title END,project=CASE WHEN excluded.project!='' THEN excluded.project ELSE sessions.project END,started_at=CASE WHEN sessions.started_at=0 THEN excluded.started_at WHEN excluded.started_at=0 THEN sessions.started_at ELSE min(sessions.started_at,excluded.started_at) END,updated_at=max(sessions.updated_at,excluded.updated_at)`
+const sessionSQL = `INSERT INTO sessions(harness,session_id,parent_id,title,project,started_at,updated_at,raw_project) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(harness,session_id) DO UPDATE SET parent_id=CASE WHEN excluded.parent_id!='' THEN excluded.parent_id ELSE sessions.parent_id END,title=CASE WHEN excluded.title!='' THEN excluded.title ELSE sessions.title END,project=CASE WHEN excluded.project!='' THEN excluded.project ELSE sessions.project END,raw_project=CASE WHEN excluded.raw_project!='' THEN excluded.raw_project ELSE sessions.raw_project END,started_at=CASE WHEN sessions.started_at=0 THEN excluded.started_at WHEN excluded.started_at=0 THEN sessions.started_at ELSE min(sessions.started_at,excluded.started_at) END,updated_at=max(sessions.updated_at,excluded.updated_at)`
 
 // Write couples a parsed source with its resolutions and checkpoint.
 type Write struct {
@@ -124,6 +130,14 @@ func (s *Store) Commit(ctx context.Context, h model.Harness, path string, b harn
 func (s *Store) CommitMany(ctx context.Context, writes []Write) error {
 	s.writer.Lock()
 	defer s.writer.Unlock()
+	for _, w := range writes {
+		for _, e := range w.Batch.Events {
+			s.projects.probe(e.ProjectPath)
+		}
+		for _, m := range w.Batch.Sessions {
+			s.projects.probe(m.Project)
+		}
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -161,15 +175,15 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 		return errors.New("resolution count differs from event count")
 	}
 	var err error
-	const suffix = ` ON CONFLICT(harness,dedup_key) DO UPDATE SET session_id=excluded.session_id,parent_id=excluded.parent_id,project=excluded.project,timestamp=excluded.timestamp,model=excluded.model,provider=excluded.provider,base_url=excluded.base_url,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,resolved_provider=excluded.resolved_provider,attrib=excluded.attrib,cost=excluded.cost WHERE events.session_id=excluded.session_id OR (events.parent_id!='' AND excluded.parent_id='')`
-	const row = `(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+	const suffix = ` ON CONFLICT(harness,dedup_key) DO UPDATE SET session_id=excluded.session_id,parent_id=excluded.parent_id,project=excluded.project,timestamp=excluded.timestamp,model=excluded.model,provider=excluded.provider,base_url=excluded.base_url,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,resolved_provider=excluded.resolved_provider,attrib=excluded.attrib,cost=excluded.cost,priced=excluded.priced,raw_project=excluded.raw_project WHERE events.session_id=excluded.session_id OR (events.parent_id!='' AND excluded.parent_id='')`
+	const row = `(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 	const batchSize = 128
 	var values []any
 	flush := func() error {
 		if len(values) == 0 {
 			return nil
 		}
-		query := `INSERT INTO events VALUES ` + strings.TrimSuffix(strings.Repeat(row+",", len(values)/18), ",") + suffix
+		query := `INSERT INTO events(harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced,raw_project) VALUES ` + strings.TrimSuffix(strings.Repeat(row+",", len(values)/20), ",") + suffix
 		stmt, e := prepare(query)
 		if e == nil {
 			_, e = stmt.ExecContext(ctx, values...)
@@ -188,7 +202,7 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 		if m.Harness == "" {
 			m.Harness = h
 		}
-		_, e := sessions.ExecContext(ctx, m.Harness, m.SessionID, m.ParentID, harness.Title(m.Title), m.Project, stamp(m.StartedAt), stamp(m.UpdatedAt))
+		_, e := sessions.ExecContext(ctx, m.Harness, m.SessionID, m.ParentID, harness.Title(m.Title), s.projects.resolve(m.Project), stamp(m.StartedAt), stamp(m.UpdatedAt), m.Project)
 		return e
 	}
 	meta := make(map[string]model.SessionMeta)
@@ -236,8 +250,14 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 		if len(res) > 0 {
 			r = res[i]
 		}
-		values = append(values, e.Harness, e.DedupKey, e.SessionID, e.ParentID, e.ProjectPath, stamp(e.Timestamp), e.Model, e.Provider, e.BaseURL, e.Tokens.Input, e.Tokens.Output, e.Tokens.CacheRead, e.Tokens.CacheWrite, e.Tokens.Reasoning, e.CostUSD, r.Provider, r.Attrib, r.Cost)
-		if len(values) == batchSize*18 {
+		// Nonzero legacy resolutions are priced; explicit zero requires Priced.
+		r.Priced = r.Priced || r.Cost != 0
+		if e.CostUSD != nil {
+			r.Cost = *e.CostUSD
+			r.Priced = true
+		}
+		values = append(values, e.Harness, e.DedupKey, e.SessionID, e.ParentID, s.projects.resolve(e.ProjectPath), stamp(e.Timestamp), e.Model, e.Provider, e.BaseURL, e.Tokens.Input, e.Tokens.Output, e.Tokens.CacheRead, e.Tokens.CacheWrite, e.Tokens.Reasoning, e.CostUSD, r.Provider, r.Attrib, r.Cost, r.Priced, e.ProjectPath)
+		if len(values) == batchSize*20 {
 			if err = flush(); err != nil {
 				return err
 			}
@@ -283,6 +303,7 @@ func (s *Store) Rebuild(ctx context.Context) error {
 		return e
 	}
 	if e = tx.Commit(); e == nil {
+		s.projects = newProjectResolver()
 		s.notify()
 	}
 	return e

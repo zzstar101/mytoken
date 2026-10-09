@@ -1,0 +1,55 @@
+{
+  "sessionId": "gem-sess-main",
+  "projectHash": "abc123",
+  "startTime": "2025-03-18T10:00:00.000Z",
+  "lastUpdated": "2025-03-18T10:05:00.000Z",
+  "summary": "Gemini CLI session",
+  "directories": ["/Users/dev/myproj"],
+  "kind": "main",
+  "messages": [
+    {
+      "id": "g-msg-0",
+      "timestamp": "2025-03-18T10:00:01.000Z",
+      "type": "user",
+      "content": [{ "text": "<session_context>\nplumbing that must be ignored" }]
+    },
+    {
+      "id": "g-msg-1",
+      "timestamp": "2025-03-18T10:00:05.000Z",
+      "type": "user",
+      "content": [{ "text": "Explain the gemini token accounting" }],
+      "displayContent": [{ "text": "Explain the gemini token accounting" }]
+    },
+    {
+      "id": "g-msg-2",
+      "timestamp": "2025-03-18T10:00:20.000Z",
+      "type": "gemini",
+      "content": [{ "text": "Sure." }],
+      "thoughts": [{ "subject": "plan", "description": "work out the totals" }],
+      "tokens": { "input": 15, "output": 20, "cached": 5, "thoughts": 2, "tool": 0, "total": 37 },
+      "model": "gemini-2.5-pro"
+    },
+    {
+      "id": "g-msg-3",
+      "timestamp": "2025-03-18T10:01:00.000Z",
+      "type": "gemini",
+      "content": [{ "text": "Second turn." }],
+      "tokens": { "input": 10, "output": 20, "cached": 5, "thoughts": 2, "total": 37 },
+      "model": "gemini-2.5-pro"
+    },
+    {
+      "id": "g-msg-4",
+      "timestamp": "2025-03-18T10:02:00.000Z",
+      "type": "gemini",
+      "content": [{ "text": "No usage recorded." }],
+      "model": "gemini-2.5-pro"
+    },
+    {
+      "id": "g-msg-5",
+      "timestamp": "2025-03-18T10:03:00.000Z",
+      "type": "gemini",
+      "content": [{ "text": "No model recorded." }],
+      "tokens": { "input": 1, "output": 1 }
+    }
+  ]
+}

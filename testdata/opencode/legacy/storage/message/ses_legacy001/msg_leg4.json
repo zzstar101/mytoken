@@ -1,0 +1,10 @@
+{
+  "sessionID": "ses_legacy001",
+  "role": "assistant",
+  "modelID": "claude-opus-4-1",
+  "providerID": "anthropic",
+  "cost": 0.001,
+  "tokens": { "input": 60, "output": 5, "reasoning": 0, "cache": { "read": 0, "write": 0 } },
+  "time": { "created": 1742302300000, "completed": 1742302300000 },
+  "path": { "root": "/Users/dev/legacy" }
+}

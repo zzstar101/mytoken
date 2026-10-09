@@ -1,0 +1,4 @@
+[{"role":"user","content":[{"type":"text","text":"Fix the flaky integration test"}]},
+{"role":"assistant","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>code</slug>\n<name>Code</name>\n<model>anthropic/claude-sonnet-4-20250514</model>\n</environment_details>"}]},
+{"role":"user","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>code</slug>\n<name>Code</name>\n<model>anthropic/claude-sonnet-4-5-20250929</model>\n</environment_details>\n\n# Current Workspace Directory (/home/dev/roo-proj) Files\nsrc/a.ts"}]},
+{"role":"assistant","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>architect</slug>\n<name>Architect</name>\n<model>anthropic/claude-sonnet-4-5-20250929</model>\n</environment_details>"}]}]

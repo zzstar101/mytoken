@@ -1,0 +1,8 @@
+{"sessionId":"gem-sess-jsonl","projectHash":"def678","startTime":"2025-03-18T11:00:00.000Z","lastUpdated":"2025-03-18T11:05:00.000Z","summary":"JSONL session","kind":"main"}
+{"id":"g-j-1","timestamp":"2025-03-18T11:00:05.000Z","type":"user","content":"Stream the jsonl records"}
+{"id":"g-j-2","timestamp":"2025-03-18T11:00:20.000Z","type":"gemini","content":[{"text":"Reading them."}],"tokens":{"input":100,"output":50,"cached":0,"thoughts":0,"tool":0,"total":150},"model":"gemini-2.5-flash"}
+{"$set":{"lastUpdated":"2025-03-18T11:10:00.000Z"}}
+{"id":"g-j-2","timestamp":"2025-03-18T11:00:20.000Z","type":"gemini","content":[{"text":"Reading them."}],"toolCalls":[{"id":"tc1","name":"read_file","result":"ok"}],"tokens":{"input":100,"output":50,"cached":0,"thoughts":0,"tool":20,"total":170},"model":"gemini-2.5-flash"}
+{"$patch":{"id":"g-j-2","updates":[{"tokens":{"input":100,"output":50,"cached":0,"thoughts":0,"tool":20,"total":170}}]}}
+{"$rewindTo":"g-j-missing"}
+{"id":"g-j-4","timestamp":"2025-03-18T11:12:00.000Z","type":"gemini","content":[{"text":"After the no-op rewind."}],"tokens":{"input":7,"output":3,"cached":0,"thoughts":0,"tool":0,"total":10},"model":"gemini-2.5-flash"}

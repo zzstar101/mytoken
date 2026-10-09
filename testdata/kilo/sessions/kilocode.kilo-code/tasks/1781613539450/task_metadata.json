@@ -1,0 +1,8 @@
+{
+  "files_in_context": [],
+  "model_usage": [
+    {"ts": 1781613539450, "model_id": "claude-sonnet-4-5-20250929", "model_provider_id": "anthropic", "mode": "code"},
+    {"ts": 1781613539600, "model_id": "glm-5", "model_provider_id": "zai", "mode": "code"}
+  ],
+  "environment_history": []
+}

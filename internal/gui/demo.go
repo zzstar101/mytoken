@@ -104,7 +104,7 @@ func NewDemoService(now time.Time) query.Service {
 				cost := (float64(tok.Input)+float64(tok.CacheWrite)*1.25)*m.in/1e6 + float64(tok.CacheRead)*m.in*0.1/1e6 + float64(tok.Output+tok.Reasoning)*m.out/1e6
 				evs = append(evs, query.AttributedEvent{
 					UsageEvent:       model.UsageEvent{Harness: h, DedupKey: fmt.Sprintf("%s-%d", sid, r), SessionID: sid, ProjectPath: meta.Project, Timestamp: t.UTC(), Model: m.model, Tokens: tok},
-					ResolvedProvider: m.provider, Attrib: m.attrib, Cost: cost,
+					ResolvedProvider: m.provider, Attrib: m.attrib, Cost: cost, Priced: true,
 				})
 			}
 			meta.UpdatedAt = t
@@ -352,4 +352,65 @@ func (d *demo) Session(_ context.Context, h model.Harness, id string) (query.Ses
 
 func (d *demo) Subscribe() (<-chan struct{}, func()) {
 	return make(chan struct{}), func() {}
+}
+
+// demoSettings is an in-memory query.Settings for previews: two made-up
+// relay aliases lack a price until mapped.
+type demoSettings struct {
+	rules    []query.PriceRule
+	aliases  []query.ModelAlias
+	unpriced []query.UnpricedModel
+}
+
+// NewDemoSettings returns pricing settings to go with NewDemoService.
+func NewDemoSettings() query.Settings {
+	m := 1.0
+	return &demoSettings{
+		rules:   []query.PriceRule{{Provider: "kami-cn", Multiplier: 0.3, Source: "user"}, {Provider: "nerv-base", Model: "step-5-preview", Multiplier: m, Source: "cc-switch"}},
+		aliases: []query.ModelAlias{{From: "opus-max", To: "claude-opus-4-5", Provider: "kami-cn"}},
+		unpriced: []query.UnpricedModel{
+			{Model: "claude-opus-5-5-high", Provider: "kami-cn", Requests: 42, Tokens: 2_720_000, Suggestions: []string{"claude-opus-4-5", "claude-opus-4-1", "claude-sonnet-4-5"}},
+			{Model: "deepseek-v41", Provider: "nerv-base", Requests: 17, Tokens: 860_000, Suggestions: []string{"deepseek-v4.1-flash", "deepseek-chat"}},
+		},
+	}
+}
+
+func (d *demoSettings) PriceRules(context.Context) ([]query.PriceRule, error) { return d.rules, nil }
+func (d *demoSettings) SetPriceRules(_ context.Context, r []query.PriceRule) error {
+	d.rules = r
+	return nil
+}
+func (d *demoSettings) ImportCCSwitch(context.Context) (int, error) { return 0, nil }
+func (d *demoSettings) Providers(context.Context) ([]string, error) {
+	return []string{"anthropic", "kami-cn", "nerv-base", "openai", "deepseek", "moonshot"}, nil
+}
+func (d *demoSettings) ModelAliases(context.Context) ([]query.ModelAlias, error) {
+	return d.aliases, nil
+}
+func (d *demoSettings) SetModelAliases(_ context.Context, a []query.ModelAlias) error {
+	d.aliases = a
+	keep := d.unpriced[:0]
+	for _, u := range d.unpriced {
+		mapped := false
+		for _, x := range a {
+			mapped = mapped || x.From == u.Model
+		}
+		if !mapped {
+			keep = append(keep, u)
+		}
+	}
+	d.unpriced = keep
+	return nil
+}
+func (d *demoSettings) UnpricedModels(context.Context) ([]query.UnpricedModel, error) {
+	return d.unpriced, nil
+}
+func (d *demoSettings) SearchCatalog(_ context.Context, q string, limit int) ([]string, error) {
+	var out []string
+	for _, id := range []string{"claude-opus-4-5", "claude-opus-4-1", "claude-sonnet-4-5", "gpt-5-codex", "deepseek-chat", "deepseek-v4.1-flash", "kimi-k2"} {
+		if strings.Contains(id, strings.ToLower(q)) && len(out) < limit {
+			out = append(out, id)
+		}
+	}
+	return out, nil
 }

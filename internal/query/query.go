@@ -30,6 +30,9 @@ type Totals struct {
 	CostUSD  float64      `json:"costUsd"`
 	Requests int64        `json:"requests"`
 	Sessions int64        `json:"sessions"`
+	// Unpriced counts requests with neither a log cost nor a known price;
+	// CostUSD excludes them. The UI shows "—" when Unpriced == Requests.
+	Unpriced int64 `json:"unpriced"`
 	// CacheHit = CacheRead / (Input + CacheRead + CacheWrite); 0 when denominator is 0.
 	CacheHit float64 `json:"cacheHit"`
 }
@@ -50,6 +53,7 @@ type Bucket struct {
 	CostUSD  float64      `json:"costUsd"`
 	Requests int64        `json:"requests"`
 	Sessions int64        `json:"sessions"`
+	Unpriced int64        `json:"unpriced"` // see Totals.Unpriced
 }
 
 // ProviderModel is a session's usage split by provider × model.
@@ -60,6 +64,7 @@ type ProviderModel struct {
 	Tokens   model.Tokens       `json:"tokens"`
 	CostUSD  float64            `json:"costUsd"`
 	Requests int64              `json:"requests"`
+	Unpriced int64              `json:"unpriced"` // see Totals.Unpriced
 }
 
 // SessionRow is a session with its aggregates. For a parent session, Tokens,
@@ -69,6 +74,7 @@ type SessionRow struct {
 	Tokens    model.Tokens    `json:"tokens"`
 	CostUSD   float64         `json:"costUsd"`
 	Requests  int64           `json:"requests"`
+	Unpriced  int64           `json:"unpriced"` // see Totals.Unpriced
 	Children  int             `json:"children"`
 	Breakdown []ProviderModel `json:"breakdown"` // sorted by Tokens.Total() desc
 }
@@ -79,6 +85,7 @@ type AttributedEvent struct {
 	ResolvedProvider string             `json:"resolvedProvider"`
 	Attrib           model.AttribSource `json:"attrib"`
 	Cost             float64            `json:"cost"`
+	Priced           bool               `json:"priced"` // false: no log cost and no known price
 }
 
 // Session sort keys.

@@ -1,0 +1,13 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Wire up the payments page\n\n# Current Workspace Directory (/home/user/proj-beta) Files\nsrc/payments.ts\n"}
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [{"type": "text", "text": "Adding the checkout form first."}],
+    "model": {"id": "gpt-5.1", "providerId": "openai"}
+  }
+]

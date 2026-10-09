@@ -1,0 +1,2 @@
+[{"role":"user","content":[{"type":"text","text":"Add the windows runner"}]},
+{"role":"user","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>code</slug>\n<name>Code</name>\n<model>anthropic/claude-sonnet-4-5-20250929</model>\n</environment_details>\n\n# Current Workspace Directory (/home/dev/kilo-proj) Files\n.github/workflows/ci.yml"}]}]

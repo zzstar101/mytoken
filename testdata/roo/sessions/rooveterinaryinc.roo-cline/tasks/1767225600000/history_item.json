@@ -1,0 +1,1 @@
+{"id":"1767225600000","number":1,"ts":1767225600000,"task":"Fix the flaky integration test","tokensIn":12300,"tokensOut":1560,"cacheWrites":580,"cacheReads":9800,"totalCost":0.1277,"workspace":"/home/dev/roo-proj","mode":"code","status":"completed"}

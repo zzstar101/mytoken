@@ -1,0 +1,3 @@
+[{"ts":1767331400000,"type":"say","say":"task","text":"Pin the runner image"},
+{"ts":1767331410000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":640,\"tokensOut\":85,\"cacheWrites\":30,\"cacheReads\":420,\"cost\":0.0037}"},
+{"ts":1767331420000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":760,\"tokensOut\":70,\"cacheWrites\":0,\"cacheReads\":520,\"cost\":0.0041}"}]

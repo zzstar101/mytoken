@@ -1,0 +1,16 @@
+{
+  "id": "1767225800000",
+  "rootTaskId": "1767225600000",
+  "parentTaskId": "1767225600000",
+  "number": 2,
+  "ts": 1767225800000,
+  "task": "Add the retry wrapper",
+  "tokensIn": 1850,
+  "tokensOut": 260,
+  "cacheWrites": 50,
+  "cacheReads": 300,
+  "totalCost": 0.03,
+  "workspace": "/home/user/proj-alpha",
+  "mode": "code",
+  "status": "completed"
+}

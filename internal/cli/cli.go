@@ -50,6 +50,8 @@ func run(args []string, out, errout io.Writer) int {
 		done, total := a.Scanner.Progress()
 		fmt.Fprintf(out, "Scanned %d/%d sources: %d events, %d sessions in %s\n", done, total, tot.Requests, tot.Sessions, time.Since(start).Round(time.Millisecond))
 		return 0
+	case "prices":
+		return runPrices(ctx, args[1:], out, errout)
 	case "stats":
 		fs := flag.NewFlagSet("stats", flag.ContinueOnError)
 		fs.SetOutput(errout)
@@ -114,17 +116,17 @@ func run(args []string, out, errout io.Writer) int {
 			}
 			return 0
 		}
-		fmt.Fprintf(out, "Requests: %d  Sessions: %d  Tokens: %d  Cost: $%.4f  Cache hit: %.1f%%\n", total.Requests, total.Sessions, total.Tokens.Total(), total.CostUSD, total.CacheHit*100)
+		fmt.Fprintf(out, "Requests: %d  Sessions: %d  Tokens: %d  Cost: $%.4f  Cache hit: %.1f%%  Unpriced: %d\n", total.Requests, total.Sessions, total.Tokens.Total(), total.CostUSD, total.CacheHit*100, total.Unpriced)
 		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tREQUESTS\tTOKENS\tCOST USD")
+		fmt.Fprintln(w, "NAME\tREQUESTS\tTOKENS\tCOST USD\tUNPRICED")
 		switch values := rows.(type) {
 		case []query.Bucket:
 			for _, v := range values {
-				fmt.Fprintf(w, "%s\t%d\t%d\t%.4f\n", v.Label, v.Requests, v.Tokens.Total(), v.CostUSD)
+				fmt.Fprintf(w, "%s\t%d\t%d\t%.4f\t%d\n", v.Label, v.Requests, v.Tokens.Total(), v.CostUSD, v.Unpriced)
 			}
 		case []query.SessionRow:
 			for _, v := range values {
-				fmt.Fprintf(w, "%s/%s\t%d\t%d\t%.4f\n", v.Harness, v.SessionID, v.Requests, v.Tokens.Total(), v.CostUSD)
+				fmt.Fprintf(w, "%s/%s\t%d\t%d\t%.4f\t%d\n", v.Harness, v.SessionID, v.Requests, v.Tokens.Total(), v.CostUSD, v.Unpriced)
 			}
 		case []query.Point:
 			for _, v := range values {

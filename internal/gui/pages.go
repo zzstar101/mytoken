@@ -57,7 +57,7 @@ func (s *State) rankingPage(c *ui.Context, pal palette) {
 						ui.Spacer(c)
 						bigNumber(c, pal, fmtTokens(b.Tokens.Total()), []float32{30, 24, 22}[i])
 						ui.Row(c).Gap(10).Children(func() {
-							ui.Text(c, fmtCost(b.CostUSD)).FontSize(11.5).TextColor(pal.muted).FontFeatures("tnum")
+							ui.Text(c, fmtCostOf(b.CostUSD, b.Requests, b.Unpriced)).FontSize(11.5).TextColor(pal.muted).FontFeatures("tnum")
 							ui.Text(c, trf("requestsN", fmtInt(b.Requests))).FontSize(11.5).TextColor(pal.muted)
 						})
 						classBar(c, pal, b.Tokens, 6)
@@ -112,7 +112,7 @@ func (s *State) rankTable(c *ui.Context, pal palette, bs []query.Bucket) {
 			}
 			ui.Text(c, fmtPct(share)).FontSize(12).TextColor(pal.muted).FontFeatures("tnum").Width(54).TextAlign(ui.End)
 			ui.Text(c, fmtInt(b.Requests)).FontSize(12).TextColor(pal.muted).FontFeatures("tnum").Width(70).TextAlign(ui.End)
-			ui.Text(c, fmtCost(b.CostUSD)).FontSize(12).TextColor(pal.ink).FontFeatures("tnum").Width(74).TextAlign(ui.End)
+			ui.Text(c, fmtCostOf(b.CostUSD, b.Requests, b.Unpriced)).FontSize(12).TextColor(pal.ink).FontFeatures("tnum").Width(74).TextAlign(ui.End)
 			ui.Text(c, fmtTokens(b.Tokens.Total())).FontSize(13).FontWeight(700).TextColor(pal.ink).FontFeatures("tnum").Width(80).TextAlign(ui.End)
 		})
 	}
@@ -154,7 +154,7 @@ func (s *State) projectsPage(c *ui.Context, pal palette) {
 						})
 						rankBar(c, pal, float64(b.Tokens.Total())/float64(top), col, 6)
 						ui.Row(c).Gap(14).Children(func() {
-							miniStat(c, pal, tr("cost"), fmtCost(b.CostUSD))
+							miniStat(c, pal, tr("cost"), fmtCostOf(b.CostUSD, b.Requests, b.Unpriced))
 							miniStat(c, pal, tr("sessions"), fmtInt(b.Sessions))
 							miniStat(c, pal, tr("requests"), fmtInt(b.Requests))
 						})
@@ -188,6 +188,7 @@ func (s *State) settingsPage(c *ui.Context, pal palette) {
 					settingRow(c, pal, tr("dataDir"), s.Hooks.DataDir, nil)
 				}
 			})
+			s.pricingCards(c, pal)
 			card(c, pal, tr("sources"), nil, func() {
 				ui.Text(c, tr("sourcesSub")).FontSize(12).TextColor(pal.muted)
 				for _, p := range harness.All() {

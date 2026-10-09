@@ -145,7 +145,7 @@ func (s *State) detailView(c *ui.Context, pal palette) {
 					})
 				}
 				stat("tokens", fmtTokens(r.Tokens.Total()), Tomori)
-				stat("cost", fmtCost(r.CostUSD), Anon)
+				stat("cost", fmtCostOf(r.CostUSD, r.Requests, r.Unpriced), Anon)
 				stat("requests", fmtInt(r.Requests), Rana)
 				den := r.Tokens.Input + r.Tokens.CacheRead + r.Tokens.CacheWrite
 				hit := 0.0
@@ -287,7 +287,7 @@ func (s *State) breakdownTable(c *ui.Context, pal palette, bd []query.ProviderMo
 					attribChip(c, pal, b.Attrib)
 					ui.Spacer(c)
 					ui.Text(c, trf("requestsN", fmtInt(b.Requests))).FontSize(11).TextColor(pal.muted)
-					ui.Text(c, fmtCost(b.CostUSD)).FontSize(12).TextColor(pal.muted).FontFeatures("tnum").Width(64).TextAlign(ui.End)
+					ui.Text(c, fmtCostOf(b.CostUSD, b.Requests, b.Unpriced)).FontSize(12).TextColor(pal.muted).FontFeatures("tnum").Width(64).TextAlign(ui.End)
 					ui.Text(c, fmtTokens(b.Tokens.Total())).FontSize(13).FontWeight(750).TextColor(pal.ink).FontFeatures("tnum").Width(70).TextAlign(ui.End)
 				})
 				ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {

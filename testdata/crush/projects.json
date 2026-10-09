@@ -1,0 +1,6 @@
+{
+  "projects": [
+    { "path": "proj-a", "data_dir": ".crush" },
+    { "path": "proj-b", "data_dir": "data/b" }
+  ]
+}

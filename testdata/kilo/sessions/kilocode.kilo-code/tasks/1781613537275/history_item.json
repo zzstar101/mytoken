@@ -1,0 +1,9 @@
+{
+  "id": "1781613537275",
+  "rootTaskId": "1781613537275",
+  "ts": 1781613537275,
+  "task": "Port the migration script",
+  "workspace": "/home/user/proj-alpha",
+  "mode": "code",
+  "childIds": ["1781613538300"]
+}

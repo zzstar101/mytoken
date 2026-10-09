@@ -1,0 +1,2 @@
+[{"role":"user","content":[{"type":"text","text":"Set up the CI matrix"}]},
+{"role":"user","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>code</slug>\n<name>Code</name>\n<model>azure/gpt-5</model>\n</environment_details>\n\n# Current Workspace Directory (/home/dev/kilo-proj) Files\n.github/workflows/"}]}]

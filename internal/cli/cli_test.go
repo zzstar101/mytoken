@@ -12,6 +12,27 @@ import (
 	"time"
 )
 
+func TestPricesCLI(t *testing.T) {
+	t.Setenv("MYTOKEN_HOME", t.TempDir())
+	var out, errout bytes.Buffer
+	args := []string{"prices", "set", "--provider", "Relay", "--model", "custom", "--input", "0", "--multiplier", "0.5"}
+	if code := run(args, &out, &errout); code != 0 {
+		t.Fatalf("code=%d err=%s", code, errout.String())
+	}
+	out.Reset()
+	if code := run([]string{"prices", "list"}, &out, &errout); code != 0 {
+		t.Fatal(code, errout.String())
+	}
+	if !bytes.Contains(out.Bytes(), []byte("Relay")) || !bytes.Contains(out.Bytes(), []byte("custom")) {
+		t.Fatal(out.String())
+	}
+	for _, args := range [][]string{{"prices", "set", "--input", "2"}, {"prices", "set", "--provider", "Relay", "--input", "-1"}, {"prices", "nonsense"}} {
+		if code := run(args, &out, &errout); code == 0 {
+			t.Fatal(args)
+		}
+	}
+}
+
 func TestStatsJSON(t *testing.T) {
 	t.Setenv("MYTOKEN_HOME", t.TempDir())
 	a, e := app.Open()

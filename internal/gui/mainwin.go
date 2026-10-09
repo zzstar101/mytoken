@@ -96,7 +96,7 @@ func (s *State) todayMini(c *ui.Context, pal palette) {
 			ui.Icon(c, icSparkle).FontSize(12).TextColor(Soyo)
 			ui.Text(c, tr("today")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
 			ui.Spacer(c)
-			ui.Text(c, fmtCost(t.CostUSD)).FontSize(11.5).FontWeight(650).TextColor(pal.muted).FontFeatures("tnum")
+			ui.Text(c, fmtCostOf(t.CostUSD, t.Requests, t.Unpriced)).FontSize(11.5).FontWeight(650).TextColor(pal.muted).FontFeatures("tnum")
 		})
 		bigNumber(c, pal, fmtTokens(t.Tokens.Total()), 20)
 		classBar(c, pal, t.Tokens, 6)
@@ -156,6 +156,7 @@ func (s *State) overviewPage(c *ui.Context, pal palette) {
 	pageHeader(c, pal, tr("overview"), sub, func() { s.spanSwitch(c, pal) })
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Padding(8, 8, 16, 8).Gap(12).Children(func() {
+			s.unpricedBanner(c, pal)
 			s.kpis(c, pal, ov)
 			ui.Row(c).Gap(12).AlignItems(ui.Stretch).Children(func() {
 				card(c, pal, tr("trend"), func() { classLegend(c, pal) }, func() {
@@ -276,7 +277,7 @@ func (s *State) kpis(c *ui.Context, pal palette, ov Overview) {
 		foot      string
 	}{
 		{"tokens", Tomori, fmtTokens(t.Tokens.Total()), float64(t.Tokens.Total()), float64(pv.Tokens.Total()), series(func(p query.Point) float64 { return float64(p.Tokens.Total()) }), fmtInt(t.Tokens.Total())},
-		{"cost", Anon, fmtCost(t.CostUSD), t.CostUSD, pv.CostUSD, series(func(p query.Point) float64 { return p.CostUSD }), ""},
+		{"cost", Anon, fmtCostOf(t.CostUSD, t.Requests, t.Unpriced), t.CostUSD, pv.CostUSD, series(func(p query.Point) float64 { return p.CostUSD }), ""},
 		{"requests", Rana, fmtTokens(t.Requests), float64(t.Requests), float64(pv.Requests), nil, trf("sessionsN", t.Sessions)},
 		{"cacheHit", Taki, fmtPct(t.CacheHit), t.CacheHit, pv.CacheHit, hits, tr("cacheRead") + " " + fmtTokens(t.Tokens.CacheRead)},
 	}
@@ -342,7 +343,7 @@ func (s *State) bucketList(c *ui.Context, pal palette, bs []query.Bucket, max in
 					ui.Text(c, label).FontSize(12.5).FontWeight(600).TextColor(pal.ink).SingleLine().Ellipsis("…").Shrink(1)
 					ui.Spacer(c)
 					if showCost {
-						ui.Text(c, fmtCost(b.CostUSD)).FontSize(11).TextColor(pal.muted).FontFeatures("tnum")
+						ui.Text(c, fmtCostOf(b.CostUSD, b.Requests, b.Unpriced)).FontSize(11).TextColor(pal.muted).FontFeatures("tnum")
 					}
 					ui.Text(c, fmtTokens(b.Tokens.Total())).FontSize(12.5).FontWeight(700).TextColor(pal.ink).FontFeatures("tnum")
 				})
@@ -367,5 +368,18 @@ func (s *State) recentCard(c *ui.Context, pal palette, rows []query.SessionRow) 
 				})
 			}
 		})
+	})
+}
+
+// unpricedBanner nudges towards mapping models the price list doesn't know.
+func (s *State) unpricedBanner(c *ui.Context, pal palette) {
+	n := len(s.pr.unpriced)
+	if n == 0 || s.ov.Totals.Unpriced == 0 {
+		return
+	}
+	ui.Row(c).Gap(10).Padding(9, 14).Radius(12).AlignItems(ui.Center).Background(Soyo.Alpha(0.14)).Children(func() {
+		dot(c, Soyo, 8)
+		ui.Text(c, trf("unpricedBanner", n)).FontSize(12.5).TextColor(pal.ink).Grow(1).Basis(0)
+		ui.Text(c, tr("fixIt")).FontSize(12.5).FontWeight(650).TextColor(Soyo.Mix(pal.ink, 0.35)).Cursor(ui.CursorPointer).Role(ui.RoleButton).OnClick(func() { s.SetPage("settings") })
 	})
 }

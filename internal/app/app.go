@@ -5,9 +5,15 @@ import (
 	"context"
 	"github.com/zzstar/mytoken/internal/attrib"
 	_ "github.com/zzstar/mytoken/internal/harness/claude"
+	_ "github.com/zzstar/mytoken/internal/harness/cline"
 	_ "github.com/zzstar/mytoken/internal/harness/codex"
+	_ "github.com/zzstar/mytoken/internal/harness/crush"
 	_ "github.com/zzstar/mytoken/internal/harness/dsh"
+	_ "github.com/zzstar/mytoken/internal/harness/gemini"
+	_ "github.com/zzstar/mytoken/internal/harness/kilo"
+	_ "github.com/zzstar/mytoken/internal/harness/opencode"
 	_ "github.com/zzstar/mytoken/internal/harness/pi"
+	_ "github.com/zzstar/mytoken/internal/harness/roo"
 	"github.com/zzstar/mytoken/internal/paths"
 	"github.com/zzstar/mytoken/internal/pricing"
 	"github.com/zzstar/mytoken/internal/query"
@@ -22,6 +28,7 @@ type App struct {
 	workers  sync.WaitGroup
 	Store    *store.Store
 	Scanner  *scan.Scanner
+	Settings query.Settings
 	Query    query.Service
 	Resolver *attrib.Resolver
 	Pricing  *pricing.Pricer
@@ -47,9 +54,14 @@ func Open() (*App, error) {
 	}
 	prices := pricing.New(dir)
 	a := &App{Store: st, Resolver: resolver, Pricing: prices}
+	a.Settings = query.NewSettings(st, prices)
+	if e = query.LoadPricingSettings(context.Background(), st, prices); e != nil {
+		a.Close()
+		return nil, e
+	}
 	a.Scanner = scan.New(st, resolver, prices)
 	a.Query = query.NewService(st)
-	if e = st.RecomputeCosts(context.Background(), prices.Cost); e != nil {
+	if e = st.RecomputePrices(context.Background(), prices.Evaluate); e != nil {
 		a.Close()
 		return nil, e
 	}
@@ -66,7 +78,7 @@ func Open() (*App, error) {
 			if ctx.Err() != nil {
 				return
 			}
-			_ = st.RecomputeCosts(ctx, prices.Cost)
+			_ = st.RecomputePrices(ctx, prices.Evaluate)
 			select {
 			case <-ctx.Done():
 				return

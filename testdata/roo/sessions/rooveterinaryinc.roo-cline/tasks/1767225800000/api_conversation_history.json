@@ -1,0 +1,2 @@
+[{"role":"user","content":[{"type":"text","text":"Bump the dependency pins"}]},
+{"role":"user","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>code</slug>\n<name>Code</name>\n<model>openai/gpt-5.1</model>\n</environment_details>\n\n# Current Workspace Directory (/home/dev/roo-proj) Files\npackage.json"}]}]

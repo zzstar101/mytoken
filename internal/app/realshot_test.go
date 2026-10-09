@@ -27,7 +27,7 @@ func TestRealShots(t *testing.T) {
 	defer a.Close()
 	os.MkdirAll(dir, 0o755)
 	gui.SetLang("zh")
-	s := gui.NewState(a.Query, gui.Hooks{Progress: a.Scanner.Progress}, nil)
+	s := gui.NewState(a.Query, gui.Hooks{Progress: a.Scanner.Progress, Settings: a.Settings}, nil)
 	s.Start()
 	for _, page := range []string{"overview", "sessions", "ranking", "projects", "settings"} {
 		s.SetPage(page)

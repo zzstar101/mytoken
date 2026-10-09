@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "session_id": "9f1c2b3a-1111-4222-8333-444455556666",
+  "source": "cli",
+  "started_at": "2026-01-01T00:05:00.000Z",
+  "ended_at": "2026-01-01T00:05:30.000Z",
+  "status": "completed",
+  "interactive": false,
+  "provider": "cline-pass",
+  "model": "cline-pass/glm-5.2",
+  "cwd": "/home/user/proj-alpha",
+  "workspace_root": "/home/user/proj-alpha",
+  "enable_tools": true,
+  "enable_spawn": false,
+  "prompt": "Summarise the cache change",
+  "metadata": {"title": "CLI cache summary"}
+}

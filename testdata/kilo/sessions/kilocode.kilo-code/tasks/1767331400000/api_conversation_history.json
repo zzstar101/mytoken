@@ -1,0 +1,2 @@
+[{"role":"user","content":[{"type":"text","text":"Pin the runner image"}]},
+{"role":"user","content":[{"type":"text","text":"<environment_details>\n# Current Mode\n<slug>architect</slug>\n<name>Architect</name>\n<model>anthropic/claude-sonnet-4-5-20250929</model>\n</environment_details>"}]}]

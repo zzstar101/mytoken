@@ -1,0 +1,5 @@
+[{"ts":1767225900000,"type":"say","say":"task","text":"Add telemetry"},
+{"ts":1767225910000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"openai\"}"},
+{"ts":1767225920000,"type":"say","say":"api_req_started","text":"not-json"},
+{"ts":1767225930000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"openai\",\"tokensIn\":700,\"tokensOut\":90,\"cacheWrites\":40,\"cacheReads\":300,\"cost\":0.0041}"},
+{"ts":1767225940000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"openai\",\"tokensIn\":0,\"tokensOut\":0,\"cacheWrites\":0,\"cacheReads\":0,\"cost\":0}"}]

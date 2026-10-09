@@ -1,0 +1,12 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Port the migration script\n\n# Current Workspace Directory (/home/user/proj-alpha) Files\ndb/migrate.py\n\n\n# Current Mode\n<slug>code</slug>\n<name>Code</name>\n<model>gpt-5</model>\n"}
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [{"type": "text", "text": "Starting with the schema diff."}]
+  }
+]

@@ -1,0 +1,3 @@
+{"sessionId":"gem-sess-sub","projectHash":"def678","startTime":"2025-03-18T11:06:00.000Z","lastUpdated":"2025-03-18T11:07:00.000Z","summary":"subagent run","directories":["/Users/dev/myproj"],"kind":"subagent"}
+{"id":"g-sub-1","timestamp":"2025-03-18T11:06:05.000Z","type":"user","content":[{"text":"Look up the accounting rules"}]}
+{"id":"g-sub-2","timestamp":"2025-03-18T11:06:30.000Z","type":"gemini","content":[{"text":"Found them."}],"tokens":{"input":40,"output":8,"cached":12,"thoughts":4,"tool":0,"total":64},"model":"gemini-2.5-flash"}

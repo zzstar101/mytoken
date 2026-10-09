@@ -1,0 +1,11 @@
+[
+  {"ts":1767225600000,"type":"say","say":"task","text":"Refactor the widget cache"},
+  {"ts":1767225601000,"type":"say","say":"text","text":"I'll start by mapping the current cache keys."},
+  {"ts":1767225610000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":1200,\"tokensOut\":300,\"cacheWrites\":100,\"cacheReads\":400,\"cost\":0.031}","modelInfo":{"modelId":"claude-sonnet-4-5-20250929","providerId":"anthropic","mode":"act"}},
+  {"ts":1767225615000,"type":"say","say":"api_req_started","text":"{}","modelInfo":{"modelId":"claude-sonnet-4-5-20250929","providerId":"anthropic","mode":"act"}},
+  {"ts":1767225620000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":800,\"tokensOut\":210,\"cacheWrites\":0,\"cacheReads\":900,\"cost\":0.0192}","modelInfo":{"modelId":"claude-sonnet-4-5-20250929","providerId":"anthropic","mode":"act"}},
+  {"ts":1767225630000,"type":"say","say":"user_feedback","text":"thanks, ship it"},
+  {"ts":1767225640000,"type":"say","say":"api_req_started","text":"not-json-at-all"},
+  {"ts":0,"type":"say","say":"api_req_started","text":"{\"tokensIn\":5,\"tokensOut\":5}"},
+  {"ts":"not-a-time","type":"say","say":"api_req_started","text":"{\"tokensIn\":5,\"tokensOut\":5}"}
+]

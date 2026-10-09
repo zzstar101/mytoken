@@ -24,6 +24,8 @@ type Hooks struct {
 	// OpenMain shows the main window; Quit quits (the tray panel's buttons).
 	OpenMain func()
 	Quit     func()
+	// Settings edits pricing; nil hides the pricing cards.
+	Settings query.Settings
 	// Now is the clock (tests pin it).
 	Now func() time.Time
 }
@@ -56,6 +58,7 @@ type State struct {
 	detailBusy bool
 
 	rankTab int
+	pr      pricingState
 
 	mu      sync.Mutex
 	loading map[string]bool
@@ -111,6 +114,9 @@ func (s *State) Reload() {
 	s.loadSessions()
 	if s.sel != "" {
 		s.loadDetail(s.detail.Row.Harness, s.detail.Row.SessionID)
+	}
+	if s.Hooks.Settings != nil {
+		s.loadPricing()
 	}
 }
 

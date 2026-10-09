@@ -160,8 +160,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 	}
 	flush()
+	if e := s.st.NormalizeProjects(ctx); e != nil {
+		errs = append(errs, e)
+	}
 	if s.pricer != nil {
-		if e := s.st.RecomputeCosts(ctx, s.pricer.Cost); e != nil {
+		if e := s.st.RecomputePrices(ctx, s.pricer.Evaluate); e != nil {
 			errs = append(errs, e)
 		}
 	}
@@ -199,12 +202,13 @@ func (s *Scanner) scanOne(ctx context.Context, item source) (*store.Write, error
 		}
 		event.Provider = provider
 		var cost float64
+		priced := event.CostUSD != nil
 		if s.pricer != nil {
-			cost = s.pricer.Cost(event)
+			cost, priced = s.pricer.Evaluate(event)
 		} else if event.CostUSD != nil {
 			cost = *event.CostUSD
 		}
-		resolved[i] = store.Resolution{Provider: provider, Attrib: kind, Cost: cost}
+		resolved[i] = store.Resolution{Provider: provider, Attrib: kind, Cost: cost, Priced: priced}
 	}
 	return &store.Write{Harness: h, Path: item.src.Path, Batch: b, Resolutions: resolved}, nil
 }

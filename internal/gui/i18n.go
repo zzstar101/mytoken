@@ -85,6 +85,30 @@ var strs = map[string][2]string{ // key: {zh, en}
 	"recent":           {"最近", "Recent"},
 	"mostTokens":       {"最多 Token", "Most tokens"},
 	"mostCost":         {"最贵", "Costliest"},
+	"failed":           {"出错了", "Failed"},
+	"mapped":           {"已把 %s 映射为 %s", "Mapped %s to %s"},
+	"badMultiplier":    {"倍率要是一个大于 0 的数字", "The multiplier must be a number above 0"},
+	"multiplierSet":    {"%s 的倍率已设为 %s×", "%s now bills at %s×"},
+	"unpricedTitle":    {"没找到价格的模型", "Models without a price"},
+	"unpricedSub":      {"这些名字在价格表里找不到，多半是中转站或配置里自定义的别名。映射到真实模型后会按它计价，并在排行里合并。", "These names aren't in the price list — usually aliases a relay or your config made up. Map each to the real model to price it and merge it in rankings."},
+	"allPriced":        {"所有模型都找到价格了 ✓", "Every model has a price ✓"},
+	"importCCSwitch":   {"导入 cc-switch 价格", "Import cc-switch prices"},
+	"imported":         {"从 cc-switch 导入了 %d 条价格规则", "Imported %d price rules from cc-switch"},
+	"aliasesTitle":     {"模型映射", "Model mappings"},
+	"remove":           {"移除", "Remove"},
+	"multipliersTitle": {"供应商倍率", "Provider multipliers"},
+	"multipliersSub":   {"中转站常按官方价的若干倍计费；按回车生效。日志自带的费用不受影响。", "Relays often bill a multiple of list price. Press Return to apply; costs the log reported stay as they are."},
+	"customPrices":     {"另有 %d 条模型自定义价格（来自 cc-switch 或命令行）", "Plus %d custom model prices (from cc-switch or the CLI)"},
+	"nReq":             {"%s 次请求", "%s requests"},
+	"mapTo":            {"映射为", "Map to"},
+	"other":            {"其他…", "Other…"},
+	"cancel":           {"取消", "Cancel"},
+	"searchCatalog":    {"搜索价格表里的模型", "Search the price list"},
+	"noMatch":          {"没有匹配的模型", "No matching model"},
+	"unpricedBanner":   {"%d 个模型没找到价格，费用可能偏低", "%d models have no price, so costs may be low"},
+	"fixIt":            {"去映射 →", "Map them →"},
+	"noModelName":      {"（日志里没有模型名）", "(no model name in the log)"},
+	"noModelNameSub":   {"这些请求没有记录模型，无法映射；多半是中转站的探活或报错请求。", "These requests never named a model, so there's nothing to map — usually relay health checks or errors."},
 	"search":           {"搜索会话、项目、模型…", "Search sessions, projects, models…"},
 	"noSessions":       {"还没有会话呢", "No sessions yet"},
 	"noSessionsSub":    {"迷子でもいい、前へ進め——先去写点代码吧", "Go write some code, the tokens will follow"},
@@ -221,6 +245,18 @@ func fmtCost(usd float64) string {
 		return "$" + fmtInt(int64(math.Round(usd)))
 	}
 	return "$" + trimNum(usd/1000, 1) + "K"
+}
+
+// fmtCostOf formats a cost that may lack a price: "—" when nothing in it
+// was priced, the priced part with a trailing "+" when only some was.
+func fmtCostOf(usd float64, requests, unpriced int64) string {
+	switch {
+	case requests > 0 && unpriced >= requests:
+		return "—"
+	case unpriced > 0:
+		return fmtCost(usd) + "+"
+	}
+	return fmtCost(usd)
 }
 
 func fmtPct(f float64) string {

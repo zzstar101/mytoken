@@ -1,0 +1,12 @@
+{
+  "id": "msg_leg1",
+  "sessionID": "ses_legacy001",
+  "role": "assistant",
+  "modelID": "claude-opus-4-1",
+  "providerID": "anthropic",
+  "cost": 0.02,
+  "tokens": { "input": 2000, "output": 150, "reasoning": 25, "cache": { "read": 800, "write": 200 } },
+  "time": { "created": 1742302100000, "completed": 1742302105000 },
+  "path": { "root": "/Users/dev/legacy", "cwd": "/Users/dev/legacy" },
+  "agent": "build"
+}

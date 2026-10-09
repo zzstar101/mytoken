@@ -80,6 +80,8 @@ type Pricer struct {
 	aliases               map[string]Price
 	attempted             time.Time
 	overrides             map[string]map[string]Price
+	rules                 map[[2]string]Rule
+	modelAliases          map[[2]string]string
 	multipliers           map[string]float64
 	dir                   string
 	fetched               time.Time
@@ -199,10 +201,7 @@ func (p *Pricer) index() {
 func (p *Pricer) HasPrice(provider, name string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if _, ok := p.overrides[provider][Normalize(name)]; ok {
-		return true
-	}
-	_, ok := p.lookup(name)
+	_, ok, _ := p.effective(provider,name)
 	return ok
 }
 func (p *Pricer) SetMultiplier(provider string, multiplier float64) {
@@ -222,25 +221,8 @@ func (p *Pricer) SetPrice(provider, name string, price Price) {
 	p.overrides[provider][Normalize(name)] = price
 }
 func (p *Pricer) Cost(e model.UsageEvent) float64 {
-	if e.CostUSD != nil {
-		return *e.CostUSD
-	}
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	price, _ := p.lookup(e.Model)
-	if v, ok := p.overrides[e.Provider][Normalize(e.Model)]; ok {
-		price = v
-	}
-	reasoning := price.Output
-	if price.Reasoning != nil {
-		reasoning = *price.Reasoning
-	}
-	t := e.Tokens
-	cost := (float64(t.Input)*price.Input + float64(t.Output)*price.Output + float64(t.CacheRead)*price.CacheRead + float64(t.CacheWrite)*price.CacheWrite + float64(t.Reasoning)*reasoning) / 1e6
-	if m, ok := p.multipliers[e.Provider]; ok {
-		cost *= m
-	}
-	return cost
+ cost,_:=p.Evaluate(e)
+ return cost
 }
 func (p *Pricer) fetch(ctx context.Context, url string) ([]byte, error) {
 	req, e := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

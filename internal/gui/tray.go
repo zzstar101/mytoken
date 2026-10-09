@@ -24,7 +24,7 @@ func (s *State) TrayView(c *ui.Context) {
 				ui.Text(c, tr("today")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
 				ui.Row(c).AlignItems(ui.End).Gap(10).Children(func() {
 					bigNumber(c, pal, fmtTokens(t.Totals.Tokens.Total()), 34)
-					ui.Text(c, fmtCost(t.Totals.CostUSD)).FontSize(15).FontWeight(700).TextColor(Anon).FontFeatures("tnum").Padding(0, 0, 5, 0)
+					ui.Text(c, fmtCostOf(t.Totals.CostUSD, t.Totals.Requests, t.Totals.Unpriced)).FontSize(15).FontWeight(700).TextColor(Anon).FontFeatures("tnum").Padding(0, 0, 5, 0)
 					ui.Spacer(c)
 					ui.Column(c).AlignItems(ui.End).Gap(1).Padding(0, 0, 4, 0).Children(func() {
 						ui.Text(c, trf("requestsN", fmtInt(t.Totals.Requests))).FontSize(11).TextColor(pal.muted)

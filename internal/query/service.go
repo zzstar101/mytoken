@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"github.com/zzstar/mytoken/internal/model"
 	"github.com/zzstar/mytoken/internal/store"
@@ -58,8 +59,22 @@ func (s *service) load(ctx context.Context, f Filter) (data, error) {
 	if e != nil {
 		return d, e
 	}
+	var raw string
+	var aliases []ModelAlias
+	e = tx.QueryRowContext(ctx, "SELECT value FROM settings WHERE key='model-aliases'").Scan(&raw)
+	if e != nil && !errors.Is(e, sql.ErrNoRows) {
+		return d, e
+	}
+	if raw != "" {
+		if e = json.Unmarshal([]byte(raw), &aliases); e != nil {
+			return d, e
+		}
+	}
+	aliasLookup := aliasMap(aliases)
+	models := f.Models
+	f.Models = nil
 	where, args := filterSQL(f)
-	rows, e = tx.QueryContext(ctx, `SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost FROM events`+where+" ORDER BY timestamp,harness,dedup_key", args...)
+	rows, e = tx.QueryContext(ctx, `SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced FROM events`+where+" ORDER BY timestamp,harness,dedup_key", args...)
 	if e != nil {
 		return d, e
 	}
@@ -67,7 +82,7 @@ func (s *service) load(ctx context.Context, f Filter) (data, error) {
 		var v AttributedEvent
 		var at int64
 		var cost sql.NullFloat64
-		if e = rows.Scan(&v.Harness, &v.DedupKey, &v.SessionID, &v.ParentID, &v.ProjectPath, &at, &v.Model, &v.Provider, &v.BaseURL, &v.Tokens.Input, &v.Tokens.Output, &v.Tokens.CacheRead, &v.Tokens.CacheWrite, &v.Tokens.Reasoning, &cost, &v.ResolvedProvider, &v.Attrib, &v.Cost); e != nil {
+		if e = rows.Scan(&v.Harness, &v.DedupKey, &v.SessionID, &v.ParentID, &v.ProjectPath, &at, &v.Model, &v.Provider, &v.BaseURL, &v.Tokens.Input, &v.Tokens.Output, &v.Tokens.CacheRead, &v.Tokens.CacheWrite, &v.Tokens.Reasoning, &cost, &v.ResolvedProvider, &v.Attrib, &v.Cost, &v.Priced); e != nil {
 			rows.Close()
 			return d, e
 		}
@@ -75,6 +90,23 @@ func (s *service) load(ctx context.Context, f Filter) (data, error) {
 		if cost.Valid {
 			x := cost.Float64
 			v.CostUSD = &x
+		}
+		if target, ok := aliasLookup[[2]string{v.ResolvedProvider, v.Model}]; ok {
+			v.Model = target
+		} else if target, ok := aliasLookup[[2]string{"", v.Model}]; ok {
+			v.Model = target
+		}
+		if len(models) > 0 {
+			matches := false
+			for _, name := range models {
+				if name == v.Model {
+					matches = true
+					break
+				}
+			}
+			if !matches {
+				continue
+			}
 		}
 		d.events = append(d.events, v)
 	}
@@ -142,7 +174,11 @@ func (s *service) Totals(ctx context.Context, f Filter) (Totals, error) {
 	sessions := map[sessionKey]bool{}
 	for _, v := range d.events {
 		out.Tokens = out.Tokens.Add(v.Tokens)
-		out.CostUSD += v.Cost
+		if v.Priced {
+			out.CostUSD += v.Cost
+		} else {
+			out.Unpriced++
+		}
 		out.Requests++
 		sessions[d.root(sessionKey{v.Harness, v.SessionID})] = true
 	}
@@ -202,7 +238,9 @@ func (s *service) series(ctx context.Context, f Filter, hourly bool) ([]Point, e
 	for _, v := range d.events {
 		if i, ok := indices[floor(v.Timestamp, hourly).UnixNano()]; ok {
 			out[i].Tokens = out[i].Tokens.Add(v.Tokens)
-			out[i].CostUSD += v.Cost
+			if v.Priced {
+				out[i].CostUSD += v.Cost
+			}
 		}
 	}
 	return out, nil
@@ -249,7 +287,11 @@ func (s *service) buckets(ctx context.Context, f Filter, kind string) ([]Bucket,
 			seen[key] = map[sessionKey]bool{}
 		}
 		b.Tokens = b.Tokens.Add(v.Tokens)
-		b.CostUSD += v.Cost
+		if v.Priced {
+			b.CostUSD += v.Cost
+		} else {
+			b.Unpriced++
+		}
 		b.Requests++
 		seen[key][d.root(sessionKey{v.Harness, v.SessionID})] = true
 	}
@@ -290,7 +332,11 @@ func (d data) rows() map[sessionKey]*SessionRow {
 				break
 			}
 			r.Tokens = r.Tokens.Add(e.Tokens)
-			r.CostUSD += e.Cost
+			if e.Priced {
+				r.CostUSD += e.Cost
+			} else {
+				r.Unpriced++
+			}
 			r.Requests++
 			if e.Timestamp.After(r.UpdatedAt) {
 				r.UpdatedAt = e.Timestamp
@@ -305,7 +351,11 @@ func (d data) rows() map[sessionKey]*SessionRow {
 				breakdowns[k][pk] = b
 			}
 			b.Tokens = b.Tokens.Add(e.Tokens)
-			b.CostUSD += e.Cost
+			if e.Priced {
+				b.CostUSD += e.Cost
+			} else {
+				b.Unpriced++
+			}
 			b.Requests++
 			if r.ParentID == "" {
 				break

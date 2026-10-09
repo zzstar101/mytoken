@@ -1,0 +1,5 @@
+[{"ts":1767331200000,"type":"say","say":"task","text":"Set up the CI matrix"},
+{"ts":1767331205000,"type":"ask","ask":"tool","text":"{\"tool\":\"executeCommand\"}"},
+{"ts":1767331210000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"azure/openai\",\"tokensIn\":5200,\"tokensOut\":710,\"cacheWrites\":240,\"cacheReads\":3900,\"cost\":0.0398}"},
+{"ts":1767331220000,"type":"say","say":"api_req_started","text":"{\"apiProtocol\":\"azure/openai\",\"tokensIn\":9800,\"tokensOut\":1240,\"cacheWrites\":610,\"cacheReads\":7600,\"cost\":0.0751}"},
+{"ts":1767331230000,"type":"say","say":"completion_result","text":"The matrix is green."}]

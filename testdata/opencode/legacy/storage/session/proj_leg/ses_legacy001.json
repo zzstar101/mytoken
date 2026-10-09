@@ -1,0 +1,9 @@
+{
+  "id": "ses_legacy001",
+  "projectID": "proj_leg",
+  "directory": "/Users/dev/legacy",
+  "parentID": "",
+  "title": "Legacy JSON session",
+  "version": "0.4.1",
+  "time": { "created": 1742302000000, "updated": 1742302600000 }
+}

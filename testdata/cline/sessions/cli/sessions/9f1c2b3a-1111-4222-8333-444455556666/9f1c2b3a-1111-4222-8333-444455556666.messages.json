@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "updated_at": 1767225930000,
+  "agent": "lead",
+  "sessionId": "9f1c2b3a-1111-4222-8333-444455556666",
+  "origin": {"source": "cli", "mode": "headless", "sessionId": "9f1c2b3a-1111-4222-8333-444455556666"},
+  "messages": [
+    {"id": "m1", "role": "user", "ts": 1767225900000, "content": [{"type": "text", "text": "Summarise the cache change"}]},
+    {"id": "m2", "role": "assistant", "ts": 1767225910000, "modelInfo": {"id": "cline/glm-5", "provider": "cline-pass"}, "metrics": {"inputTokens": 7507, "outputTokens": 131, "cacheReadTokens": 50, "cacheWriteTokens": 0, "cost": 0.0110232}},
+    {"id": "m3", "role": "assistant", "ts": 1767225920000, "metrics": {"inputTokens": 8200, "outputTokens": 200, "cacheReadTokens": 100, "cacheWriteTokens": 400, "cost": 0.02}},
+    {"id": "m4", "role": "assistant", "ts": 1767225930000, "content": [{"type": "text", "text": "Done."}]}
+  ]
+}
