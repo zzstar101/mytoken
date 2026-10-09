@@ -1,0 +1,6 @@
+{"type":"assistant","sessionId":"signals","timestamp":"2026-01-02T00:00:00Z","requestId":"req-before","message":{"id":"msg-before","model":"test-model","usage":{"input_tokens":10,"output_tokens":1}}}
+{"type":"system","subtype":"compact_boundary","sessionId":"signals","timestamp":"2026-01-02T00:00:01Z"}
+{"type":"assistant","sessionId":"signals","timestamp":"2026-01-02T00:00:02Z","requestId":"req-before","message":{"id":"msg-before","model":"test-model","usage":{"input_tokens":10,"output_tokens":2}}}
+{"type":"assistant","sessionId":"signals","timestamp":"2026-01-02T00:00:03Z","requestId":"req-after","message":{"id":"msg-after","model":"test-model","usage":{"input_tokens":12,"output_tokens":3}}}
+{"type":"assistant","sessionId":"signals","timestamp":"2026-01-02T00:00:04Z","requestId":"req-after","message":{"id":"msg-after","model":"test-model","usage":{"input_tokens":12,"output_tokens":4}}}
+{"type":"assistant","sessionId":"signals","timestamp":"2026-01-02T00:00:05Z","message":{"id":"msg-next","model":"test-model","usage":{"input_tokens":14,"output_tokens":5}}}

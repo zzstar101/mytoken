@@ -41,6 +41,14 @@ func benchmarkFixture(tb testing.TB) (Service, time.Time) {
 		for j := range events {
 			at := start.Add(time.Duration(session)*2*time.Hour + time.Duration(j)*time.Minute)
 			events[j] = model.UsageEvent{DedupKey: fmt.Sprintf("event-%03d-%04d", session, j), SessionID: id, ParentID: parent, Timestamp: at, ProjectPath: fmt.Sprintf("/benchmark/project-%02d", session%20), Model: fmt.Sprintf("model-%d", session%4), Tokens: model.Tokens{Input: int64(100 + j%13), Output: 20, CacheRead: 200, CacheWrite: 10, Reasoning: 5}}
+			// Exercise populated per-request metadata without adding rollup dimensions.
+			events[j].RequestID = fmt.Sprintf("req-%03d-%04d-0123456789abcdef", session, j)
+			if j%80 == 0 {
+				events[j].Boundary = model.BoundaryCompact
+			}
+			if j%100 == 0 {
+				events[j].Bill = &model.Bill{Amount: 1.25, Unit: "credits"}
+			}
 			res[j] = store.Resolution{Provider: fmt.Sprintf("provider-%d", session%3), Attrib: model.AttribLog, Cost: .001, Priced: true}
 		}
 		if err = st.Commit(ctx, model.Codex, id, harness.Batch{Events: events}, res); err != nil {

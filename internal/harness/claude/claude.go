@@ -140,13 +140,15 @@ func (p *Parser) Discover(ctx context.Context) ([]harness.Source, error) {
 // the facts that live in already-consumed bytes (title, first project) so a
 // resumed parse can still emit a complete SessionMeta.
 type state struct {
-	Title     string `json:"t,omitempty"`
-	Project   string `json:"p,omitempty"`
-	StartedAt string `json:"s,omitempty"`
-	UpdatedAt string `json:"u,omitempty"`
+	Title      string                            `json:"t,omitempty"`
+	Project    string                            `json:"p,omitempty"`
+	StartedAt  string                            `json:"s,omitempty"`
+	UpdatedAt  string                            `json:"u,omitempty"`
+	Boundaries map[string]*harness.BoundaryState `json:"boundaries,omitempty"`
 }
 
 type rawLine struct {
+	Subtype     string      `json:"subtype"`
 	Type        string      `json:"type"`
 	Timestamp   string      `json:"timestamp"`
 	SessionID   string      `json:"sessionId"`
@@ -195,6 +197,7 @@ func decodeLine(raw []byte) (rawLine, bool) {
 		return rawLine{}, false
 	}
 	rl.Type = fieldString(fields, "type")
+	rl.Subtype = fieldString(fields, "subtype")
 	rl.Timestamp = fieldString(fields, "timestamp")
 	rl.SessionID = fieldString(fields, "sessionId")
 	rl.Cwd = fieldString(fields, "cwd")
@@ -294,6 +297,12 @@ func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Curs
 	parentID := parentSessionOf(src.Path)
 
 	acc := newAccumulator(fileSession, parentID)
+	if st8.Boundaries != nil {
+		acc.boundaries = st8.Boundaries
+	}
+	if t, err := time.Parse(time.RFC3339Nano, st8.UpdatedAt); err == nil {
+		acc.updated = t.UTC()
+	}
 	if st8.Project != "" {
 		acc.project = st8.Project
 	}
@@ -375,6 +384,10 @@ func (p *Parser) handleLine(b *harness.Batch, rl *rawLine, acc *accumulator, fil
 	acc.observe(sid, pid, ts, rl.Cwd)
 
 	switch rl.Type {
+	case "system":
+		if rl.Subtype == "compact_boundary" {
+			acc.boundary(sid).Pending = model.BoundaryCompact
+		}
 	case "assistant":
 		p.handleAssistant(b, rl, sid, pid, ts, acc)
 	case "user":
@@ -420,6 +433,8 @@ func (p *Parser) handleAssistant(b *harness.Batch, rl *rawLine, sid, pid string,
 	ev := model.UsageEvent{
 		Harness:     model.ClaudeCode,
 		DedupKey:    key,
+		RequestID:   firstNonEmpty(rl.RequestID, m.ID),
+		Boundary:    acc.boundary(sid).Apply(key),
 		SessionID:   sid,
 		ParentID:    pid,
 		ProjectPath: acc.project,
@@ -527,15 +542,17 @@ func parentSessionOf(path string) string {
 
 // accumulator collects the per-batch sessions and merges streaming duplicates.
 type accumulator struct {
-	primary  string
-	parent   string
-	project  string
-	started  time.Time
-	titles   map[string]string
-	fallback map[string]string
-	metas    map[string]*model.SessionMeta
-	order    []string
-	index    map[string]int
+	primary    string
+	parent     string
+	project    string
+	started    time.Time
+	updated    time.Time
+	boundaries map[string]*harness.BoundaryState
+	titles     map[string]string
+	fallback   map[string]string
+	metas      map[string]*model.SessionMeta
+	order      []string
+	index      map[string]int
 }
 
 func newAccumulator(primary, parent string) *accumulator {
@@ -549,7 +566,25 @@ func newAccumulator(primary, parent string) *accumulator {
 	}
 }
 
+func (a *accumulator) boundary(sid string) *harness.BoundaryState {
+	if a.boundaries == nil {
+		a.boundaries = map[string]*harness.BoundaryState{}
+	}
+	if a.boundaries[sid] == nil {
+		a.boundaries[sid] = &harness.BoundaryState{}
+	}
+	return a.boundaries[sid]
+}
+
 func (a *accumulator) observe(sid, pid string, ts time.Time, project string) {
+	if sid == a.primary && !ts.IsZero() {
+		if a.started.IsZero() || ts.Before(a.started) {
+			a.started = ts
+		}
+		if ts.After(a.updated) {
+			a.updated = ts
+		}
+	}
 	m, ok := a.metas[sid]
 	if !ok {
 		m = &model.SessionMeta{Harness: model.ClaudeCode, SessionID: sid, ParentID: pid}
@@ -648,7 +683,7 @@ func (a *accumulator) sessions() []model.SessionMeta {
 }
 
 func (a *accumulator) encodeState() string {
-	s := state{Project: a.project}
+	s := state{Project: a.project, Boundaries: a.boundaries}
 	if t, ok := a.titles[a.primary]; ok {
 		s.Title = t
 	} else if t, ok := a.fallback[a.primary]; ok {
@@ -662,7 +697,13 @@ func (a *accumulator) encodeState() string {
 			s.UpdatedAt = m.UpdatedAt.UTC().Format(time.RFC3339Nano)
 		}
 	}
-	if s == (state{}) {
+	if !a.started.IsZero() {
+		s.StartedAt = a.started.UTC().Format(time.RFC3339Nano)
+	}
+	if !a.updated.IsZero() {
+		s.UpdatedAt = a.updated.UTC().Format(time.RFC3339Nano)
+	}
+	if s.Title == "" && s.Project == "" && s.StartedAt == "" && s.UpdatedAt == "" && len(s.Boundaries) == 0 {
 		return ""
 	}
 	raw, err := json.Marshal(s)

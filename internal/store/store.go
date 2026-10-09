@@ -179,8 +179,8 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 	}
 	var err error
 
-	const row = `(?,?,?,?,?,?,?,?,?,?,?,?)`
-	const suffix = ` ON CONFLICT(harness,dedup_key) DO UPDATE SET dimension_id=excluded.dimension_id,timestamp=excluded.timestamp,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,cost=excluded.cost,priced=excluded.priced WHERE (event_data.dimension_id,event_data.timestamp,event_data.input,event_data.output,event_data.cache_read,event_data.cache_write,event_data.reasoning,event_data.log_cost,event_data.cost,event_data.priced) IS NOT (excluded.dimension_id,excluded.timestamp,excluded.input,excluded.output,excluded.cache_read,excluded.cache_write,excluded.reasoning,excluded.log_cost,excluded.cost,excluded.priced) AND (SELECT old.session_id=new.session_id OR (old.parent_id!='' AND new.parent_id='') FROM event_dimensions old JOIN event_dimensions new ON new.id=excluded.dimension_id WHERE old.id=event_data.dimension_id)`
+	const row = `(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+	const suffix = ` ON CONFLICT(harness,dedup_key) DO UPDATE SET dimension_id=excluded.dimension_id,timestamp=excluded.timestamp,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,cost=excluded.cost,priced=excluded.priced,request_id=coalesce(nullif(excluded.request_id,''),event_data.request_id),boundary=coalesce(nullif(excluded.boundary,''),event_data.boundary),bill_amount=coalesce(excluded.bill_amount,event_data.bill_amount),bill_unit=CASE WHEN excluded.bill_amount IS NOT NULL THEN excluded.bill_unit ELSE event_data.bill_unit END WHERE (event_data.dimension_id,event_data.timestamp,event_data.input,event_data.output,event_data.cache_read,event_data.cache_write,event_data.reasoning,event_data.log_cost,event_data.cost,event_data.priced,event_data.request_id,event_data.boundary,event_data.bill_amount,event_data.bill_unit) IS NOT (excluded.dimension_id,excluded.timestamp,excluded.input,excluded.output,excluded.cache_read,excluded.cache_write,excluded.reasoning,excluded.log_cost,excluded.cost,excluded.priced,coalesce(nullif(excluded.request_id,''),event_data.request_id),coalesce(nullif(excluded.boundary,''),event_data.boundary),coalesce(excluded.bill_amount,event_data.bill_amount),CASE WHEN excluded.bill_amount IS NOT NULL THEN excluded.bill_unit ELSE event_data.bill_unit END) AND (SELECT old.session_id=new.session_id OR (old.parent_id!='' AND new.parent_id='') FROM event_dimensions old JOIN event_dimensions new ON new.id=excluded.dimension_id WHERE old.id=event_data.dimension_id)`
 	const batchSize = 128
 	var values []any
 	// Resolve each distinct dimension tuple once per parser batch, rather than
@@ -205,7 +205,7 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 		if len(values) == 0 {
 			return nil
 		}
-		query := `INSERT INTO event_data(` + factColumns + `) VALUES ` + strings.TrimSuffix(strings.Repeat(row+",", len(values)/12), ",") + suffix
+		query := `INSERT INTO event_data(` + factColumns + `) VALUES ` + strings.TrimSuffix(strings.Repeat(row+",", len(values)/16), ",") + suffix
 		stmt, e := prepare(query)
 		if e == nil {
 			_, e = stmt.ExecContext(ctx, values...)
@@ -282,8 +282,14 @@ func (s *Store) commit(ctx context.Context, h model.Harness, path string, b harn
 		if err != nil {
 			return err
 		}
-		values = append(values, e.Harness, e.DedupKey, id, stamp(e.Timestamp), e.Tokens.Input, e.Tokens.Output, e.Tokens.CacheRead, e.Tokens.CacheWrite, e.Tokens.Reasoning, e.CostUSD, r.Cost, r.Priced)
-		if len(values) == batchSize*12 {
+		var billAmount any
+		billUnit := ""
+		if e.Bill != nil {
+			billAmount = e.Bill.Amount
+			billUnit = e.Bill.Unit
+		}
+		values = append(values, e.Harness, e.DedupKey, id, stamp(e.Timestamp), e.Tokens.Input, e.Tokens.Output, e.Tokens.CacheRead, e.Tokens.CacheWrite, e.Tokens.Reasoning, e.CostUSD, r.Cost, r.Priced, e.RequestID, e.Boundary, billAmount, billUnit)
+		if len(values) == batchSize*16 {
 			if err = flush(); err != nil {
 				return err
 			}

@@ -262,14 +262,18 @@ func (p *Parser) parseJSONL(src harness.Source, st os.FileInfo, fp string, cur h
 		}
 	}
 	s := newSession(src.Path)
+	if off > 0 {
+		_ = json.Unmarshal([]byte(cur.Extra), &s.boundary)
+	}
 	n, rerr := readCompleteLines(f, s.consume)
 	b := s.batch()
+	boundaryRaw, _ := json.Marshal(s.boundary)
 	b.Next = harness.Cursor{
 		Offset:      off + n,
 		Size:        st.Size(),
 		ModTime:     st.ModTime(),
 		Fingerprint: fp,
-		Extra:       kindJSONL,
+		Extra:       string(boundaryRaw),
 	}
 	if rerr != nil {
 		// Keep whatever complete lines were read and retry from there.
@@ -398,6 +402,7 @@ type session struct {
 	startedAt time.Time
 	updatedAt time.Time
 	events    []model.UsageEvent
+	boundary  harness.BoundaryState
 }
 
 func newSession(path string) *session {
@@ -503,6 +508,8 @@ func (s *session) consume(line []byte) error {
 		s.events = append(s.events, model.UsageEvent{
 			Harness:     model.DSH,
 			DedupKey:    firstNonEmpty(mID(d.Message), respID, fmt.Sprintf("%s#%d", s.id, int64(r.Seq))),
+			RequestID:   respID,
+			Boundary:    s.boundary.Apply(firstNonEmpty(mID(d.Message), respID, fmt.Sprintf("%s#%d", s.id, int64(r.Seq)))),
 			SessionID:   s.id,
 			ParentID:    s.parentID,
 			ProjectPath: s.project,
@@ -513,6 +520,7 @@ func (s *session) consume(line []byte) error {
 		})
 
 	case "compaction/summary":
+		s.boundary.Pending = model.BoundaryCompact
 		d := dshCompaction{Usage: fast.Data.Usage, CompactionID: fast.Data.CompactionID, Provider: fast.Data.Provider, Model: fast.Data.Model}
 		if err != nil {
 			d = dshCompaction{}

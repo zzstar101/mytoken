@@ -104,15 +104,16 @@ func (s *service) load(ctx context.Context, f Filter, mode ...loadMode) (data, e
 		for _, id := range ids {
 			args = append(args, id)
 		}
-		rows, e = tx.QueryContext(ctx, `SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced FROM events`+where+" ORDER BY timestamp,harness,dedup_key", args...)
+		rows, e = tx.QueryContext(ctx, `SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced,request_id,boundary,bill_amount,bill_unit FROM events`+where+" ORDER BY timestamp,harness,dedup_key", args...)
 		if e != nil {
 			return d, e
 		}
 		for rows.Next() {
 			var v AttributedEvent
 			var at int64
-			var cost sql.NullFloat64
-			if e = rows.Scan(&v.Harness, &v.DedupKey, &v.SessionID, &v.ParentID, &v.ProjectPath, &at, &v.Model, &v.Provider, &v.BaseURL, &v.Tokens.Input, &v.Tokens.Output, &v.Tokens.CacheRead, &v.Tokens.CacheWrite, &v.Tokens.Reasoning, &cost, &v.ResolvedProvider, &v.Attrib, &v.Cost, &v.Priced); e != nil {
+			var cost, billAmount sql.NullFloat64
+			var billUnit string
+			if e = rows.Scan(&v.Harness, &v.DedupKey, &v.SessionID, &v.ParentID, &v.ProjectPath, &at, &v.Model, &v.Provider, &v.BaseURL, &v.Tokens.Input, &v.Tokens.Output, &v.Tokens.CacheRead, &v.Tokens.CacheWrite, &v.Tokens.Reasoning, &cost, &v.ResolvedProvider, &v.Attrib, &v.Cost, &v.Priced, &v.RequestID, &v.Boundary, &billAmount, &billUnit); e != nil {
 				rows.Close()
 				return d, e
 			}
@@ -120,6 +121,9 @@ func (s *service) load(ctx context.Context, f Filter, mode ...loadMode) (data, e
 			if cost.Valid {
 				x := cost.Float64
 				v.CostUSD = &x
+			}
+			if billAmount.Valid {
+				v.Bill = &model.Bill{Amount: billAmount.Float64, Unit: billUnit}
 			}
 			eventSource(&v)
 			loaded = append(loaded, v)

@@ -1,0 +1,5 @@
+{"type":"session","id":"signals","createdAt":1767312000000,"cwd":"/missing/project"}
+{"type":"assistant/message","seq":1,"time":1767312001000,"data":{"message":{"id":"local-before","source":{"provider":"test","model":"test-model","replayState":{"response":{"responseId":"resp-before"}}}},"usage":{"inputTokens":10,"outputTokens":1}}}
+{"type":"compaction/summary","seq":2,"time":1767312002000,"data":{"compactionId":"local-compact","provider":"test","model":"test-model","usage":{"inputTokens":5,"outputTokens":1}}}
+{"type":"assistant/message","seq":3,"time":1767312003000,"data":{"message":{"id":"local-after","source":{"provider":"test","model":"test-model","replayState":{"response":{"responseId":"resp-after"}}}},"usage":{"inputTokens":12,"outputTokens":2}}}
+{"type":"assistant/message","seq":4,"time":1767312004000,"data":{"message":{"id":"local-no-upstream-id","source":{"provider":"test","model":"test-model"}},"usage":{"inputTokens":14,"outputTokens":3}}}

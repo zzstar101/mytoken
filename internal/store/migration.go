@@ -61,6 +61,9 @@ func (s *Store) migrate() error {
 	if err != nil {
 		return err
 	}
+	if err = migrateSignals(tx); err != nil {
+		return err
+	}
 	if _, err = tx.Exec(eventIndexes); err != nil {
 		return err
 	}

@@ -63,6 +63,9 @@ type UsageEvent struct {
     BaseURL     string    // 日志里能拿到就填
     Tokens      Tokens
     CostUSD     *float64  // 日志自带费用（如有），否则 nil
+    RequestID   string    // 明确上游 request/response ID，未知为空
+    Boundary    Boundary  // 本请求前明确观察到的上下文边界，未知为空
+    Bill        *Bill     // 工具原生账单；nil 与金额 0 不同
 }
 
 type SessionMeta struct {
@@ -114,6 +117,30 @@ func All() []Parser
 - 指纹变化（截断 / 轮转）→ 从 0 重读，依赖 DedupKey 去重。
 - 流式重复记录（同一 message id 多次出现）要取最终值，DedupKey 相同、后写覆盖。
 - 每个解析器带 `testdata/` fixture + 表驱动测试，断言 token 合计与会话数。
+
+### 4.1 请求身份、生命周期与原生账单（0.1.x 增补）
+
+`UsageEvent` 新增三个可选 JSON 字段 `requestId`、`boundary`、`bill`，均 `omitempty`，不改变旧 token / `CostUSD` / DedupKey 语义。
+
+```go
+type Boundary string
+const (
+    BoundaryCompact Boundary = "compact"
+    BoundaryClear   Boundary = "clear"
+    BoundaryResume  Boundary = "resume"
+)
+type Bill struct {
+    Amount float64 `json:"amount"`
+    Unit   string  `json:"unit"`
+}
+```
+
+- **RequestID 不生成**：只保留日志中的上游 request/response ID，不拿本地 UUID、会话 ID、turn ID、文件 offset 或 DedupKey 冒充。Claude 优先 `requestId`，缺失时保留上游 `message.id`（`msg_*` response/message ID）；Pi 为 `message.responseId`；DSH 为 `message.source.replayState.response.responseId`。Codex 仅支持 usage 同条 payload 的显式 `request_id` / `response_id`，缺失时留空。0.2 对账须区分 request 与 response ID 的命名空间，不能保证所有中继账单都有这些 ID。
+- **Boundary 不推断**：当前只输出明确的 `compact`。Claude `system/subtype=compact_boundary`、Codex `type=compacted`、Pi `type=compaction`、DSH `compaction/summary` 标记后，下一个不同的非零 usage 请求获得此边界。DSH summary 自身仍按原有规则计 token，但边界标在其后普通请求，不能把 summary 请求的输入误认成压缩后上下文。没有 usage 的标记不新增请求。`clear` / `resume` 预留，不从用户文本、模型切换、`turn_context`、父线程关系或缓存量骤降猜测；空值表示未知，而非断言没有发生边界。
+- 增量 `Cursor.Extra` 持久化 pending marker 与最近请求身份；标记单独落在一批、usage 在下一批时仍保留；前一请求的重复记录不消费 pending，下一请求的连续流式重复沿用同一边界。Claude 内嵌子代理分别保存状态。截断重读后可重建；store upsert 中空的 optional 信号不覆盖已观察到的非空信号。多个无 usage 的连续边界目前折叠为一个标签，不是完整生命周期事件日志。
+- **Bill 不换汇、不冒充估价**：仅用于工具明确报告的逐请求收费，保留 `Amount` 与原始 `Unit`（如 `credits`）；nil 是未报告，非 nil 且 Amount=0 是明确零收费。它既不替代 `CostUSD`，也不计入美元 Totals/rollup，不改变 `CostSource`。现有日志未找到可靠的逐请求原生积分收费，故现有 parser 不捏造 Bill；Pi `usage.cost.total` 仍仅映射原来的 `CostUSD`，Codex `rate_limits.credits.balance` 是余额，不能当请求费用。金额与单位已由存储/查询 fixture 覆盖，未来有原生账单的 harness 可直接接入。
+- 只读字段级抽样：3 个 Claude 日志 430 条 assistant 均有 message.id、无 requestId；120 个 Codex rollout 有 15,037 条 token_count、20 条 compacted，usage 中没有请求 ID，compaction_response_id 为 null。测试 fixture 只含假 ID、时间、数值、空 summary；无用户对话或凭据。Claude compact_boundary 使用显式格式回归 fixture，不声称在本次 Claude 抽样中观察到该标记。
+- 存储在 `event_data` 增加 `request_id TEXT NOT NULL DEFAULT ''`、`boundary TEXT NOT NULL DEFAULT ''`、`bill_amount REAL NULL`、`bill_unit TEXT NOT NULL DEFAULT ''`；旧紧凑库原地 ALTER，无逐行重写，重建 decoded `events` view 与 INSTEAD OF trigger。20 个旧字段、rowid、dedup、rollup 不变；新字段不建冗余索引。旧事件迁移后信号未知；历史日志仍存在时显式重扫可补齐，源日志已清理则保持未知。`Session` 返回的 `AttributedEvent` 原样包含信号，汇总不会伪造请求 ID。
 
 ## 5. 查询 API（`internal/query`，UI 与 CLI 共用）
 
@@ -229,7 +256,7 @@ type Service interface {
 - `go vet ./... && go test ./...` 全绿，`-race` 覆盖 scan / store。
 - 本机全量首扫 < 10s（以当前 ~/.claude、~/.codex、~/.dsh、~/.pi 为基准），增量更新 < 1s 可见。
 - 常驻内存 < 80MB，二进制 < 30MB。
-- 0.1.x 查询基准：`go test ./internal/query -run='^$' -bench=BenchmarkService -benchtime=1x -benchmem`，CI 三平台执行。确定性生成 200,000 请求 / 600 会话，覆盖 Totals、Daily、Hourly（24h，含 harness 筛选）、四类排行、Sessions（6 条/全部）及单会话详情。
+- 0.1.x 查询基准：`go test ./internal/query -run='^$' -bench=BenchmarkService -benchtime=1x -benchmem`，CI 三平台执行。确定性生成 200,000 请求 / 600 会话（每条含假 RequestID，稀疏 compact 与独立 credits Bill），覆盖 Totals、Daily、Hourly（24h，含 harness 筛选）、四类排行、Sessions（6 条/全部）及单会话详情。
 - 严格本机门槛：`MYTOKEN_STRICT_PERF=1 go test ./internal/query -run TestQueryPerformanceBudget -v -count=1`；每次查询 <100ms、新增 Go 分配 <50MiB。默认测试不在共享 CI 上断言墙钟时间。进程峰值另用编译后的测试二进制测量，避免把 Go 编译器内存算成应用内存。
 
 ### 10.1 0.1.x 测量快照（Apple M5，非跨机器保证）
@@ -241,3 +268,10 @@ type Service interface {
 - 扫描不是查询内存预算：新全量重扫 Go 堆峰值约 **81.8MiB**、RSS **154.1MiB**（旧 Go 堆 77.7MiB / RSS 225MiB）。不要把查询 <50MB 误写成全量解析/扫描进程的承诺。
 - 非默认展示时区回退、超长 Hourly 范围、极高维度基数仍按扫描事实/汇总组数量增长；上述性能门槛覆盖默认系统时区与 24h 小时图。字典保留可能不再被引用的少量旧维度，避免昂贵的逐写垃圾回收。
 - 真实库探针仅允许 `MYTOKEN_HOME` 位于 `/tmp/mtbench` 副本目录：`MYTOKEN_REAL_PERF=1 go test ./internal/scan -run TestCopiedDatabaseScanPerformance -v -count=1`；旧 schema 子目录可用 `MYTOKEN_MIGRATION_PERF=1 go test ./internal/store -run TestCopiedDatabaseMigrationPerformance -v -count=1` 验证迁移。绝不在正常应用数据目录执行性能重扫。
+
+### 10.2 请求信号增补测量（同机，独立副本）
+
+- 已紧凑的旧库增加 4 列信号，`store.Open` **83.3ms**，全部 20 个旧字段 SHA256 不变。随后显式重扫仍存在的 2,089 个源，207,962 事件中补得 **81,928 个 RequestID / 867 个 compact / 0 个原生 Bill**。RequestID 分布：Claude 170、Codex 1,730、DSH 63,068、Pi 16,960；compact 分布：Codex 843、DSH 24。这是全库重扫结果，与 §4.1 的局部只读结构抽样并不等同。
+- 补齐后全部表/索引 **59,043,840B / 283.92B 每事件**，空闲页 0，仍低于 300B；不截断、不哈希 ID。任意长 ID/单位仍会按实际长度增加体积，300B 是该实际副本的测量目标，不是无限输入下的硬上限。
+- 新 200K fixture 的 RequestID 全非空，含稀疏 compact/native Bill：Totals/Daily/By* **2.2–3.0ms**，Hourly **13.7–13.8ms**，Sessions **3.1–3.3ms**，Session **4.4ms**，单次分配 **0.72–3.30MB**。独立进程（含两次造数）峰值 RSS **47,824,896B**，系统 footprint **37,192,328B**，严格 <100ms / <50MiB 单查询门槛通过。
+- 首次信号补齐重扫 **12.78s**，随后空闲增量 **175.5ms**，Go 堆峰值 **85.94MiB**。重扫会为旧事件新增信号，不能与全量无变化重放的写入耗时等同；扫描仍不属于查询内存预算。

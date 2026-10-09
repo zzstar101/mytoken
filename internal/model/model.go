@@ -87,6 +87,23 @@ const (
 	AttribUserRule AttribSource = "user-rule"
 )
 
+// Boundary is an explicitly observed context lifecycle change before a request.
+// Empty means unknown; missing records and model changes are not boundaries.
+type Boundary string
+
+const (
+	BoundaryCompact Boundary = "compact"
+	BoundaryClear   Boundary = "clear"
+	BoundaryResume  Boundary = "resume"
+)
+
+// Bill preserves a tool's explicitly reported charge in its native unit. It is
+// independent of CostUSD: credits are never converted to or added to USD.
+type Bill struct {
+	Amount float64 `json:"amount"`
+	Unit   string  `json:"unit"`
+}
+
 // UsageEvent is one model request's usage, the single source of truth.
 type UsageEvent struct {
 	Harness     Harness   `json:"harness"`
@@ -99,7 +116,10 @@ type UsageEvent struct {
 	Provider    string    `json:"provider,omitempty"` // set only when the log itself says so
 	BaseURL     string    `json:"baseUrl,omitempty"`
 	Tokens      Tokens    `json:"tokens"`
-	CostUSD     *float64  `json:"costUsd,omitempty"` // cost reported by the log, if any
+	CostUSD     *float64  `json:"costUsd,omitempty"`   // cost reported by the log, if any
+	RequestID   string    `json:"requestId,omitempty"` // upstream request/response ID, never a local fallback
+	Boundary    Boundary  `json:"boundary,omitempty"`
+	Bill        *Bill     `json:"bill,omitempty"`
 }
 
 // SessionMeta describes a session. Title is the only conversation text stored.

@@ -29,6 +29,26 @@ type Cursor struct {
 	Extra       string    `json:"extra,omitempty"`
 }
 
+// BoundaryState persists a lifecycle marker across incremental parser batches.
+// The marker belongs to the next distinct usage request, not a replay of the
+// preceding request. Consecutive streaming copies retain the assigned marker.
+type BoundaryState struct {
+	Pending      model.Boundary `json:"pending,omitempty"`
+	LastKey      string         `json:"lastKey,omitempty"`
+	LastBoundary model.Boundary `json:"lastBoundary,omitempty"`
+}
+
+func (s *BoundaryState) Apply(key string) model.Boundary {
+	if key != "" && key == s.LastKey {
+		return s.LastBoundary
+	}
+	boundary := s.Pending
+	s.Pending = ""
+	s.LastKey = key
+	s.LastBoundary = boundary
+	return boundary
+}
+
 // Batch is what one Parse call produces.
 type Batch struct {
 	Events   []model.UsageEvent

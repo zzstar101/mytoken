@@ -120,15 +120,16 @@ func (p *Parser) Discover(ctx context.Context) ([]harness.Source, error) {
 // state is the incremental parse state persisted in Cursor.Extra: the facts
 // that live in already-consumed bytes plus the last cumulative token snapshot.
 type state struct {
-	Session  string        `json:"s,omitempty"`
-	Parent   string        `json:"p,omitempty"`
-	Model    string        `json:"m,omitempty"`
-	Provider string        `json:"pr,omitempty"`
-	Cwd      string        `json:"c,omitempty"`
-	Title    string        `json:"t,omitempty"`
-	Started  string        `json:"st,omitempty"`
-	Updated  string        `json:"u,omitempty"`
-	Total    *model.Tokens `json:"tot,omitempty"`
+	Session  string                `json:"s,omitempty"`
+	Parent   string                `json:"p,omitempty"`
+	Model    string                `json:"m,omitempty"`
+	Provider string                `json:"pr,omitempty"`
+	Cwd      string                `json:"c,omitempty"`
+	Title    string                `json:"t,omitempty"`
+	Started  string                `json:"st,omitempty"`
+	Updated  string                `json:"u,omitempty"`
+	Total    *model.Tokens         `json:"tot,omitempty"`
+	Boundary harness.BoundaryState `json:"boundary,omitzero"`
 }
 
 type rawLine struct {
@@ -138,6 +139,8 @@ type rawLine struct {
 }
 
 type rawPayload struct {
+	RequestID     string          `json:"request_id"`
+	ResponseID    string          `json:"response_id"`
 	Type          string          `json:"type"`
 	ID            string          `json:"id"`
 	SessionID     string          `json:"session_id"`
@@ -191,6 +194,8 @@ func decodePayload(raw json.RawMessage) (rawPayload, bool) {
 		return v
 	}
 	pl.Type = str("type")
+	pl.RequestID = str("request_id")
+	pl.ResponseID = str("response_id")
 	pl.ID = str("id")
 	pl.SessionID = str("session_id")
 	pl.ThreadID = str("thread_id")
@@ -455,6 +460,10 @@ func (p *Parser) handleLine(b *harness.Batch, rl *rawLine, acc *accumulator, ts 
 
 func handlePayload(b *harness.Batch, typ string, pl *rawPayload, acc *accumulator, ts time.Time) {
 	switch typ {
+	case "compacted":
+		acc.boundary.Pending = model.BoundaryCompact
+		acc.observe(ts)
+		return
 	case "session_meta":
 		if pl.ID != "" {
 			acc.session = pl.ID
@@ -484,7 +493,7 @@ func handlePayload(b *harness.Batch, typ string, pl *rawPayload, acc *accumulato
 			acc.session = pl.SessionID
 		}
 		acc.observe(ts)
-		acc.addUsage(b, pl.ThreadTokenUsage, pl.Usage, ts)
+		acc.addUsage(b, pl.ThreadTokenUsage, pl.Usage, ts, firstNonEmpty(pl.RequestID, pl.ResponseID))
 		return
 	case "event_msg":
 		switch pl.Type {
@@ -493,7 +502,7 @@ func handlePayload(b *harness.Batch, typ string, pl *rawPayload, acc *accumulato
 				return
 			}
 			acc.observe(ts)
-			acc.addUsage(b, pl.Info.Total, pl.Info.Last, ts)
+			acc.addUsage(b, pl.Info.Total, pl.Info.Last, ts, firstNonEmpty(pl.RequestID, pl.ResponseID))
 		case "user_message":
 			if t := userText(pl.Message); t != "" {
 				acc.setTitle(t)
@@ -514,6 +523,15 @@ func handlePayload(b *harness.Batch, typ string, pl *rawPayload, acc *accumulato
 	default:
 		acc.observe(ts)
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func parentOf(pl *rawPayload) string {
@@ -581,6 +599,7 @@ type accumulator struct {
 	updated time.Time
 
 	prevTotal *model.Tokens
+	boundary  harness.BoundaryState
 
 	index map[string]int
 	// unmodeled indexes events of the current batch that were written before a
@@ -598,6 +617,7 @@ func newAccumulator(st *state) *accumulator {
 		cwd:       st.Cwd,
 		title:     st.Title,
 		prevTotal: st.Total,
+		boundary:  st.Boundary,
 		index:     map[string]int{},
 	}
 	if t, err := time.Parse(time.RFC3339, st.Started); err == nil {
@@ -643,7 +663,7 @@ func (a *accumulator) setTitle(text string) {
 
 // addUsage turns one token record into a UsageEvent. total is the
 // session-cumulative snapshot, last the per-request increment.
-func (a *accumulator) addUsage(b *harness.Batch, total, last *rawUsage, ts time.Time) {
+func (a *accumulator) addUsage(b *harness.Batch, total, last *rawUsage, ts time.Time, requestID ...string) {
 	if total == nil || last == nil {
 		return
 	}
@@ -668,6 +688,10 @@ func (a *accumulator) addUsage(b *harness.Batch, total, last *rawUsage, ts time.
 		Provider:    a.provider,
 		Tokens:      tk,
 	}
+	if len(requestID) > 0 {
+		ev.RequestID = requestID[0]
+	}
+	ev.Boundary = a.boundary.Apply(ev.DedupKey)
 	if ev.DedupKey != "" {
 		if i, ok := a.index[ev.DedupKey]; ok {
 			b.Events[i].Tokens = maxTokens(b.Events[i].Tokens, ev.Tokens)
@@ -748,6 +772,7 @@ func (a *accumulator) encodeState() string {
 		Cwd:      a.cwd,
 		Title:    a.title,
 		Total:    a.prevTotal,
+		Boundary: a.boundary,
 	}
 	if !a.started.IsZero() {
 		st.Started = a.started.UTC().Format(time.RFC3339Nano)

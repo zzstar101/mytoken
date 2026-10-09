@@ -260,17 +260,21 @@ func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Curs
 		}
 	}
 	s := newSession(p.rootFor(src.Path), src.Path)
+	if off > 0 {
+		_ = json.Unmarshal([]byte(cur.Extra), &s.boundary)
+	}
 	if strings.Contains(filepath.Base(src.Path), "_transcript.jsonl") {
 		s.provider = asyncMetaProvider(src.Path)
 	}
 	n, rerr := readCompleteLines(f, s.consume)
 	b := s.batch()
+	boundaryRaw, _ := json.Marshal(s.boundary)
 	b.Next = harness.Cursor{
 		Offset:      off + n,
 		Size:        st.Size(),
 		ModTime:     st.ModTime(),
 		Fingerprint: fp,
-		Extra:       kindJSONL,
+		Extra:       string(boundaryRaw),
 	}
 	if rerr != nil {
 		// Keep whatever complete lines were read and retry from there.
@@ -353,6 +357,7 @@ type session struct {
 	startedAt time.Time
 	updatedAt time.Time
 	events    []model.UsageEvent
+	boundary  harness.BoundaryState
 }
 
 func newSession(root, path string) *session {
@@ -404,6 +409,8 @@ func (s *session) consume(line []byte) error {
 		return nil
 	}
 	switch r.Type {
+	case "compaction":
+		s.boundary.Pending = model.BoundaryCompact
 	case "session":
 		if r.ID != "" {
 			s.id = r.ID
@@ -448,6 +455,8 @@ func (s *session) consume(line []byte) error {
 			s.events = append(s.events, model.UsageEvent{
 				Harness:     model.Pi,
 				DedupKey:    firstNonEmpty(m.ResponseID, r.ID, s.id+"#"+string(r.Timestamp)),
+				RequestID:   m.ResponseID,
+				Boundary:    s.boundary.Apply(firstNonEmpty(m.ResponseID, r.ID, s.id+"#"+string(r.Timestamp))),
 				SessionID:   s.id,
 				ParentID:    s.parentID,
 				ProjectPath: s.project,

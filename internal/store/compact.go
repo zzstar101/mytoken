@@ -6,7 +6,8 @@ import (
 )
 
 const dimensionColumns = "harness,session_id,parent_id,project,model,provider,base_url,resolved_provider,attrib,raw_project"
-const factColumns = "harness,dedup_key,dimension_id,timestamp,input,output,cache_read,cache_write,reasoning,log_cost,cost,priced"
+const legacyFactColumns = "harness,dedup_key,dimension_id,timestamp,input,output,cache_read,cache_write,reasoning,log_cost,cost,priced"
+const factColumns = legacyFactColumns + ",request_id,boundary,bill_amount,bill_unit"
 
 // migrateCompact dictionaries repeated strings, retaining exact dedup keys and
 // a stable integer rowid. The events view preserves the SQL read/update surface.
@@ -26,12 +27,49 @@ func migrateCompact(tx *sql.Tx) (bool, error) {
  CREATE INDEX dimensions_session ON event_dimensions(harness,session_id);
  CREATE INDEX dimensions_raw_project ON event_dimensions(raw_project,project);
  CREATE TABLE event_data(harness TEXT NOT NULL,dedup_key TEXT NOT NULL,dimension_id INTEGER NOT NULL REFERENCES event_dimensions(id),timestamp INTEGER NOT NULL,input INTEGER NOT NULL,output INTEGER NOT NULL,cache_read INTEGER NOT NULL,cache_write INTEGER NOT NULL,reasoning INTEGER NOT NULL,log_cost REAL,cost REAL NOT NULL,priced INTEGER NOT NULL,PRIMARY KEY(harness,dedup_key));
- INSERT INTO event_data(rowid,` + factColumns + `) SELECT e.rowid,e.harness,e.dedup_key,d.id,e.timestamp,e.input,e.output,e.cache_read,e.cache_write,e.reasoning,e.log_cost,e.cost,e.priced FROM events e JOIN event_dimensions d ON ` + dimensionMatch("e", "d") + `;
+ INSERT INTO event_data(rowid,` + legacyFactColumns + `) SELECT e.rowid,e.harness,e.dedup_key,d.id,e.timestamp,e.input,e.output,e.cache_read,e.cache_write,e.reasoning,e.log_cost,e.cost,e.priced FROM events e JOIN event_dimensions d ON ` + dimensionMatch("e", "d") + `;
  DROP TABLE events;
  CREATE VIEW events AS SELECT e.rowid AS rowid,e.harness,e.dedup_key,d.session_id,d.parent_id,d.project,e.timestamp,d.model,d.provider,d.base_url,e.input,e.output,e.cache_read,e.cache_write,e.reasoning,e.log_cost,d.resolved_provider,d.attrib,e.cost,e.priced,d.raw_project FROM event_data e JOIN event_dimensions d ON d.id=e.dimension_id;
  `)
+	return true, err
+}
+
+// migrateSignals upgrades already-compacted databases without rewriting facts.
+func migrateSignals(tx *sql.Tx) error {
+	rows, err := tx.Query(`PRAGMA table_info(event_data)`)
 	if err != nil {
-		return false, err
+		return err
+	}
+	columns := map[string]bool{}
+	for rows.Next() {
+		var id, nn, pk int
+		var name, typ string
+		var def any
+		if err = rows.Scan(&id, &name, &typ, &nn, &def, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		columns[name] = true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	changed := false
+	for _, col := range []struct{ name, decl string }{{"request_id", "TEXT NOT NULL DEFAULT ''"}, {"boundary", "TEXT NOT NULL DEFAULT ''"}, {"bill_amount", "REAL"}, {"bill_unit", "TEXT NOT NULL DEFAULT ''"}} {
+		if !columns[col.name] {
+			if _, err = tx.Exec("ALTER TABLE event_data ADD COLUMN " + col.name + " " + col.decl); err != nil {
+				return err
+			}
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	if _, err = tx.Exec(`DROP VIEW events; CREATE VIEW events AS SELECT e.rowid AS rowid,e.harness,e.dedup_key,d.session_id,d.parent_id,d.project,e.timestamp,d.model,d.provider,d.base_url,e.input,e.output,e.cache_read,e.cache_write,e.reasoning,e.log_cost,d.resolved_provider,d.attrib,e.cost,e.priced,d.raw_project,e.request_id,e.boundary,e.bill_amount,e.bill_unit FROM event_data e JOIN event_dimensions d ON d.id=e.dimension_id;`); err != nil {
+		return err
 	}
 	var dims []string
 	for _, c := range strings.Split(dimensionColumns, ",") {
@@ -44,15 +82,17 @@ func migrateCompact(tx *sql.Tx) (bool, error) {
 		v := "NEW." + c
 		if c == "dimension_id" {
 			v = dimID
+		} else if c == "request_id" || c == "boundary" || c == "bill_unit" {
+			v = "coalesce(" + v + ",'')"
 		}
 		vals = append(vals, v)
 		updates = append(updates, c+"="+v)
 	}
-	insert := `INSERT INTO event_data(` + factColumns + `) VALUES(` + strings.Join(vals, ",") + `) ON CONFLICT(harness,dedup_key) DO UPDATE SET dimension_id=excluded.dimension_id,timestamp=excluded.timestamp,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,cost=excluded.cost,priced=excluded.priced WHERE (SELECT session_id=NEW.session_id OR (parent_id!='' AND NEW.parent_id='') FROM event_dimensions WHERE id=event_data.dimension_id);`
+	insert := `INSERT INTO event_data(` + factColumns + `) VALUES(` + strings.Join(vals, ",") + `) ON CONFLICT(harness,dedup_key) DO UPDATE SET dimension_id=excluded.dimension_id,timestamp=excluded.timestamp,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,log_cost=excluded.log_cost,cost=excluded.cost,priced=excluded.priced,request_id=coalesce(nullif(excluded.request_id,''),event_data.request_id),boundary=coalesce(nullif(excluded.boundary,''),event_data.boundary),bill_amount=coalesce(excluded.bill_amount,event_data.bill_amount),bill_unit=CASE WHEN excluded.bill_amount IS NOT NULL THEN excluded.bill_unit ELSE event_data.bill_unit END WHERE (SELECT session_id=NEW.session_id OR (parent_id!='' AND NEW.parent_id='') FROM event_dimensions WHERE id=event_data.dimension_id);`
 	_, err = tx.Exec(`CREATE TRIGGER events_insert INSTEAD OF INSERT ON events BEGIN ` + dimInsert + insert + ` END;
  CREATE TRIGGER events_update INSTEAD OF UPDATE ON events BEGIN ` + dimInsert + `UPDATE event_data SET ` + strings.Join(updates, ",") + ` WHERE rowid=OLD.rowid; END;
  CREATE TRIGGER events_delete INSTEAD OF DELETE ON events BEGIN DELETE FROM event_data WHERE rowid=OLD.rowid; END;`)
-	return true, err
+	return err
 }
 
 func dimensionMatch(a, b string) string {

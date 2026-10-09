@@ -1,0 +1,8 @@
+{"timestamp":"2026-01-02T00:00:00Z","type":"session_meta","payload":{"id":"signals","model_provider":"test"}}
+{"timestamp":"2026-01-02T00:00:00Z","type":"turn_context","payload":{"model":"test-model","turn_id":"not-a-request"}}
+{"timestamp":"2026-01-02T00:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11},"last_token_usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11}}}}
+{"timestamp":"2026-01-02T00:00:02Z","type":"compacted","payload":{"compaction_response_id":null,"latest_token_usage_record":null,"replacement_history":[],"message":""}}
+{"timestamp":"2026-01-02T00:00:03Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11},"last_token_usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11}}}}
+{"timestamp":"2026-01-02T00:00:04Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":20,"output_tokens":2,"total_tokens":22},"last_token_usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11}},"rate_limits":{"credits":{"balance":"100","has_credits":true}}}}
+{"timestamp":"2026-01-02T00:00:05Z","type":"turn_context","payload":{"model":"different-model","turn_id":"still-not-a-request"}}
+{"timestamp":"2026-01-02T00:00:06Z","type":"event_msg","payload":{"type":"token_count","request_id":"req-explicit","info":{"total_token_usage":{"input_tokens":30,"output_tokens":3,"total_tokens":33},"last_token_usage":{"input_tokens":10,"output_tokens":1,"total_tokens":11}}}}
