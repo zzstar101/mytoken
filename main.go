@@ -144,8 +144,15 @@ func main() {
 			StateKey:      "main",
 			Content:       ui.View(func(c *ui.Context) { state.MainView(c) }),
 		})
-		// Closing the main window keeps the app in the tray.
+		// Closing the main window keeps the app in the tray. A quit (the tray
+		// menu, Cmd+Q, SIGTERM, logging out) closes every window first, so
+		// the window must let that close through, or nothing could quit.
+		quitting := false
+		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting = true })
 		main.OnClose(func(e *mygo.CloseEvent) {
+			if quitting {
+				return
+			}
 			e.PreventDefault()
 			main.Hide()
 		})
