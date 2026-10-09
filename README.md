@@ -17,7 +17,7 @@
 <p align="center"><b>⚡ Powered by <a href="https://github.com/egoist/mygo">MyGo</a>!</b></p>
 
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
-<p align="center"><a href="#install">Install</a> · <a href="#screenshots">Screenshots</a> · <a href="#supported-harnesses">Harnesses</a> · <a href="docs/CLI.md">CLI</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">Download</a></p>
+<p align="center"><a href="#install">Install</a> · <a href="#screenshots">Screenshots</a> · <a href="#supported-harnesses">Harnesses</a> · <a href="docs/CLI.md">CLI</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">Download</a></p>
 
 **Where did all your tokens go?** MyToken!!!!! reads the session logs your AI coding harnesses
 already write to disk, attributes every request to a session, provider and model, prices it, and

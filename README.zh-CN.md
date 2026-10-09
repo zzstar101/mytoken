@@ -17,7 +17,7 @@
 <p align="center"><b>⚡ 由 <a href="https://github.com/egoist/mygo">MyGo</a> 强力驱动！</b></p>
 
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b></p>
-<p align="center"><a href="#安装">安装</a> · <a href="#界面截图">截图</a> · <a href="#支持的-harness">支持的 harness</a> · <a href="docs/CLI.md">命令行</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">下载</a></p>
+<p align="center"><a href="#安装">安装</a> · <a href="#界面截图">截图</a> · <a href="#支持的-harness">支持的 harness</a> · <a href="docs/CLI.md">命令行</a> · <a href="docs/ROADMAP.md">路线图</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">下载</a></p>
 
 **你的 token 都花在哪了？** MyToken!!!!! 读取 AI 编程 harness 已经写在磁盘上的会话日志，把每一次请求归到
 会话 × 供应商 × 模型，算出费用，然后在原生桌面应用里展示出来 —— 也可以用命令行直接拿到 JSON。
