@@ -14,6 +14,8 @@
   <a href="https://github.com/egoist/mygo"><img alt="Built with MyGo" src="https://img.shields.io/badge/built%20with-MyGo-5AA9D6?style=flat-square&labelColor=2B2640"></a>
 </p>
 
+<p align="center"><b>⚡ 由 <a href="https://github.com/egoist/mygo">MyGo</a> 强力驱动！</b></p>
+
 <p align="center"><a href="README.md">English</a> · <b>简体中文</b></p>
 <p align="center"><a href="#安装">安装</a> · <a href="#界面截图">截图</a> · <a href="#支持的-harness">支持的 harness</a> · <a href="docs/CLI.md">命令行</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">下载</a></p>
 
@@ -249,7 +251,7 @@ Windows 三个平台运行 `go vet` 和 `go test`，并额外做一次 `gofmt` �
 
 - **[tokscale](https://github.com/search?q=tokscale)** —— 多个 harness 的解析规则移植自 tokscale，
   包括 Gemini CLI 的 token 折叠方式和它接受的各种字段名。
-- **[MyGo](https://github.com/egoist/mygo)** —— 应用所用的原生 UI 工具包。
+- **[MyGo](https://github.com/egoist/mygo)** —— 应用所用的原生 UI 工具包。由 MyGo 强力驱动！
 - **[models.dev](https://models.dev)** 与 **[LiteLLM](https://github.com/BerriAI/litellm)** —— 价格表来源。
 - **cc-switch** —— 价格导入格式，以及归因所使用的供应商请求日志。
 

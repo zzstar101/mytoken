@@ -14,6 +14,8 @@
   <a href="https://github.com/egoist/mygo"><img alt="Built with MyGo" src="https://img.shields.io/badge/built%20with-MyGo-5AA9D6?style=flat-square&labelColor=2B2640"></a>
 </p>
 
+<p align="center"><b>⚡ Powered by <a href="https://github.com/egoist/mygo">MyGo</a>!</b></p>
+
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center"><a href="#install">Install</a> · <a href="#screenshots">Screenshots</a> · <a href="#supported-harnesses">Harnesses</a> · <a href="docs/CLI.md">CLI</a> · <a href="https://github.com/zzstar101/mytoken/releases/latest">Download</a></p>
 
@@ -269,7 +271,7 @@ Windows, plus a `gofmt` check, for every push and pull request.
 
 - **[tokscale](https://github.com/search?q=tokscale)** — several harness readers are ports of
   tokscale's parsing rules, including Gemini CLI's token folding and accepted field names.
-- **[MyGo](https://github.com/egoist/mygo)** — the native UI toolkit the app is built with.
+- **[MyGo](https://github.com/egoist/mygo)** — the native UI toolkit the app is built with. Powered by MyGo!
 - **[models.dev](https://models.dev)** and **[LiteLLM](https://github.com/BerriAI/litellm)** — the
   price tables.
 - **cc-switch** — the pricing import format and the provider request log used by attribution.
