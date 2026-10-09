@@ -4,7 +4,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/zzstar/mytoken/internal/pricing"
+	"github.com/zzstar101/mytoken/internal/pricing"
 	"log"
 	"os"
 )

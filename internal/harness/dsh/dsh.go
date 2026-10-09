@@ -96,8 +96,8 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 const (

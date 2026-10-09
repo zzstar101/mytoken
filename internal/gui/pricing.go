@@ -8,7 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"github.com/zzstar/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/query"
 )
 
 // pricingState backs the settings page's pricing cards: models without a

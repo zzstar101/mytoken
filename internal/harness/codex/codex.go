@@ -42,8 +42,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 const (

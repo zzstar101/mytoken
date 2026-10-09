@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 func itoa(v int) string { return strconv.Itoa(v) }

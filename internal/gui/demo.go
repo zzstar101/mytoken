@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/model"
-	"github.com/zzstar/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/query"
 )
 
 // demo is a deterministic query.Service of made-up usage, for screenshots,

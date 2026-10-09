@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 	"io"
 	"net/http"
 	"os"

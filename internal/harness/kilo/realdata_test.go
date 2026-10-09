@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/harness/clinetask"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness/clinetask"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // TestRealData runs Discover+Parse over the real Kilo Code tree — the VS Code

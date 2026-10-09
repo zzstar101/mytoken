@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // TestRealData parses whatever Crush databases exist on this machine. It is

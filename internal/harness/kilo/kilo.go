@@ -34,9 +34,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/harness/clinetask"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/harness/clinetask"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // Parser reads Kilo Code task logs. It holds no mutable state and is safe for

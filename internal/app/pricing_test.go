@@ -2,9 +2,9 @@ package app
 
 import (
 	"context"
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
-	"github.com/zzstar/mytoken/internal/store"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/store"
 	"path/filepath"
 	"testing"
 )

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/zzstar/mytoken/internal/model"
-	"github.com/zzstar/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/query"
 )
 
 // MainView is the main window's content.

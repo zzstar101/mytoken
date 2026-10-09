@@ -21,10 +21,10 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"github.com/zzstar/mytoken/internal/app"
-	"github.com/zzstar/mytoken/internal/cli"
-	"github.com/zzstar/mytoken/internal/gui"
-	"github.com/zzstar/mytoken/internal/paths"
+	"github.com/zzstar101/mytoken/internal/app"
+	"github.com/zzstar101/mytoken/internal/cli"
+	"github.com/zzstar101/mytoken/internal/gui"
+	"github.com/zzstar101/mytoken/internal/paths"
 )
 
 func main() {

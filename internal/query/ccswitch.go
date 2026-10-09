@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/zzstar/mytoken/internal/pricing"
+	"github.com/zzstar101/mytoken/internal/pricing"
 	"net/url"
 	"os"
 	"path/filepath"

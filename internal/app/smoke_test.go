@@ -2,8 +2,8 @@ package app
 
 import (
 	"context"
-	"github.com/zzstar/mytoken/internal/model"
-	"github.com/zzstar/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/query"
 	"os"
 	"testing"
 	"time"

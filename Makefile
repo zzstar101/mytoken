@@ -8,7 +8,7 @@
 SHELL := /bin/sh
 GO    ?= go
 
-PKG     := github.com/zzstar/mytoken
+PKG     := github.com/zzstar101/mytoken
 BINARY  ?= mytoken
 OUT     ?= build
 

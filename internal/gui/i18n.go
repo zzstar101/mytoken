@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // Lang is "zh" or "en".

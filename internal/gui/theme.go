@@ -9,7 +9,7 @@ import (
 	"embed"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // The five member colors, slightly deepened so that they read on white.

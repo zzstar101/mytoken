@@ -13,10 +13,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/app"
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/paths"
-	"github.com/zzstar/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/app"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/paths"
+	"github.com/zzstar101/mytoken/internal/query"
 )
 
 // Version is set at build time with -ldflags -X.

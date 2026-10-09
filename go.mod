@@ -1,4 +1,4 @@
-module github.com/zzstar/mytoken
+module github.com/zzstar101/mytoken
 
 go 1.27.1
 

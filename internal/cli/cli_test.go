@@ -3,9 +3,9 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/zzstar/mytoken/internal/app"
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/app"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
 	"os"
 	"path/filepath"
 	"testing"

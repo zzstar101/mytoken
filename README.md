@@ -151,7 +151,7 @@ uninstaller.
 ### Linux (install script)
 
 ```sh
-curl -fsSL https://github.com/zzstar/mytoken/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/zzstar101/mytoken/releases/latest/download/install.sh | sh
 ```
 
 Installs per user, without root: the app in `~/.local/mytoken.app`, the `mytoken` command in
@@ -170,7 +170,7 @@ WebKitGTK 4.1 and libayatana-appindicator3 (the tray icon).
 ### With the Go toolchain
 
 ```sh
-go install github.com/zzstar/mytoken@latest
+go install github.com/zzstar101/mytoken@latest
 ```
 
 Builds the same binary the bundles carry, including the CLI, into `$(go env GOPATH)/bin/mytoken`.
@@ -203,7 +203,7 @@ Requirements: Go 1.27 or newer, and no cgo (`CGO_ENABLED=0` — the SQLite drive
 Running the app needs macOS 12+, Windows 10+ or a Linux desktop with GTK 3 and WebKitGTK 4.1.
 
 ```sh
-git clone https://github.com/zzstar/mytoken
+git clone https://github.com/zzstar101/mytoken
 cd mytoken
 
 make build     # ./mytoken, version taken from the latest v* tag

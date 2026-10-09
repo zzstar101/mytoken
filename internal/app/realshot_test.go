@@ -8,7 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"github.com/zzstar/mytoken/internal/gui"
+	"github.com/zzstar101/mytoken/internal/gui"
 )
 
 // TestRealShots renders the GUI over the real index at MYTOKEN_HOME, so the

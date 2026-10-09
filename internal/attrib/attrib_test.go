@@ -3,8 +3,8 @@ package attrib
 import (
 	"context"
 	"database/sql"
-	"github.com/zzstar/mytoken/internal/model"
-	"github.com/zzstar/mytoken/internal/store"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/store"
 	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"

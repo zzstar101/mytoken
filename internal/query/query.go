@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // Range is a half-open local-time interval [From, To). Zero values mean unbounded.

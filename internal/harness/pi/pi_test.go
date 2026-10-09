@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // fixtureRoot points at testdata/pi/sessions, a sanitized copy of a real

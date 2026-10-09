@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 // TestRealData parses whatever Gemini CLI history exists on this machine. It

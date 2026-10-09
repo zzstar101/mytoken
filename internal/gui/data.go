@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zzstar/mytoken/internal/model"
-	"github.com/zzstar/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/query"
 )
 
 // Span is a range choice of the overview.

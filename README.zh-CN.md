@@ -135,7 +135,7 @@ Linux 是 `~/.config/<编辑器>/User/globalStorage`（或 `$XDG_CONFIG_HOME/…
 ### Linux（安装脚本）
 
 ```sh
-curl -fsSL https://github.com/zzstar/mytoken/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/zzstar101/mytoken/releases/latest/download/install.sh | sh
 ```
 
 按用户安装，不需要 root：应用放在 `~/.local/mytoken.app`，`mytoken` 命令放在 `~/.local/bin`，并写入
@@ -153,7 +153,7 @@ libayatana-appindicator3（托盘图标）。
 ### 用 Go 工具链安装
 
 ```sh
-go install github.com/zzstar/mytoken@latest
+go install github.com/zzstar101/mytoken@latest
 ```
 
 编译出与发行包相同的二进制（含 CLI），位于 `$(go env GOPATH)/bin/mytoken`。
@@ -186,7 +186,7 @@ mytoken version
 macOS 12+、Windows 10+，或带 GTK 3 与 WebKitGTK 4.1 的 Linux 桌面。
 
 ```sh
-git clone https://github.com/zzstar/mytoken
+git clone https://github.com/zzstar101/mytoken
 cd mytoken
 
 make build     # 生成 ./mytoken，版本号取自最新的 v* tag

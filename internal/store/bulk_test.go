@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zzstar/mytoken/internal/harness"
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/harness"
+	"github.com/zzstar101/mytoken/internal/model"
 )
 
 func TestDeferredIndexesRestoreAfterCancellation(t *testing.T) {

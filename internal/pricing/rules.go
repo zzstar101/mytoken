@@ -1,7 +1,7 @@
 package pricing
 
 import (
-	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/model"
 	"sort"
 	"strings"
 )
