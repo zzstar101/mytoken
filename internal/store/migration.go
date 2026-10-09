@@ -64,10 +64,13 @@ func (s *Store) migrate() error {
 	if err = migrateSignals(tx); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(eventIndexes); err != nil {
+	if err = migrateEventIndexes(tx); err != nil {
 		return err
 	}
 	if err = migrateDaily(tx); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(relaySchema); err != nil {
 		return err
 	}
 	if err = tx.Commit(); err != nil {

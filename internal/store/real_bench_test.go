@@ -21,8 +21,10 @@ func TestCopiedDatabaseMigrationPerformance(t *testing.T) {
 		t.Fatal("migration probe requires copy under /tmp/mtbench/")
 	}
 	path := filepath.Join(home, "mytoken.db")
+	columns := `rowid,harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced,raw_project`
+	n := 21
 	digest := func(db *sql.DB) string {
-		rows, err := db.Query(`SELECT harness,dedup_key,session_id,parent_id,project,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,log_cost,resolved_provider,attrib,cost,priced,raw_project FROM events ORDER BY harness,dedup_key`)
+		rows, err := db.Query(`SELECT ` + columns + ` FROM events ORDER BY harness,dedup_key`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -30,8 +32,8 @@ func TestCopiedDatabaseMigrationPerformance(t *testing.T) {
 		hash := sha256.New()
 		enc := json.NewEncoder(hash)
 		for rows.Next() {
-			values := make([]any, 20)
-			args := make([]any, 20)
+			values := make([]any, n)
+			args := make([]any, n)
 			for i := range values {
 				args[i] = &values[i]
 			}
@@ -51,6 +53,14 @@ func TestCopiedDatabaseMigrationPerformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var signals int
+	if err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('events') WHERE name='request_id'`).Scan(&signals); err != nil {
+		t.Fatal(err)
+	}
+	if signals > 0 {
+		columns += `,request_id,boundary,bill_amount,bill_unit`
+		n += 4
+	}
 	before := digest(db)
 	db.Close()
 	at := time.Now()
@@ -63,5 +73,5 @@ func TestCopiedDatabaseMigrationPerformance(t *testing.T) {
 	if after := digest(st.DB()); before != after {
 		t.Fatalf("lossy migration digest %s → %s", before, after)
 	}
-	t.Logf("store.Open migration+VACUUM+rollup %s; all 20 fields unchanged (SHA256 %s)", elapsed, before)
+	t.Logf("store.Open migration %s; all %d fields including rowid unchanged (SHA256 %s)", elapsed, n, before)
 }

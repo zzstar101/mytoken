@@ -2,11 +2,45 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"strings"
 )
 
-const eventIndexes = `CREATE INDEX IF NOT EXISTS events_time ON event_data(timestamp);
+const eventIndexes = `CREATE INDEX IF NOT EXISTS events_time ON event_data(timestamp,output,input,cache_read,cache_write);
 CREATE INDEX IF NOT EXISTS events_session ON event_data(dimension_id,timestamp);`
+
+// migrateEventIndexes replaces only the old timestamp index, retaining its
+// public name and all event rows. Tokens in the covering suffix avoid a fact
+// table lookup for every request in a reconciliation time window.
+func migrateEventIndexes(tx *sql.Tx) error {
+	rows, err := tx.Query(`PRAGMA index_info(events_time)`)
+	if err != nil {
+		return err
+	}
+	var columns []string
+	for rows.Next() {
+		var seq, cid int
+		var name string
+		if err = rows.Scan(&seq, &cid, &name); err != nil {
+			rows.Close()
+			return err
+		}
+		columns = append(columns, name)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if len(columns) > 0 && strings.Join(columns, ",") != "timestamp,output,input,cache_read,cache_write" {
+		if _, err = tx.Exec(`DROP INDEX events_time`); err != nil {
+			return err
+		}
+	}
+	_, err = tx.Exec(eventIndexes)
+	return err
+}
 
 // DeferEmptyIndexes postpones secondary-index construction on a fresh index.
 // The caller must invoke the returned function, including on scan cancellation.
