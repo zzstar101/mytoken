@@ -7,6 +7,7 @@ package gui
 
 import (
 	"embed"
+	"sync"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zzstar/mytoken/internal/model"
@@ -128,65 +129,97 @@ func harnessBadge(c *ui.Context, h model.Harness, box float32) ui.Element {
 	})
 }
 
+// serif is the display face for big figures and page titles: Instrument
+// Serif (SIL OFL, see fonts/OFL.txt), embedded so it looks the same anywhere.
+const serif = "Instrument Serif"
+
+//go:embed fonts/*.ttf
+var fontFS embed.FS
+
+var fontsOnce sync.Once
+
+// loadFonts registers the embedded faces once. A failure only means the
+// system serif stands in.
+func loadFonts() {
+	fontsOnce.Do(func() {
+		for _, name := range []string{"InstrumentSerif-Regular.ttf", "InstrumentSerif-Italic.ttf"} {
+			if b, err := fontFS.ReadFile("fonts/" + name); err == nil {
+				_ = ui.RegisterFont(b, serif)
+			}
+		}
+	})
+}
+
 // palette is one appearance's colors beyond the ui.Theme.
 type palette struct {
 	dark bool
-	// base is painted under the aurora; ink and muted color text; faint
-	// colors hairlines and chart grids; well fills recessed tracks.
+	// base is painted under the stage lights; ink and muted color text;
+	// faint colors hairlines and chart grids; well fills recessed tracks.
 	base, ink, muted, faint, well ui.Color
-	// pane tints the glass so that text on it stays legible.
-	pane  ui.Color
-	hover ui.Color
+	// pane tints the glass so that text on it stays legible; edge is the
+	// glass's lit rim and lift the shadow it casts.
+	pane, edge, lift ui.Color
+	hover            ui.Color
+	// raised is the solid face of a selected pill or row.
+	raised ui.Color
 }
 
 func paletteFor(dark bool) palette {
 	if dark {
 		return palette{
-			dark:  true,
-			base:  ui.Hex("#121019"),
-			ink:   ui.Hex("#F3F0FA"),
-			muted: ui.RGBA(235, 230, 250, 0.58),
-			faint: ui.RGBA(255, 255, 255, 0.08),
-			well:  ui.RGBA(255, 255, 255, 0.06),
-			pane:  ui.RGBA(28, 24, 40, 0.45),
-			hover: ui.RGBA(255, 255, 255, 0.07),
+			dark:   true,
+			base:   ui.Hex("#0B0A10"),
+			ink:    ui.Hex("#F4F2F8"),
+			muted:  ui.RGBA(240, 236, 250, 0.54),
+			faint:  ui.RGBA(255, 255, 255, 0.075),
+			well:   ui.RGBA(255, 255, 255, 0.055),
+			pane:   ui.RGBA(24, 22, 33, 0.52),
+			edge:   ui.RGBA(255, 255, 255, 0.085),
+			lift:   ui.RGBA(0, 0, 0, 0.38),
+			hover:  ui.RGBA(255, 255, 255, 0.055),
+			raised: ui.RGBA(255, 255, 255, 0.10),
 		}
 	}
 	return palette{
-		base:  ui.Hex("#F6F3FA"),
-		ink:   ui.Hex("#231F33"),
-		muted: ui.RGBA(35, 31, 51, 0.55),
-		faint: ui.RGBA(35, 31, 51, 0.08),
-		well:  ui.RGBA(35, 31, 51, 0.05),
-		pane:  ui.RGBA(255, 255, 255, 0.50),
-		hover: ui.RGBA(35, 31, 51, 0.05),
+		base:   ui.Hex("#F2EFE9"),
+		ink:    ui.Hex("#17161C"),
+		muted:  ui.RGBA(23, 22, 28, 0.55),
+		faint:  ui.RGBA(23, 22, 28, 0.075),
+		well:   ui.RGBA(23, 22, 28, 0.05),
+		pane:   ui.RGBA(255, 255, 255, 0.56),
+		edge:   ui.RGBA(255, 255, 255, 0.80),
+		lift:   ui.RGBA(60, 45, 30, 0.08),
+		hover:  ui.RGBA(23, 22, 28, 0.04),
+		raised: ui.RGBA(255, 255, 255, 0.92),
 	}
 }
 
 // applyTheme sets MyToken's theme on c and returns its palette.
 func applyTheme(c *ui.Context) palette {
+	loadFonts()
 	base := c.Theme()
 	pal := paletteFor(base.Dark)
 	t := *base
-	t.Accent = Taki
-	t.AccentHover = Taki.Mix(ui.RGB(255, 255, 255), 0.12)
-	t.AccentPressed = Taki.Mix(ui.RGB(0, 0, 0), 0.12)
+	accent := Tomori.Mix(ui.RGB(0, 0, 0), 0.08)
+	t.Accent = accent
+	t.AccentHover = accent.Mix(ui.RGB(255, 255, 255), 0.12)
+	t.AccentPressed = accent.Mix(ui.RGB(0, 0, 0), 0.12)
 	t.AccentText = ui.RGB(255, 255, 255)
 	t.Text = pal.ink
 	t.TextMuted = pal.muted
 	t.Background = pal.base
 	t.Radius = 10
-	t.Font = "SF Pro Rounded, system-ui"
+	t.Font = "SF Pro Text, system-ui"
 	if pal.dark {
-		t.Surface = ui.RGBA(255, 255, 255, 0.08)
-		t.SurfaceHover = ui.RGBA(255, 255, 255, 0.12)
-		t.SurfacePressed = ui.RGBA(255, 255, 255, 0.16)
+		t.Surface = ui.RGBA(255, 255, 255, 0.07)
+		t.SurfaceHover = ui.RGBA(255, 255, 255, 0.11)
+		t.SurfacePressed = ui.RGBA(255, 255, 255, 0.15)
 		t.Border = ui.RGBA(255, 255, 255, 0.10)
 	} else {
-		t.Surface = ui.RGBA(255, 255, 255, 0.70)
-		t.SurfaceHover = ui.RGBA(255, 255, 255, 0.90)
-		t.SurfacePressed = ui.RGBA(235, 232, 245, 1)
-		t.Border = ui.RGBA(35, 31, 51, 0.10)
+		t.Surface = ui.RGBA(255, 255, 255, 0.72)
+		t.SurfaceHover = ui.RGBA(255, 255, 255, 0.92)
+		t.SurfacePressed = ui.RGBA(236, 232, 226, 1)
+		t.Border = ui.RGBA(23, 22, 28, 0.10)
 	}
 	c.SetTheme(&t)
 	return pal

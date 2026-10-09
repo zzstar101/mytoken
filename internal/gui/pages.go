@@ -1,7 +1,9 @@
 package gui
 
 import (
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zzstar/mytoken/internal/harness"
@@ -12,7 +14,7 @@ import (
 // rankingPage ranks providers, models and harnesses over the chosen span.
 func (s *State) rankingPage(c *ui.Context, pal palette) {
 	ov := s.ov
-	pageHeader(c, pal, tr("ranking"), "", func() { s.spanSwitch(c, pal) })
+	pageHeader(c, pal, "ranking", "", func() { s.spanSwitch(c, pal) })
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Padding(8, 8, 16, 8).Gap(12).Children(func() {
 			ui.Row(c).Children(func() {
@@ -31,42 +33,18 @@ func (s *State) rankingPage(c *ui.Context, pal palette) {
 				pane(c, pal).Padding(40).Children(func() { emptyState(c, pal, artStaff, tr("noData"), tr("noDataSub")) })
 				return
 			}
-			// Podium for the top three, then a table.
-			ui.Row(c).Gap(12).AlignItems(ui.End).Children(func() {
-				order := []int{1, 0, 2}
-				for _, i := range order {
-					if i >= len(bs) {
-						continue
-					}
-					b := bs[i]
-					col := bandAt(i)
-					h := []float32{150, 124, 108}[i]
-					pane(c.Key(b.Key), pal).Grow(1).Basis(0).Height(h + 60).Padding(16).Gap(6).Children(func() {
-						ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-							ui.Box(c).Size(26, 26).Radius(13).Center().Background(col).Children(func() {
-								ui.Textf(c, "%d", i+1).FontSize(13).FontWeight(800).TextColor(ui.RGB(255, 255, 255))
-							})
-							if s.rankTab == 2 {
-								harnessMark(c, model.Harness(b.Key), 18)
-							}
-							if i == 0 {
-								ui.Icon(c, icSparkle).FontSize(14).TextColor(Soyo)
-							}
-						})
-						label := b.Label
-						if label == "" {
-							label = b.Key
+			// The top three on a stage: lit steps with serif numerals, then
+			// everyone in a table.
+			pane(c, pal).Clip().Padding(22, 26, 0, 26).Children(func() {
+				ui.Row(c).Gap(18).AlignItems(ui.End).Children(func() {
+					for _, i := range []int{1, 0, 2} {
+						if i >= len(bs) {
+							ui.Box(c.Key(i)).Grow(1).Basis(0)
+							continue
 						}
-						ui.Text(c, label).FontSize(14).FontWeight(700).TextColor(pal.ink).SingleLine().Ellipsis("…")
-						ui.Spacer(c)
-						bigNumber(c, pal, fmtTokens(b.Tokens.Total()), []float32{30, 24, 22}[i])
-						ui.Row(c).Gap(10).Children(func() {
-							ui.Text(c, fmtCostOf(b.CostUSD, b.Requests, b.Unpriced)).FontSize(11.5).TextColor(pal.muted).FontFeatures("tnum")
-							ui.Text(c, trf("requestsN", fmtInt(b.Requests))).FontSize(11.5).TextColor(pal.muted)
-						})
-						classBar(c, pal, b.Tokens, 6)
-					})
-				}
+						s.podiumPlace(c.Key(bs[i].Key), pal, bs[i], i)
+					}
+				})
 			})
 			card(c, pal, "", func() { classLegend(c, pal) }, func() {
 				s.rankTable(c, pal, bs)
@@ -98,7 +76,10 @@ func (s *State) rankTable(c *ui.Context, pal palette, bs []query.Bucket) {
 			row.Background(pal.hover)
 		}
 		row.Children(func() {
-			ui.Textf(c, "%d", i+1).FontSize(12).TextColor(pal.muted).Width(22).FontFeatures("tnum")
+			num := ui.Text(c, fmt.Sprint(i+1)).Font(serif).Italic().FontSize(20).TextColor(pal.muted).Width(22)
+			if i < 3 {
+				num.TextColor(bandAt(i))
+			}
 			ui.Column(c).Grow(1).Basis(0).Gap(5).Children(func() {
 				label := b.Label
 				if label == "" {
@@ -129,7 +110,7 @@ func (s *State) rankTable(c *ui.Context, pal palette, bs []query.Bucket) {
 // projectsPage shows usage per working directory.
 func (s *State) projectsPage(c *ui.Context, pal palette) {
 	ov := s.ov
-	pageHeader(c, pal, tr("projects"), "", func() { s.spanSwitch(c, pal) })
+	pageHeader(c, pal, "projects", "", func() { s.spanSwitch(c, pal) })
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Padding(8, 8, 16, 8).Gap(12).Children(func() {
 			if len(ov.Projects) == 0 {
@@ -142,26 +123,40 @@ func (s *State) projectsPage(c *ui.Context, pal palette) {
 					top = v
 				}
 			}
-			ui.Grid(c).Columns(2).Gap(12).Children(func() {
+			var all int64
+			for _, b := range ov.Projects {
+				all += b.Tokens.Total()
+			}
+			ui.Grid(c).Columns(2).Gap(14).Children(func() {
 				for i, b := range ov.Projects {
 					col := bandAt(i)
-					pane(c.Key(b.Key), pal).Padding(16).Gap(8).Children(func() {
+					share := float64(b.Tokens.Total()) / float64(max(all, 1))
+					card := pane(c.Key(b.Key), pal).Padding(18, 22, 18, 22).Gap(10).Transition(hoverFade)
+					if card.Hovered() {
+						card.Border(1, col.Alpha(0.45))
+					}
+					card.Children(func() {
 						ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-							ui.Box(c).Size(32, 32).Radius(10).Center().Shrink(0).Background(col.Alpha(0.16)).Children(func() {
-								ui.Icon(c, icFolder).FontSize(16).TextColor(col)
-							})
-							ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
+							ui.Text(c, fmt.Sprintf("No. %02d", i+1)).Font(serif).Italic().FontSize(16).TextColor(col)
+							ui.Spacer(c)
+							ui.Text(c, fmtPct(share)).FontSize(11).FontWeight(650).TextColor(pal.muted).FontFeatures("tnum")
+						})
+						ui.Row(c).Gap(12).AlignItems(ui.End).Children(func() {
+							ui.Column(c).Grow(1).Basis(0).Gap(3).Children(func() {
 								name := baseName(b.Key)
 								if name == "" {
 									name = tr("untitled")
 								}
-								ui.Text(c, name).FontSize(14).FontWeight(700).TextColor(pal.ink).SingleLine().Ellipsis("…")
-								ui.Text(c, shortPath(b.Key)).FontSize(11).TextColor(pal.muted).SingleLine().Ellipsis("…")
+								ui.Text(c, name).FontSize(17).FontWeight(720).TextColor(pal.ink).SingleLine().Ellipsis("…")
+								ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
+									ui.Icon(c, icFolder).FontSize(11).TextColor(pal.muted)
+									ui.Text(c, shortPath(b.Key)).FontSize(11).TextColor(pal.muted).SingleLine().Ellipsis("…")
+								})
 							})
-							bigNumber(c, pal, fmtTokens(b.Tokens.Total()), 20)
+							bigNumber(c, pal, fmtTokens(b.Tokens.Total()), 40)
 						})
-						rankBar(c, pal, float64(b.Tokens.Total())/float64(top), col, 6)
-						ui.Row(c).Gap(14).Children(func() {
+						rankBar(c, pal, float64(b.Tokens.Total())/float64(top), col, 4)
+						ui.Row(c).Gap(22).Children(func() {
 							miniStat(c, pal, tr("cost"), fmtCostOf(b.CostUSD, b.Requests, b.Unpriced))
 							miniStat(c, pal, tr("sessions"), fmtInt(b.Sessions))
 							miniStat(c, pal, tr("requests"), fmtInt(b.Requests))
@@ -175,61 +170,74 @@ func (s *State) projectsPage(c *ui.Context, pal palette) {
 
 // settingsPage holds the few preferences there are.
 func (s *State) settingsPage(c *ui.Context, pal palette) {
-	pageHeader(c, pal, tr("settings"), "", nil)
+	pageHeader(c, pal, "settings", "", nil)
 	ui.Scroll(c).Grow(1).Children(func() {
-		ui.Column(c).Padding(8, 8, 16, 8).Gap(12).MaxWidth(720).Children(func() {
-			card(c, pal, "", nil, func() {
-				settingRow(c, pal, tr("launchAtLogin"), tr("launchAtLoginSub"), func() {
-					on := s.Hooks.OpenAtLogin != nil && s.Hooks.OpenAtLogin()
-					if ui.Switch(c, &on).Changed() && s.Hooks.SetOpenAtLogin != nil {
-						s.Hooks.SetOpenAtLogin(on)
-					}
-				})
-				ui.Divider(c)
-				settingRow(c, pal, tr("rebuild"), tr("rebuildSub"), func() {
-					if ui.Button(c, tr("rebuild")).Clicked() && s.Hooks.Rebuild != nil {
-						go s.Hooks.Rebuild()
-					}
-				})
-				if s.Hooks.DataDir != "" {
-					ui.Divider(c)
-					settingRow(c, pal, tr("dataDir"), s.Hooks.DataDir, nil)
-				}
-			})
-			s.pricingCards(c, pal)
-			card(c, pal, tr("sources"), nil, func() {
-				ui.Text(c, tr("sourcesSub")).FontSize(12).TextColor(pal.muted)
-				for _, p := range harness.All() {
-					h := p.Harness()
-					ui.Row(c.Key(string(h))).Gap(10).Padding(6, 0).AlignItems(ui.Center).Children(func() {
-						harnessMark(c, h, 16)
-						ui.Text(c, h.DisplayName()).FontSize(13).FontWeight(650).TextColor(pal.ink).Width(130)
-						ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
-							for _, r := range p.Roots() {
-								ok := exists(r)
-								col := pal.muted
-								if !ok {
-									col = pal.muted.Alpha(0.5)
-								}
-								ui.Row(c.Key(r)).Gap(6).AlignItems(ui.Center).Children(func() {
-									if ok {
-										dot(c, Rana, 6)
-									} else {
-										dot(c, pal.faint, 6)
-									}
-									ui.Text(c, shortPath(r)).FontSize(11.5).TextColor(col).SingleLine().Ellipsis("…")
-								})
-							}
-						})
+		ui.Row(c).Padding(8, 8, 16, 8).Gap(14).AlignItems(ui.Start).Children(func() {
+			ui.Column(c).Grow(1).Basis(0).Gap(14).Children(func() {
+				card(c, pal, "", nil, func() {
+					settingRow(c, pal, tr("launchAtLogin"), tr("launchAtLoginSub"), func() {
+						on := s.Hooks.OpenAtLogin != nil && s.Hooks.OpenAtLogin()
+						if ui.Switch(c, &on).Changed() && s.Hooks.SetOpenAtLogin != nil {
+							s.Hooks.SetOpenAtLogin(on)
+						}
 					})
-				}
-			})
-			card(c, pal, tr("about"), nil, func() {
-				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-					logo(c, pal, 20)
-					ui.Text(c, "v0.1 · MIT").FontSize(12).TextColor(pal.muted)
+					ui.Divider(c)
+					settingRow(c, pal, tr("rebuild"), tr("rebuildSub"), func() {
+						if ui.Button(c, tr("rebuild")).Clicked() && s.Hooks.Rebuild != nil {
+							go s.Hooks.Rebuild()
+						}
+					})
+					if s.Hooks.DataDir != "" {
+						ui.Divider(c)
+						settingRow(c, pal, tr("dataDir"), s.Hooks.DataDir, nil)
+					}
 				})
-				ui.Text(c, "Built with MyGo · 春日影は、もう演奏しない").FontSize(11.5).TextColor(pal.muted)
+				s.pricingCards(c, pal)
+			})
+			ui.Column(c).Width(360).Shrink(0).Gap(14).Children(func() {
+				card(c, pal, tr("sources"), nil, func() {
+					ui.Text(c, tr("sourcesSub")).FontSize(12).TextColor(pal.muted)
+					for _, p := range harness.All() {
+						h := p.Harness()
+						ui.Row(c.Key(string(h))).Gap(10).Padding(6, 0).AlignItems(ui.Center).Children(func() {
+							harnessMark(c, h, 16)
+							ui.Text(c, h.DisplayName()).FontSize(13).FontWeight(650).TextColor(pal.ink).Width(118)
+							ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
+								for _, r := range p.Roots() {
+									ok := exists(r)
+									col := pal.muted
+									if !ok {
+										col = pal.muted.Alpha(0.5)
+									}
+									ui.Row(c.Key(r)).Gap(6).AlignItems(ui.Center).Children(func() {
+										if ok {
+											dot(c, Rana, 6)
+										} else {
+											dot(c, pal.faint, 6)
+										}
+										ui.Text(c, shortPath(r)).FontSize(11.5).TextColor(col).SingleLine().Ellipsis("…")
+									})
+								}
+							})
+						})
+					}
+				})
+				// Liner notes.
+				pane(c, pal).Clip().Padding(22, 22, 20, 22).Gap(10).Draw(func(p *ui.Painter, r ui.Rect) {
+					softGlow(p, r.X+r.W*0.85, r.Y+r.H*0.1, r.W*0.5, Tomori.Alpha(0.14))
+					for i, col := range Band {
+						if i >= 5 {
+							break
+						}
+						star(p, r.X+r.W-28-float32(i)*15, r.Y+r.H-22-float32(i%2)*8, 3+float32(i%3), col.Alpha(0.6))
+					}
+				}).Children(func() {
+					kicker(c, pal, tr("about"))
+					logo(c, pal, 30)
+					ui.Text(c, "v0.1 · MIT").FontSize(12).TextColor(pal.muted).FontFeatures("tnum")
+					ui.Text(c, "春日影は、もう演奏しない").Font(serif).Italic().FontSize(15).TextColor(pal.ink.Alpha(0.8))
+					ui.Text(c, "Built with MyGo").FontSize(11).TextColor(pal.muted)
+				})
 			})
 		})
 	})
@@ -250,4 +258,49 @@ func settingRow(c *ui.Context, pal palette, title, sub string, control func()) {
 func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// podiumPlace is one of the top three: name and figures over a lit step
+// whose height follows the place, its numeral painted large in serif.
+func (s *State) podiumPlace(c *ui.Context, pal palette, b query.Bucket, i int) {
+	col := bandAt(i)
+	step := []float32{96, 72, 56}[i]
+	ui.Column(c).Grow(1).Basis(0).Gap(8).Children(func() {
+		ui.Column(c).Gap(6).Padding(0, 4).Children(func() {
+			ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+				if s.rankTab == 2 {
+					harnessMark(c, model.Harness(b.Key), 16)
+				} else {
+					dot(c, col, 7)
+				}
+				label := b.Label
+				if label == "" {
+					label = b.Key
+				}
+				ui.Text(c, label).FontSize(13.5).FontWeight(680).TextColor(pal.ink).SingleLine().Ellipsis("…").Shrink(1)
+				if i == 0 {
+					ui.Icon(c, icSparkle).FontSize(13).TextColor(Soyo).Shrink(0)
+				}
+			})
+			bigNumber(c, pal, fmtTokens(b.Tokens.Total()), []float32{52, 40, 36}[i])
+			ui.Row(c).Gap(10).Children(func() {
+				ui.Text(c, fmtCostOf(b.CostUSD, b.Requests, b.Unpriced)).FontSize(11.5).TextColor(pal.muted).FontFeatures("tnum")
+				ui.Text(c, trf("requestsN", fmtInt(b.Requests))).FontSize(11.5).TextColor(pal.muted)
+			})
+		})
+		el := ui.Box(c).FillWidth().Height(step + 14)
+		grow := entrance(el, time.Duration(600+i*140)*time.Millisecond)
+		el.Draw(func(p *ui.Painter, r ui.Rect) {
+			h := step * grow
+			sr := ui.Rect{X: r.X, Y: r.Y + r.H - h, W: r.W, H: h + 20}
+			if i == 0 {
+				softGlow(p, sr.X+sr.W/2, sr.Y, sr.W*0.55, col.Alpha(0.22))
+			}
+			p.FillGradient(sr, ui.LinearGradient{From: col.Alpha(0.30), To: col.Alpha(0.04), Angle: 180}, 14)
+			p.Fill(ui.Rect{X: sr.X + 14, Y: sr.Y, W: sr.W - 28, H: 2}, col.Alpha(0.9), 1)
+			n := ui.Span{Text: fmt.Sprint(i + 1), Size: []float32{60, 50, 40}[i], Font: serif, Italic: true, Color: col.Alpha(0.9)}
+			w, _ := p.MeasureText(0, n)
+			p.Clip(r, 0, func() { p.RichText(sr.X+(sr.W-w)/2, sr.Y+4, 0, n) })
+		})
+	})
 }

@@ -2,6 +2,7 @@ package gui
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo/plugins/glass"
@@ -32,40 +33,42 @@ var (
 	icSparkle  = icon(`<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>`)
 )
 
-// aurora paints the window's backdrop: the base color and five soft blobs of
-// the member colors, which the glass panes above refract.
+// aurora paints the window's backdrop as a darkened live house: a wash of
+// house light from above, five stage beams in the member colors and a warm
+// spill on the floor, which the glass panes above refract.
 func aurora(pal palette) func(p *ui.Painter, r ui.Rect) {
 	return func(p *ui.Painter, r ui.Rect) {
 		p.Fill(r, pal.base, 0)
-		a := float32(0.20)
+		big := float32(math.Max(float64(r.W), float64(r.H)))
+		beam, wash, floor := float32(0.10), float32(0.10), float32(0.16)
 		if pal.dark {
-			a = 0.22
+			beam, wash, floor = 0.20, 0.12, 0.20
 		}
-		blob := func(fx, fy, fr float32, c ui.Color, alpha float32) {
-			cx, cy := r.X+r.W*fx, r.Y+r.H*fy
-			rad := fr * float32(math.Max(float64(r.W), float64(r.H)))
-			// A blurred circular shadow is a soft glow at the cost of one
-			// draw; stacks of path rings swamp the renderer's path budget.
-			softGlow(p, cx, cy, rad, c.Alpha(alpha*1.3))
+		// House light: a broad haze over the top edge.
+		softGlow(p, r.X+r.W*0.5, r.Y-big*0.18, big*0.55, Taki.Mix(Tomori, 0.5).Alpha(wash))
+		// Five beams fanning down from rigs above the window, crossing.
+		for i, b := range [][3]float32{{0.10, 0.34, 0}, {0.30, 0.62, 1}, {0.52, 0.18, 4}, {0.72, 0.82, 3}, {0.92, 0.50, 2}} {
+			top, bottom := r.X+r.W*b[0], r.X+r.W*b[1]
+			col := bandAt(int(b[2]))
+			half := r.W * 0.012
+			spread := r.W * (0.13 + 0.02*float32(i%2))
+			// Three nested cones for a soft-edged beam.
+			for _, k := range []float32{1, 0.66, 0.36} {
+				path := new(ui.Path).MoveTo(top-half*k, r.Y-4).LineTo(top+half*k, r.Y-4).
+					LineTo(bottom+spread*k, r.Y+r.H).LineTo(bottom-spread*k, r.Y+r.H).Close()
+				p.FillPathGradient(path, ui.LinearGradient{From: col.Alpha(beam / 3), To: col.Alpha(0), Angle: 180, End: 0.9})
+			}
 		}
-		blob(0.08, 0.10, 0.42, Tomori, a)
-		blob(0.92, 0.05, 0.38, Anon, a*0.9)
-		blob(0.55, 0.55, 0.36, Taki, a*0.7)
-		blob(0.12, 0.95, 0.40, Rana, a*0.8)
-		blob(0.95, 0.90, 0.36, Soyo, a*0.9)
-		// Faint music dust: tiny stars, notes and the odd pick, fixed in place.
-		seed := uint32(42)
-		rnd := func() float32 { seed = seed*1664525 + 1013904223; return float32(seed>>8) / float32(1<<24) }
-		for i := 0; i < 18; i++ {
-			x, y := r.X+rnd()*r.W, r.Y+rnd()*r.H
-			col := bandAt(i).Alpha(0.22)
-			switch {
-			case i%3 == 0:
-				note(p, x, y, 9+rnd()*6, col)
-			case i%5 == 2:
-				pick(p, x, y, 8+rnd()*4, rnd()-0.5, col)
-			default:
-				star(p, x, y, 3+rnd()*4, col)
+		// Spill on the stage floor.
+		softGlow(p, r.X+r.W*0.18, r.Y+r.H*1.05, big*0.32, Anon.Alpha(floor*0.7))
+		softGlow(p, r.X+r.W*0.62, r.Y+r.H*1.08, big*0.36, Tomori.Alpha(floor*0.8))
+		softGlow(p, r.X+r.W*0.98, r.Y+r.H*0.92, big*0.26, Soyo.Alpha(floor*0.6))
+		// A few rig lights twinkling in the dark.
+		if pal.dark {
+			seed := uint32(7)
+			rnd := func() float32 { seed = seed*1664525 + 1013904223; return float32(seed>>8) / float32(1<<24) }
+			for i := 0; i < 14; i++ {
+				star(p, r.X+rnd()*r.W, r.Y+rnd()*r.H*0.4, 1.2+rnd()*2.4, ui.RGBA(255, 255, 255, 0.10+rnd()*0.25))
 			}
 		}
 	}
@@ -91,16 +94,6 @@ func pick(p *ui.Painter, x, y, h, rot float32, c ui.Color) {
 	tx, ty = at(0, -0.46)
 	path.CubeTo(c1x, c1y, c2x, c2y, tx, ty)
 	p.FillPath(path.Close(), c)
-}
-
-// flourish is a small star, note and pick set beside a page title.
-func flourish(c *ui.Context) ui.Element {
-	return ui.Box(c).Size(50, 26).Shrink(0).Draw(func(p *ui.Painter, r ui.Rect) {
-		star(p, r.X+7, r.Y+14, 5, Soyo.Alpha(0.7))
-		note(p, r.X+22, r.Y+21, 14, Tomori.Alpha(0.55))
-		pick(p, r.X+40, r.Y+13, 12, 0.4, Anon.Alpha(0.55))
-		star(p, r.X+31, r.Y+4, 2.5, Taki.Alpha(0.6))
-	})
 }
 
 // hoverFade eases row and pill backgrounds as the pointer comes and goes.
@@ -139,17 +132,18 @@ func note(p *ui.Painter, x, y, h float32, c ui.Color) {
 	p.FillPath(flag, c)
 }
 
-// pane is a floating pane of glass.
+// pane is a floating pane of glass with a lit rim and a soft shadow.
 func pane(c *ui.Context, pal palette) ui.Element {
-	return ui.Column(c).Radius(18).Material(glass.Glass{Style: glass.Regular, Tint: pal.pane})
+	return ui.Column(c).Radius(20).Material(glass.Glass{Style: glass.Regular, Tint: pal.pane}).
+		Border(1, pal.edge).Shadow(0, 12, 32, -8, pal.lift)
 }
 
 // card is a titled pane.
 func card(c *ui.Context, pal palette, title string, trailing func(), body func()) ui.Element {
-	return pane(c, pal).Padding(16, 18).Gap(12).Children(func() {
+	return pane(c, pal).Padding(18, 20).Gap(14).Children(func() {
 		if title != "" || trailing != nil {
 			ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-				ui.Text(c, title).FontSize(13).FontWeight(650).TextColor(pal.muted).LetterSpacing(0.2)
+				kicker(c, pal, title)
 				ui.Spacer(c)
 				if trailing != nil {
 					trailing()
@@ -158,6 +152,12 @@ func card(c *ui.Context, pal palette, title string, trailing func(), body func()
 		}
 		body()
 	})
+}
+
+// kicker is a small tracked-out label over a section, in capitals where the
+// script has them.
+func kicker(c *ui.Context, pal palette, s string) ui.Element {
+	return ui.Text(c, strings.ToUpper(s)).FontSize(11).FontWeight(650).TextColor(pal.muted).LetterSpacing(0.9).SingleLine()
 }
 
 // dot is a small round swatch.
@@ -183,33 +183,99 @@ func chipOn(c *ui.Context, pal palette, text string, col ui.Color) ui.Element {
 	})
 }
 
-// logo draws "MyToken" followed by five exclamation marks, one per member.
+// logo sets "MyToken" in the display serif, followed by five exclamation
+// marks drawn as the band: one bar and dot per member.
 func logo(c *ui.Context, pal palette, size float32) ui.Element {
-	return ui.RichText(c,
-		ui.Span{Text: "MyToken", Weight: 800, Color: pal.ink, Size: size},
-		ui.Span{Text: "!", Weight: 900, Color: Tomori, Size: size},
-		ui.Span{Text: "!", Weight: 900, Color: Anon, Size: size},
-		ui.Span{Text: "!", Weight: 900, Color: Rana, Size: size},
-		ui.Span{Text: "!", Weight: 900, Color: Soyo, Size: size},
-		ui.Span{Text: "!", Weight: 900, Color: Taki, Size: size},
-	).SingleLine()
+	return ui.Row(c).AlignItems(ui.End).Gap(size * 0.12).Shrink(0).Children(func() {
+		ui.Text(c, "MyToken").Font(serif).Italic().FontSize(size * 1.18).TextColor(pal.ink).LetterSpacing(-0.3).SingleLine()
+		bangs(c, size*0.86, false).Margin(0, 0, size*0.26, 0)
+	})
 }
 
-// bigNumber is a large tabular figure.
+// bangs draws the five exclamation marks at height h. Live, the bars bounce
+// like a level meter, each to its own beat.
+func bangs(c *ui.Context, h float32, live bool) ui.Element {
+	w := h * 0.17
+	gap := h * 0.12
+	el := ui.Box(c).Size(5*w+4*gap, h).Shrink(0)
+	var t float32
+	if live {
+		t = el.Loop("meter", 2400*time.Millisecond, ui.Linear)
+	}
+	return el.Draw(func(p *ui.Painter, r ui.Rect) {
+		for i, col := range []ui.Color{Tomori, Anon, Rana, Soyo, Taki} {
+			x := r.X + float32(i)*(w+gap)
+			full := r.H * 0.66
+			bar := full
+			if live {
+				ph := float64(t)*2*math.Pi*float64(i%3+2) + float64(i)*1.7
+				bar = full * float32(0.42+0.58*math.Abs(math.Sin(ph)))
+			}
+			p.Fill(ui.Rect{X: x, Y: r.Y + full - bar, W: w, H: bar}, col, w/2)
+			p.FillPath(new(ui.Path).Circle(x+w/2, r.Y+r.H-w/2, w/2), col)
+		}
+	})
+}
+
+// bigNumber is a large figure in the display serif, its unit (万, M, %…)
+// set small beside it.
 func bigNumber(c *ui.Context, pal palette, s string, size float32) ui.Element {
-	return ui.Text(c, s).FontSize(size).FontWeight(750).TextColor(pal.ink).FontFeatures("tnum").SingleLine().LetterSpacing(-0.5)
+	return ui.RichText(c, figure(pal, s, size)...).SingleLine()
 }
 
-// segmented is a pill switcher over glass.
+// figure splits a formatted value into spans: a leading currency sign and
+// the digits in the serif, a trailing unit small in the interface face.
+func figure(pal palette, s string, size float32) []ui.Span {
+	lead, num, unit := splitFigure(s)
+	var spans []ui.Span
+	if lead != "" {
+		spans = append(spans, ui.Span{Text: lead, Font: serif, Size: size * 0.66, Color: pal.muted})
+	}
+	spans = append(spans, ui.Span{Text: num, Font: serif, Size: size, Color: pal.ink, LetterSpacing: -0.02 * size})
+	if unit != "" {
+		spans = append(spans, ui.Span{Text: " " + unit, Size: size * 0.34, Weight: 650, Color: pal.muted})
+	}
+	return spans
+}
+
+// splitFigure cuts "$1.5K" into "$", "1.5" and "K", and "2162万" into "",
+// "2162" and "万".
+func splitFigure(s string) (lead, num, unit string) {
+	i := 0
+	for i < len(s) && !isFigure(s[i]) {
+		i++
+	}
+	j := i
+	for j < len(s) && isFigure(s[j]) {
+		j++
+	}
+	if j == i {
+		return "", s, ""
+	}
+	return s[:i], s[i:j], strings.TrimSpace(s[j:])
+}
+
+func isFigure(b byte) bool { return b >= '0' && b <= '9' || b == '.' || b == ',' }
+
+// countUp is a figure that counts up from zero when it first appears.
+func countUp(c *ui.Context, pal palette, v float64, format func(float64) string, size float32) ui.Element {
+	el := ui.Box(c).Shrink(0)
+	f := entrance(el, 1100*time.Millisecond)
+	return el.Children(func() {
+		bigNumber(c, pal, format(v*float64(f)), size)
+	})
+}
+
+// segmented is a pill switcher whose raised thumb slides to the choice.
 func segmented(c *ui.Context, pal palette, sel *int, labels ...string) bool {
 	changed := false
-	ui.Row(c).Padding(3).Gap(2).Radius(99).Background(pal.well).Children(func() {
+	box := ui.Row(c).Padding(3).Gap(2).Radius(99).Background(pal.well).Border(1, pal.faint)
+	box.Children(func() {
+		var segs []ui.Element
 		for i, l := range labels {
 			on := *sel == i
-			b := ui.Row(c.Key(l)).Padding(5, 12).Radius(99).Cursor(ui.CursorPointer).Label(l).Role(ui.RoleButton).Transition(hoverFade)
-			if on {
-				b.Background(pal.pane.Alpha(0.95)).Shadow(0, 1, 3, 0, ui.RGBA(0, 0, 0, 0.12))
-			} else if b.Hovered() {
+			b := ui.Row(c.Key(l)).Padding(5, 13).Radius(99).Cursor(ui.CursorPointer).Label(l).Role(ui.RoleButton).Transition(hoverFade)
+			if !on && b.Hovered() {
 				b.Background(pal.hover)
 			}
 			b.Children(func() {
@@ -223,9 +289,36 @@ func segmented(c *ui.Context, pal palette, sel *int, labels ...string) bool {
 				*sel = i
 				changed = true
 			}
+			segs = append(segs, b)
 		}
+		glider(box, segs, *sel, 99, pal.raised, ui.Transparent, ui.RGBA(0, 0, 0, 0.12))
 	})
 	return changed
+}
+
+// glider paints a raised pill behind items[i], as laid out last frame, in
+// parent's own drawing (so under the items), easing it from choice to choice.
+func glider(parent ui.Element, items []ui.Element, i int, radius float32, fill, edge, shadow ui.Color) {
+	if i < 0 || i >= len(items) {
+		return
+	}
+	pb, b := parent.Bounds(), items[i].Bounds()
+	if b.W == 0 {
+		return
+	}
+	const d = 320 * time.Millisecond
+	x := parent.AnimateWith("gx", b.X-pb.X, d, ui.EaseOut)
+	y := parent.AnimateWith("gy", b.Y-pb.Y, d, ui.EaseOut)
+	w := parent.AnimateWith("gw", b.W, d, ui.EaseOut)
+	h := parent.AnimateWith("gh", b.H, d, ui.EaseOut)
+	parent.Draw(func(p *ui.Painter, r ui.Rect) {
+		rr := ui.Rect{X: r.X + x, Y: r.Y + y, W: w, H: h}
+		p.Shadow(rr, radius, 0, 2, 8, 0, shadow)
+		p.Fill(rr, fill, radius)
+		if edge != ui.Transparent {
+			p.Stroke(rr, edge, radius, 1)
+		}
+	})
 }
 
 // delta shows the change against the previous period.

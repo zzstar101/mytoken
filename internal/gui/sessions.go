@@ -10,7 +10,7 @@ import (
 
 func (s *State) sessionsPage(c *ui.Context, pal palette) {
 	rows := filterRows(s.sessions.Rows, s.search)
-	pageHeader(c, pal, tr("sessions"), trf("sessionsN", s.sessions.Total), func() {
+	pageHeader(c, pal, "sessions", trf("sessionsN", s.sessions.Total), func() {
 		if segmented(c, pal, &s.sortIdx, tr("recent"), tr("mostTokens"), tr("mostCost")) {
 			s.loadSessions()
 		}
@@ -58,16 +58,20 @@ func (s *State) sessionsPage(c *ui.Context, pal palette) {
 // thin class bar.
 func (s *State) sessionRow(c *ui.Context, pal palette, r query.SessionRow, selected bool, onClick func()) {
 	col := harnessColor(r.Harness)
-	row := ui.Row(c).Padding(9, 10).Gap(10).Radius(12).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleButton).Transition(hoverFade)
+	row := ui.Row(c).Padding(9, 12, 9, 10).Gap(11).Radius(12).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleButton).Transition(hoverFade)
 	switch {
 	case selected:
-		row.Background(col.Alpha(0.15)).Border(1, col.Alpha(0.35))
+		row.Background(pal.raised).Border(1, pal.edge).Shadow(0, 4, 14, -4, pal.lift)
+		// A colored edge on the left, like a lit fader.
+		row.Draw(func(p *ui.Painter, rr ui.Rect) {
+			p.Fill(ui.Rect{X: rr.X + 1, Y: rr.Y + 12, W: 3, H: rr.H - 24}, col, 2)
+		})
 	case row.Hovered():
 		row.Background(pal.hover)
 	}
 	row.Children(func() {
-		harnessBadge(c, r.Harness, 30)
-		ui.Column(c).Grow(1).Basis(0).Gap(3).Children(func() {
+		harnessBadge(c, r.Harness, 32)
+		ui.Column(c).Grow(1).Basis(0).Gap(4).Children(func() {
 			title := r.Title
 			if title == "" {
 				title = tr("untitled")
@@ -89,8 +93,8 @@ func (s *State) sessionRow(c *ui.Context, pal palette, r query.SessionRow, selec
 				}
 			})
 		})
-		ui.Column(c).Gap(3).AlignItems(ui.End).Shrink(0).Children(func() {
-			ui.Text(c, fmtTokens(r.Tokens.Total())).FontSize(13).FontWeight(750).TextColor(pal.ink).FontFeatures("tnum")
+		ui.Column(c).Gap(1).AlignItems(ui.End).Shrink(0).Children(func() {
+			bigNumber(c, pal, fmtTokens(r.Tokens.Total()), 21)
 			ui.Text(c, fmtAgo(s.Hooks.Now(), r.UpdatedAt)).FontSize(10.5).TextColor(pal.muted).FontFeatures("tnum")
 		})
 	})
@@ -109,8 +113,8 @@ func (s *State) detailView(c *ui.Context, pal palette) {
 	col := harnessColor(r.Harness)
 	ui.Scroll(c).Fill().Children(func() {
 		ui.Column(c).Gap(12).Padding(0, 0, 12, 0).Children(func() {
-			// Header.
-			pane(c, pal).Padding(18).Gap(10).Children(func() {
+			// Header: who, what, when, then the figures and the mix.
+			pane(c, pal).Padding(20, 24, 22, 24).Gap(12).Children(func() {
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 					harnessBadge(c, r.Harness, 24)
 					chip(c, r.Harness.DisplayName(), col)
@@ -120,50 +124,64 @@ func (s *State) detailView(c *ui.Context, pal palette) {
 					if r.Tokens.Total() > 50_000_000 {
 						chip(c, tr("heavy"), Anon)
 					}
+					ui.Spacer(c)
+					ui.Text(c, r.SessionID).FontSize(10.5).TextColor(pal.muted.Alpha(0.8)).FontFeatures("tnum").SingleLine().Ellipsis("…").MaxWidth(220)
 				})
 				title := r.Title
 				if title == "" {
 					title = tr("untitled")
 				}
-				ui.Text(c, title).FontSize(19).FontWeight(750).TextColor(pal.ink).MaxLines(2)
-				ui.Row(c).Gap(16).Children(func() {
+				ui.Text(c, title).FontSize(22).FontWeight(720).TextColor(pal.ink).MaxLines(2)
+				ui.Row(c).Gap(18).Children(func() {
 					if r.Project != "" {
 						metaItem(c, pal, icFolder, shortPath(r.Project))
 					}
 					metaItem(c, pal, icClock, fmtWhen(r.StartedAt)+" → "+fmtWhen(r.UpdatedAt))
 				})
-				ui.Text(c, r.SessionID).FontSize(10.5).TextColor(pal.muted.Alpha(0.8)).FontFeatures("tnum").SingleLine().Ellipsis("…")
-			})
-			// Numbers.
-			ui.Row(c).Gap(12).Children(func() {
-				stat := func(key, v string, k ui.Color) {
-					pane(c.Key(key), pal).Grow(1).Basis(0).Padding(14, 16).Gap(4).Children(func() {
-						ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-							ui.Box(c).Size(8, 8).Radius(3).Background(k)
-							ui.Text(c, tr(key)).FontSize(12).FontWeight(650).TextColor(pal.muted)
-						})
-						bigNumber(c, pal, v, 24)
-					})
-				}
-				stat("tokens", fmtTokens(r.Tokens.Total()), Tomori)
-				stat("cost", fmtCostOf(r.CostUSD, r.Requests, r.Unpriced), Anon)
-				stat("requests", fmtInt(r.Requests), Rana)
+				ui.Box(c).Height(1).FillWidth().Margin(6, 0, 4, 0).Background(pal.faint)
 				den := r.Tokens.Input + r.Tokens.CacheRead + r.Tokens.CacheWrite
 				hit := 0.0
 				if den > 0 {
 					hit = float64(r.Tokens.CacheRead) / float64(den)
 				}
-				stat("cacheHit", fmtPct(hit), Taki)
-			})
-			// Class mix.
-			card(c, pal, tr("composition"), func() { classLegend(c, pal) }, func() {
-				classBar(c, pal, r.Tokens, 12)
-				ui.Row(c).Gap(14).Children(func() {
-					for _, k := range classes {
-						if v := k.get(r.Tokens); v > 0 {
-							miniStat(c.Key(k.key), pal, tr(k.key), fmtTokens(v))
-						}
+				ui.Row(c).AlignItems(ui.Stretch).Children(func() {
+					figures := []struct {
+						key   string
+						col   ui.Color
+						value string
+					}{
+						{"tokens", Tomori, fmtTokens(r.Tokens.Total())},
+						{"cost", Anon, fmtCostOf(r.CostUSD, r.Requests, r.Unpriced)},
+						{"requests", Rana, fmtInt(r.Requests)},
+						{"cacheHit", Taki, fmtPct(hit)},
 					}
+					for i, f := range figures {
+						if i > 0 {
+							ui.Box(c.Key("rule"+f.key)).Width(1).Margin(4, 18, 4, 0).Background(pal.faint)
+						}
+						ui.Column(c.Key(f.key)).Grow(1).Basis(0).Gap(4).Children(func() {
+							ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+								dot(c, f.col, 6)
+								kicker(c, pal, tr(f.key))
+							})
+							bigNumber(c, pal, f.value, 38)
+						})
+					}
+				})
+				ui.Column(c).Gap(10).Margin(8, 0, 0, 0).Children(func() {
+					ui.Row(c).AlignItems(ui.Center).Children(func() {
+						kicker(c, pal, tr("composition"))
+						ui.Spacer(c)
+						classLegend(c, pal)
+					})
+					classBar(c, pal, r.Tokens, 10)
+					ui.Row(c).Gap(22).Children(func() {
+						for _, k := range classes {
+							if v := k.get(r.Tokens); v > 0 {
+								miniStat(c.Key(k.key), pal, tr(k.key), fmtTokens(v))
+							}
+						}
+					})
 				})
 			})
 			// Provider × model.

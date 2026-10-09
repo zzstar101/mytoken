@@ -125,9 +125,9 @@ func stackedBars(c *ui.Context, pal palette, pts []query.Point, hourly bool, hei
 		p.Line(plot.X, plot.Y+plot.H, plot.X+plot.W, plot.Y+plot.H, 1, pal.faint.Alpha(0.16))
 		n := len(pts)
 		slot := plot.W / float32(n)
-		bw := slot * 0.62
-		if bw > 26 {
-			bw = 26
+		bw := slot * 0.5
+		if bw > 22 {
+			bw = 22
 		}
 		if bw < 2 {
 			bw = slot * 0.8
@@ -195,10 +195,80 @@ func stackedBars(c *ui.Context, pal palette, pts []query.Point, hourly bool, hei
 	return el
 }
 
+// heroWave draws the days as one smooth melody across the hero's foot: a
+// line in the band's colors over five faint staff lines, rising in when the
+// page opens, with the day under the pointer called out.
+func heroWave(c *ui.Context, pal palette, pts []query.Point, height float32) ui.Element {
+	el := ui.Box(c).FillWidth().Height(height)
+	hx, _, hover := el.PointerPosition()
+	grow := entrance(el, 1000*time.Millisecond)
+	el.Draw(func(p *ui.Painter, r ui.Rect) {
+		for i := 0; i < 5; i++ {
+			y := r.Y + 14 + (r.H-18)*float32(i)/4
+			p.Line(r.X, y, r.X+r.W, y, 1, pal.faint.Alpha(0.6))
+		}
+		n := len(pts)
+		if n < 2 {
+			return
+		}
+		var mx float64
+		for _, pt := range pts {
+			mx = math.Max(mx, float64(pt.Tokens.Total()))
+		}
+		if mx == 0 {
+			mx = 1
+		}
+		// The line runs from edge to edge; days sit at even steps.
+		pad := float32(28)
+		at := func(i int) (float32, float32) {
+			v := float32(float64(pts[i].Tokens.Total())/mx) * grow
+			return r.X + pad + (r.W-2*pad)*float32(i)/float32(n-1), r.Y + r.H - 4 - (r.H-22)*v
+		}
+		line := new(ui.Path)
+		area := new(ui.Path)
+		x0, y0 := at(0)
+		line.MoveTo(r.X, y0).LineTo(x0, y0)
+		area.MoveTo(r.X, r.Y+r.H).LineTo(r.X, y0).LineTo(x0, y0)
+		for i := 1; i < n; i++ {
+			px, py := at(i - 1)
+			x, y := at(i)
+			m := (px + x) / 2
+			line.CubeTo(m, py, m, y, x, y)
+			area.CubeTo(m, py, m, y, x, y)
+		}
+		xe, ye := at(n - 1)
+		line.LineTo(r.X+r.W, ye)
+		area.LineTo(r.X+r.W, ye).LineTo(r.X+r.W, r.Y+r.H).Close()
+		p.FillPathGradient(area, ui.LinearGradient{From: Tomori.Alpha(0.16), To: Taki.Alpha(0.16), Angle: 90, Oklab: true})
+		p.FillPathGradient(area, ui.LinearGradient{From: pal.base.Alpha(0), To: pal.base.Alpha(0.35), Angle: 180})
+		p.StrokePathGradient(line, 2.2, ui.LinearGradient{From: Tomori, To: Anon, Angle: 90, Oklab: true})
+		hi := n - 1
+		if hover {
+			hi = int(math.Round(float64((hx - pad) / ((r.W - 2*pad) / float32(n-1)))))
+			hi = max(0, min(n-1, hi))
+		}
+		x, y := at(hi)
+		if hover {
+			p.Line(x, r.Y+8, x, r.Y+r.H, 1, pal.ink.Alpha(0.18))
+		}
+		softGlow(p, x, y, 14, Anon.Alpha(0.35))
+		p.FillPath(new(ui.Path).Circle(x, y, 4.5), Anon)
+		p.FillPath(new(ui.Path).Circle(x, y, 2), ui.RGB(255, 255, 255))
+		if hover {
+			pt := pts[hi]
+			tooltipBox(p, pal, r, x, r.Y+r.H/2, pt.Day.Format("2006-01-02 Mon"),
+				[][2]string{{tr("tokens"), fmtTokens(pt.Tokens.Total())}, {tr("cost"), fmtCost(pt.CostUSD)}}, nil)
+		}
+		_ = xe
+	})
+	return el
+}
+
 // miniBars draws compact bars with no axes (the tray's 24 hours).
 func miniBars(c *ui.Context, pal palette, pts []query.Point, height float32) ui.Element {
 	el := ui.Box(c).FillWidth().Height(height)
 	hx, _, hover := el.PointerPosition()
+	grow := entrance(el, 600*time.Millisecond)
 	el.Draw(func(p *ui.Painter, r ui.Rect) {
 		n := len(pts)
 		if n == 0 {
@@ -213,25 +283,31 @@ func miniBars(c *ui.Context, pal palette, pts []query.Point, height float32) ui.
 		}
 		plotH := r.H - 16
 		slot := r.W / float32(n)
-		bw := slot * 0.64
+		bw := slot * 0.56
 		hi := -1
 		if hover {
 			hi = int(hx / slot)
 		}
+		// A quiet hour is a dot on the floor; a busy one rises as a level
+		// meter in the band's colors.
 		for i, pt := range pts {
-			x := r.X + slot*float32(i) + (slot-bw)/2
-			h := float32(float64(pt.Tokens.Total())/mx) * plotH
-			p.Fill(ui.Rect{X: x, Y: r.Y, W: bw, H: plotH}, pal.well, bw/2)
-			if h > 0 {
-				if h < bw {
-					h = bw
-				}
-				g := ui.LinearGradient{From: Tomori, To: Taki, Angle: 180, Oklab: true}
-				if i == hi {
-					g = ui.LinearGradient{From: Anon, To: Taki, Angle: 180, Oklab: true}
-				}
-				p.FillGradient(ui.Rect{X: x, Y: r.Y + plotH - h, W: bw, H: h}, g, bw/2)
+			cx := r.X + slot*(float32(i)+0.5)
+			x := cx - bw/2
+			h := float32(float64(pt.Tokens.Total())/mx) * plotH * grow
+			if h <= 0 {
+				p.FillPath(new(ui.Path).Circle(cx, r.Y+plotH-1.5, 1.5), pal.faint)
+				continue
 			}
+			if h < bw {
+				h = bw
+			}
+			g := ui.LinearGradient{From: Tomori, To: Taki, Angle: 180, Oklab: true}
+			if i == hi {
+				g = ui.LinearGradient{From: Anon, To: Soyo, Angle: 180, Oklab: true}
+			} else if hi >= 0 {
+				g = ui.LinearGradient{From: Tomori.Alpha(0.5), To: Taki.Alpha(0.5), Angle: 180, Oklab: true}
+			}
+			p.FillGradient(ui.Rect{X: x, Y: r.Y + plotH - h, W: bw, H: h}, g, bw/2)
 		}
 		for _, i := range []int{0, n / 2, n - 1} {
 			lab := pts[i].Day.Format("15:00")
@@ -365,8 +441,9 @@ func donut(c *ui.Context, pal palette, t model.Tokens, size float32) ui.Element 
 			k := classes[hi]
 			big, small = fmtPct(float64(k.get(t))/total), tr(k.key)
 		}
-		w, h := p.MeasureText(0, ui.Span{Text: big, Size: size * 0.14, Weight: 800})
-		p.RichText(cx-w/2, cy-h/2-6, 0, ui.Span{Text: big, Size: size * 0.14, Weight: 800, Color: pal.ink, Features: "tnum"})
+		fig := figure(pal, big, size*0.2)
+		w, h := p.MeasureText(0, fig...)
+		p.RichText(cx-w/2, cy-h/2-6, 0, fig...)
 		w2, _ := p.MeasureText(0, ui.Span{Text: small, Size: 11})
 		p.RichText(cx-w2/2, cy+h/2-4, 0, ui.Span{Text: small, Size: 11, Color: pal.muted})
 	})
@@ -563,17 +640,39 @@ func timeline(c *ui.Context, pal palette, evs []query.AttributedEvent, models []
 				}
 			}
 		}
-		p.StrokePath(cum, 1.5, pal.muted.Alpha(0.35))
+		// The running total as a soft wash behind the requests.
+		area := new(ui.Path)
+		acc = 0
+		for i, e := range evs {
+			acc += float64(e.Tokens.Total())
+			x := plot.X + plot.W*float32(e.Timestamp.Sub(t0).Seconds()/span)
+			y := plot.Y + plot.H*(1-float32(acc/all))
+			if i == 0 {
+				area.MoveTo(x, plot.Y+plot.H).LineTo(x, y)
+			} else {
+				area.LineTo(x, y)
+			}
+		}
+		area.LineTo(plot.X+plot.W, plot.Y+plot.H).Close()
+		p.FillPathGradient(area, ui.LinearGradient{From: Tomori.Alpha(0.10), To: Tomori.Alpha(0), Angle: 180})
+		p.StrokePath(cum, 1.25, Tomori.Alpha(0.45))
+		// Each request is a stem from the floor with a ringed head, like a
+		// note on a staff.
 		for i, e := range evs {
 			x := plot.X + plot.W*float32(e.Timestamp.Sub(t0).Seconds()/span)
 			v := float64(e.Tokens.Total())
 			y := plot.Y + plot.H*(1-float32(v/mx))
-			rad := float32(2.5 + 4*math.Sqrt(v/mx))
+			rad := float32(2 + 3.2*math.Sqrt(v/mx))
 			col := colOf(e.Model)
-			if i == best {
-				p.FillPath(new(ui.Path).Circle(x, y, rad+3), col.Alpha(0.25))
+			if best >= 0 && i != best && bestD < 24 {
+				col = col.Alpha(0.5)
 			}
-			p.FillPath(new(ui.Path).Circle(x, y, rad), col.Alpha(0.85))
+			p.Line(x, plot.Y+plot.H, x, y+rad, 1, col.Alpha(0.35))
+			if i == best && bestD < 24 {
+				p.FillPath(new(ui.Path).Circle(x, y, rad+5), col.Alpha(0.18))
+			}
+			p.FillPath(new(ui.Path).Circle(x, y, rad+1.5), pal.raised)
+			p.FillPath(new(ui.Path).Circle(x, y, rad), col)
 		}
 		for _, lab := range []struct {
 			t time.Time

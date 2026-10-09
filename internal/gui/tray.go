@@ -13,68 +13,80 @@ func (s *State) TrayView(c *ui.Context) {
 	t := s.today
 	c.Root().Background(ui.Transparent)
 	ui.Box(c).Fill().Radius(16).Clip().Draw(aurora(pal)).Children(func() {
-		pane(c, pal).Fill().Padding(16).Gap(12).Children(func() {
+		pane(c, pal).Fill().Padding(18, 18, 14, 18).Gap(14).Children(func() {
 			ui.Row(c).AlignItems(ui.Center).Children(func() {
 				logo(c, pal, 17)
 				ui.Spacer(c)
-				ui.Text(c, s.Hooks.Now().Format("01-02 Mon")).FontSize(11).TextColor(pal.muted)
+				ui.Text(c, s.Hooks.Now().Format("Mon · Jan 2")).Font(serif).Italic().FontSize(14).TextColor(pal.muted)
 			})
-			// Today.
-			ui.Column(c).Gap(4).Children(func() {
-				ui.Text(c, tr("today")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
+			// Today, large.
+			ui.Column(c).Gap(6).Children(func() {
+				ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+					bangs(c, 10, t.Totals.Tokens.Total() > 0)
+					kicker(c, pal, tr("today"))
+				})
 				ui.Row(c).AlignItems(ui.End).Gap(10).Children(func() {
-					bigNumber(c, pal, fmtTokens(t.Totals.Tokens.Total()), 34)
-					ui.Text(c, fmtCostOf(t.Totals.CostUSD, t.Totals.Requests, t.Totals.Unpriced)).FontSize(15).FontWeight(700).TextColor(Anon).FontFeatures("tnum").Padding(0, 0, 5, 0)
+					countUp(c, pal, float64(t.Totals.Tokens.Total()), func(v float64) string { return fmtTokens(int64(v)) }, 58)
 					ui.Spacer(c)
-					ui.Column(c).AlignItems(ui.End).Gap(1).Padding(0, 0, 4, 0).Children(func() {
-						ui.Text(c, trf("requestsN", fmtInt(t.Totals.Requests))).FontSize(11).TextColor(pal.muted)
-						ui.Text(c, tr("cacheHit")+" "+fmtPct(t.Totals.CacheHit)).FontSize(11).TextColor(pal.muted)
+					ui.Column(c).AlignItems(ui.End).Gap(2).Padding(0, 0, 8, 0).Children(func() {
+						ui.RichText(c, figure(pal, fmtCostOf(t.Totals.CostUSD, t.Totals.Requests, t.Totals.Unpriced), 26)...)
+						ui.Text(c, trf("requestsN", fmtInt(t.Totals.Requests))+" · "+tr("cacheHit")+" "+fmtPct(t.Totals.CacheHit)).FontSize(10.5).TextColor(pal.muted)
 					})
 				})
-				classBar(c, pal, t.Totals.Tokens, 7)
+				classBar(c, pal, t.Totals.Tokens, 5)
 			})
 			if t.Totals.Tokens.Total() == 0 {
 				ui.Column(c).Grow(1).Center().Children(func() {
 					emptyState(c, pal, artStage, tr("nothingToday"), tr("nothingTodaySub"))
 				})
 			} else {
-				// Last 24 hours.
-				ui.Column(c).Gap(6).Children(func() {
-					ui.Text(c, tr("last24h")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
-					miniBars(c, pal, t.Hourly, 74)
+				ui.Column(c).Gap(8).Children(func() {
+					kicker(c, pal, tr("last24h"))
+					miniBars(c, pal, t.Hourly, 62)
 				})
-				// Top models today.
-				ui.Column(c).Gap(6).Children(func() {
-					ui.Text(c, tr("topModels")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
+				ui.Column(c).Gap(8).Children(func() {
+					kicker(c, pal, tr("topModels"))
 					s.bucketList(c, pal, t.Models, 3, true, false)
 				})
-				// Active sessions.
-				if len(t.Active) > 0 {
-					ui.Column(c).Gap(2).Grow(1).Basis(0).Clip().Children(func() {
-						ui.Text(c, tr("activeNow")).FontSize(11.5).FontWeight(650).TextColor(pal.muted)
-						for i, r := range t.Active {
-							if i >= 2 {
-								break
-							}
-							s.sessionRow(c.Key(string(r.Harness)+r.SessionID), pal, r, false, func() {
-								s.page = "sessions"
-								s.Select(r.Harness, r.SessionID)
-								if s.Hooks.OpenMain != nil {
-									s.Hooks.OpenMain()
-								}
-							})
+				// What is playing now, one line each.
+				ui.Column(c).Gap(4).Grow(1).Basis(0).Clip().Children(func() {
+					if len(t.Active) == 0 {
+						return
+					}
+					kicker(c, pal, tr("activeNow"))
+					for i, r := range t.Active {
+						if i >= 2 {
+							break
 						}
-					})
-				} else {
-					ui.Spacer(c)
-				}
+						row := ui.Row(c.Key(string(r.Harness)+r.SessionID)).Gap(8).Padding(5, 6).Radius(8).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleButton).Transition(hoverFade)
+						if row.Hovered() {
+							row.Background(pal.hover)
+						}
+						row.Children(func() {
+							harnessMark(c, r.Harness, 15)
+							title := r.Title
+							if title == "" {
+								title = tr("untitled")
+							}
+							ui.Text(c, title).FontSize(12.5).FontWeight(600).TextColor(pal.ink).SingleLine().Ellipsis("…").Grow(1).Basis(0)
+							ui.Text(c, fmtTokens(r.Tokens.Total())).FontSize(12).FontWeight(700).TextColor(pal.ink).FontFeatures("tnum")
+						})
+						if row.Clicked() {
+							s.page = "sessions"
+							s.Select(r.Harness, r.SessionID)
+							if s.Hooks.OpenMain != nil {
+								s.Hooks.OpenMain()
+							}
+						}
+					}
+				})
 			}
 			ui.Row(c).Gap(8).Children(func() {
-				b := trayButton(c, pal, icWindow, tr("openMain"), Taki).Grow(1)
+				b := trayButton(c, pal, icWindow, tr("openMain"), true).Grow(1)
 				if b.Clicked() && s.Hooks.OpenMain != nil {
 					s.Hooks.OpenMain()
 				}
-				q := trayButton(c, pal, icPower, tr("quit"), pal.muted)
+				q := trayButton(c, pal, icPower, "", false).Tooltip(tr("quit")).Label(tr("quit"))
 				if q.Clicked() && s.Hooks.Quit != nil {
 					s.Hooks.Quit()
 				}
@@ -83,15 +95,24 @@ func (s *State) TrayView(c *ui.Context) {
 	})
 }
 
-func trayButton(c *ui.Context, pal palette, ic *ui.SVG, label string, col ui.Color) ui.Element {
-	b := ui.Row(c.Key(label)).Padding(9, 12).Gap(6).Radius(10).Center().Cursor(ui.CursorPointer).Role(ui.RoleButton).Label(label).Transition(hoverFade)
-	if b.Hovered() {
-		b.Background(col.Alpha(0.22))
-	} else {
-		b.Background(col.Alpha(0.12))
+// trayButton is the panel's footer button: the main one in ink, the
+// other a quiet square.
+func trayButton(c *ui.Context, pal palette, ic *ui.SVG, label string, primary bool) ui.Element {
+	b := ui.Row(c.Key(label)).Padding(9, 12).Gap(7).Radius(11).Center().Cursor(ui.CursorPointer).Role(ui.RoleButton).Label(label).Transition(hoverFade)
+	fg := pal.ink
+	switch {
+	case primary:
+		fg = pal.base
+		b.Background(pal.ink.Alpha(map[bool]float32{true: 0.84, false: 0.94}[b.Hovered()])).Shadow(0, 4, 12, -4, pal.lift)
+	case b.Hovered():
+		b.Background(pal.hover).Border(1, pal.edge)
+	default:
+		b.Background(pal.well).Border(1, pal.edge)
 	}
 	return b.Children(func() {
-		ui.Icon(c, ic).FontSize(13).TextColor(col)
-		ui.Text(c, label).FontSize(12.5).FontWeight(650).TextColor(pal.ink)
+		ui.Icon(c, ic).FontSize(13).TextColor(fg)
+		if label != "" {
+			ui.Text(c, label).FontSize(12.5).FontWeight(650).TextColor(fg)
+		}
 	})
 }
