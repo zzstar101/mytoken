@@ -21,11 +21,20 @@ func withGOOS(t *testing.T, goos string) {
 	t.Cleanup(func() { runtimeGOOS = old })
 }
 
+// setHome points the home lookup at dir on every host: os.UserHomeDir reads
+// $HOME on Unix but %USERPROFILE% on Windows, so a test that only sets HOME
+// still resolves the real user's home directory on Windows.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+}
+
 // TestVSCodeTaskDirs pins the per-OS root list: the VS Code family
 // globalStorage tasks directory of the extension, for every app in the family.
 func TestVSCodeTaskDirs(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("APPDATA", "")
 
@@ -57,6 +66,14 @@ func TestVSCodeTaskDirs(t *testing.T) {
 		t.Errorf("linux roots =\n%v\nwant\n%v", linux, wantLinux)
 	}
 
+	// XDG_CONFIG_HOME pointing at ~/.config names the very same directory as the
+	// ~/.config default, so it must not duplicate every root. This is the shape
+	// the Linux CI runners run in (XDG_CONFIG_HOME=/home/runner/.config).
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	if got := VSCodeTaskDirs(ExtensionIDRoo); !reflect.DeepEqual(got, wantLinux) {
+		t.Errorf("XDG_CONFIG_HOME=~/.config roots =\n%v\nwant\n%v", got, wantLinux)
+	}
+
 	// XDG_CONFIG_HOME replaces ~/.config when set.
 	xdg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", xdg)
@@ -85,19 +102,21 @@ func TestVSCodeTaskDirs(t *testing.T) {
 // build: $CLINE_DATA_DIR, else $CLINE_DIR/data, else ~/.cline/data.
 func TestClineDataDirs(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 
 	t.Setenv("CLINE_DATA_DIR", "/explicit/data")
 	t.Setenv("CLINE_DIR", "/explicit/cline")
+	// CLINE_DATA_DIR is returned verbatim, so the literal survives on every OS.
 	if got, want := ClineDataDirs(), []string{"/explicit/data"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("CLINE_DATA_DIR: got %v, want %v", got, want)
 	}
-	if got, want := ClineSessionDirs(), []string{"/explicit/data/sessions"}; !reflect.DeepEqual(got, want) {
+	// ...but the sessions subdirectory is joined, so it is native on Windows.
+	if got, want := ClineSessionDirs(), []string{filepath.Join("/explicit/data", "sessions")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("CLINE_DATA_DIR sessions: got %v, want %v", got, want)
 	}
 
 	t.Setenv("CLINE_DATA_DIR", "")
-	if got, want := ClineDataDirs(), []string{"/explicit/cline/data"}; !reflect.DeepEqual(got, want) {
+	if got, want := ClineDataDirs(), []string{filepath.Join("/explicit/cline", "data")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("CLINE_DIR: got %v, want %v", got, want)
 	}
 

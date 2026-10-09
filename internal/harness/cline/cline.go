@@ -53,12 +53,20 @@ func NewWithRoot(root string) *Parser { return NewWithRoots(root) }
 // NewWithRoots returns a parser over the given roots. An empty list falls back
 // to the default roots. Each root is either a globalStorage directory, a tasks
 // directory, or a Cline data directory; Discover finds the task files wherever
-// they sit underneath it.
+// they sit underneath it. Roots are cleaned and deduplicated (first-seen order
+// kept), so an override or a platform that resolves two roots to one directory
+// never scans the same tree twice.
 func NewWithRoots(roots ...string) *Parser {
 	cp := make([]string, 0, len(roots))
+	seen := make(map[string]bool, len(roots))
 	for _, r := range roots {
 		if r = strings.TrimSpace(r); r != "" {
-			cp = append(cp, filepath.Clean(r))
+			r = filepath.Clean(r)
+			if seen[r] {
+				continue
+			}
+			seen[r] = true
+			cp = append(cp, r)
 		}
 	}
 	if len(cp) == 0 {

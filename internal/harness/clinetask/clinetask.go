@@ -169,13 +169,26 @@ type Options struct {
 
 // VSCodeTaskDirs returns the tasks directory of extID for every VS Code family
 // application installed on this operating system.
+//
+// Duplicate directories are dropped, keeping first-seen order. On Linux the two
+// config locations the code reads — the ~/.config default and $XDG_CONFIG_HOME —
+// are the same directory whenever XDG_CONFIG_HOME is ~/.config (the value the CI
+// runners set), so without the dedup every root would be returned twice.
 func VSCodeTaskDirs(extID string) []string {
 	var out []string
+	seen := make(map[string]bool, 2*len(vscodeApps))
 	add := func(globalStorage string) {
 		if globalStorage == "" {
 			return
 		}
-		out = append(out, filepath.Join(globalStorage, extID, "tasks"))
+		// filepath.Join cleans the result, so two spellings of one directory
+		// (a trailing separator, a "." component) collapse here too.
+		dir := filepath.Join(globalStorage, extID, "tasks")
+		if seen[dir] {
+			return
+		}
+		seen[dir] = true
+		out = append(out, dir)
 	}
 	switch goos := runtimeGOOS(); goos {
 	case "windows":

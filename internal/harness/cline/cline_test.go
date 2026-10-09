@@ -759,9 +759,14 @@ func TestRoots(t *testing.T) {
 		t.Errorf("no root ends in %s: %v", wantSuffix, roots)
 	}
 
-	t.Setenv("MYTOKEN_CLINE_DIRS", "/tmp/a"+string(filepath.ListSeparator)+"/tmp/b")
+	// The override list is split with the platform's list separator and each
+	// entry is cleaned, so the expectations have to be spelled the same way:
+	// filepath.FromSlash turns the Unix-shaped literals into native paths on
+	// Windows (where the parser correctly returns \tmp\a, not /tmp/a).
+	dirA, dirB := filepath.FromSlash("/tmp/a"), filepath.FromSlash("/tmp/b")
+	t.Setenv("MYTOKEN_CLINE_DIRS", dirA+string(filepath.ListSeparator)+dirB)
 	q := New()
-	if got := q.Roots(); len(got) != 2 || got[0] != "/tmp/a" || got[1] != "/tmp/b" {
+	if got := q.Roots(); len(got) != 2 || got[0] != dirA || got[1] != dirB {
 		t.Errorf("env override roots = %v", got)
 	}
 }

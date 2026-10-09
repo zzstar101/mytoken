@@ -590,10 +590,13 @@ func TestRegistration(t *testing.T) {
 }
 
 func TestRootsEnvOverride(t *testing.T) {
-	t.Setenv("MYTOKEN_GEMINI_DIRS", "/tmp/g1"+string(os.PathListSeparator)+"/tmp/g2")
+	// The override entries come back cleaned, so on Windows the expected roots
+	// are native (backslash) paths, not the Unix-shaped literals.
+	g1, g2 := filepath.FromSlash("/tmp/g1"), filepath.FromSlash("/tmp/g2")
+	t.Setenv("MYTOKEN_GEMINI_DIRS", g1+string(os.PathListSeparator)+g2)
 	p := New()
 	roots := p.Roots()
-	if len(roots) != 2 || roots[0] != "/tmp/g1" || roots[1] != "/tmp/g2" {
+	if len(roots) != 2 || roots[0] != g1 || roots[1] != g2 {
 		t.Fatalf("Roots() = %v", roots)
 	}
 }
