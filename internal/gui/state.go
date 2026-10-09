@@ -27,6 +27,8 @@ type Hooks struct {
 	Quit     func()
 	// Settings edits pricing; nil hides the pricing cards.
 	Settings query.Settings
+	// Relays reconciles relays; nil hides the page's data.
+	Relays Relays
 	// Now is the clock (tests pin it).
 	Now func() time.Time
 	// Visible reports whether a window shows the state; nil means always.
@@ -74,6 +76,7 @@ type State struct {
 
 	rankTab int
 	pr      pricingState
+	rl      relayState
 
 	// stale is set by data changes not reloaded yet; lastReload and
 	// waiting pace the reloads (see reloadGap).
@@ -193,6 +196,8 @@ func (s *State) Reload() {
 			s.pr.loaded = false
 		}
 	}
+	// The relay page loads when drawn; the report shown stays until replaced.
+	s.rl.loaded, s.rl.want = false, ""
 }
 
 // run runs load off the UI thread (or inline) and applies its result. Loads

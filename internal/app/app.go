@@ -5,18 +5,31 @@ import (
 	"context"
 	"github.com/zzstar101/mytoken/internal/attrib"
 	_ "github.com/zzstar101/mytoken/internal/harness/claude"
+	_ "github.com/zzstar101/mytoken/internal/harness/claudedesktop"
 	_ "github.com/zzstar101/mytoken/internal/harness/cline"
+	_ "github.com/zzstar101/mytoken/internal/harness/codebuddy"
 	_ "github.com/zzstar101/mytoken/internal/harness/codex"
 	_ "github.com/zzstar101/mytoken/internal/harness/crush"
+	_ "github.com/zzstar101/mytoken/internal/harness/droid"
 	_ "github.com/zzstar101/mytoken/internal/harness/dsh"
+	_ "github.com/zzstar101/mytoken/internal/harness/forge"
 	_ "github.com/zzstar101/mytoken/internal/harness/gemini"
+	_ "github.com/zzstar101/mytoken/internal/harness/goose"
+	_ "github.com/zzstar101/mytoken/internal/harness/grok"
+	_ "github.com/zzstar101/mytoken/internal/harness/hermes"
 	_ "github.com/zzstar101/mytoken/internal/harness/kilo"
+	_ "github.com/zzstar101/mytoken/internal/harness/kimi"
+	_ "github.com/zzstar101/mytoken/internal/harness/openclaude"
+	_ "github.com/zzstar101/mytoken/internal/harness/openclaw"
 	_ "github.com/zzstar101/mytoken/internal/harness/opencode"
 	_ "github.com/zzstar101/mytoken/internal/harness/pi"
+	_ "github.com/zzstar101/mytoken/internal/harness/qwen"
 	_ "github.com/zzstar101/mytoken/internal/harness/roo"
+	_ "github.com/zzstar101/mytoken/internal/harness/workbuddy"
 	"github.com/zzstar101/mytoken/internal/paths"
 	"github.com/zzstar101/mytoken/internal/pricing"
 	"github.com/zzstar101/mytoken/internal/query"
+	"github.com/zzstar101/mytoken/internal/reconcile"
 	"github.com/zzstar101/mytoken/internal/scan"
 	"github.com/zzstar101/mytoken/internal/store"
 	"sync"
@@ -32,6 +45,9 @@ type App struct {
 	Query    query.Service
 	Resolver *attrib.Resolver
 	Pricing  *pricing.Pricer
+	// Relays reconciles relays the user turned on (see StartRelaySync).
+	Relays      *reconcile.Service
+	relayCancel context.CancelFunc
 }
 
 func Open() (*App, error) { return open(true) }
@@ -66,6 +82,7 @@ func open(refresh bool) (*App, error) {
 	}
 	a.Scanner = scan.New(st, resolver, prices)
 	a.Query = query.NewService(st)
+	a.Relays = newRelays(a)
 	if e = st.EnsurePrices(context.Background(), prices.Fingerprint(), prices.Evaluate); e != nil {
 		a.Close()
 		return nil, e
@@ -97,10 +114,13 @@ func open(refresh bool) (*App, error) {
 	return a, nil
 }
 func (a *App) Close() error {
+	if a.relayCancel != nil {
+		a.relayCancel()
+	}
 	if a.cancel != nil {
 		a.cancel()
-		a.workers.Wait()
 	}
+	a.workers.Wait()
 	if a.Resolver != nil {
 		_ = a.Resolver.Close()
 	}

@@ -26,11 +26,11 @@ func TestSnapshots(t *testing.T) {
 	for _, lang := range []string{"zh", "en"} {
 		SetLang(lang)
 		for _, dark := range []bool{false, true} {
-			s := NewState(NewDemoService(now), Hooks{Settings: NewDemoSettings(), Now: func() time.Time { return now }, DataDir: "~/Library/Application Support/MyToken",
+			s := NewState(NewDemoService(now), Hooks{Settings: NewDemoSettings(), Relays: NewDemoRelays(now), Now: func() time.Time { return now }, DataDir: "~/Library/Application Support/MyToken",
 				Progress: func() (int, int) { return 10, 10 }}, nil)
 			s.Start()
 			rows := s.sessions.Rows
-			for _, page := range []string{"overview", "sessions", "ranking", "projects", "settings"} {
+			for _, page := range []string{"overview", "sessions", "ranking", "projects", "relays", "settings"} {
 				s.page = page
 				if page == "sessions" && len(rows) > 0 {
 					for _, r := range rows {
@@ -59,7 +59,7 @@ func TestSnapshots(t *testing.T) {
 			shot(t, filepath.Join(dir, name+".png"), s.TrayView, TrayWidth, TrayHeight, dark)
 		}
 		// Empty states: a fresh install, and a search that finds nothing.
-		empty := NewState(&demo{events: map[string][]query.AttributedEvent{}}, Hooks{Settings: NewDemoSettings(), Now: func() time.Time { return now }, DataDir: "~/Library/Application Support/MyToken",
+		empty := NewState(&demo{events: map[string][]query.AttributedEvent{}}, Hooks{Settings: NewDemoSettings(), Relays: &demoRelays{now: now}, Now: func() time.Time { return now }, DataDir: "~/Library/Application Support/MyToken",
 			Progress: func() (int, int) { return 10, 10 }}, nil)
 		empty.Start()
 		views := []struct {
@@ -71,6 +71,7 @@ func TestSnapshots(t *testing.T) {
 			{"empty-overview", func() { empty.page = "overview" }, empty.MainView, 1280, 860},
 			{"empty-ranking", func() { empty.page = "ranking" }, empty.MainView, 1280, 860},
 			{"empty-sessions", func() { empty.page = "sessions" }, empty.MainView, 1280, 860},
+			{"empty-relays", func() { empty.page = "relays" }, empty.MainView, 1280, 860},
 			{"empty-search", func() { empty.page = "sessions"; empty.search = "春日影" }, empty.MainView, 1280, 860},
 			{"empty-tray", func() {}, empty.TrayView, TrayWidth, TrayHeight},
 		}

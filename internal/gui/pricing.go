@@ -108,7 +108,10 @@ func (s *State) setMultiplier(provider, text string) {
 	var rules []query.PriceRule
 	found := false
 	for _, r := range s.pr.rules {
-		if r.Provider == provider && r.Model == "" && r.Input == nil && r.Output == nil {
+		// Only the undated user rule is ours to edit; cc-switch and relay:*
+		// rules (and dated history) are kept as they are — user rules win anyway.
+		if r.Provider == provider && r.Model == "" && r.Input == nil && r.Output == nil &&
+			(r.Source == "user" || r.Source == "") && r.From.IsZero() {
 			found = true
 			if m == 1 {
 				continue // 1× is no rule at all

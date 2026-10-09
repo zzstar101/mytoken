@@ -65,6 +65,26 @@ func harnessColor(h model.Harness) ui.Color {
 		return ui.Hex("#E0577A")
 	case model.Kilo:
 		return ui.Hex("#D99A2B")
+	case model.ClaudeDesktop, model.OpenClaude:
+		return ui.Hex("#D97757")
+	case model.Qwen:
+		return ui.Hex("#615CED")
+	case model.Kimi:
+		return ui.Hex("#3B82F6")
+	case model.Grok:
+		return ui.Hex("#6B7280")
+	case model.OpenClaw:
+		return ui.Hex("#E5484D")
+	case model.Goose:
+		return ui.Hex("#4F7A5A")
+	case model.Droid:
+		return ui.Hex("#EE6018")
+	case model.Forge:
+		return ui.Hex("#B5651D")
+	case model.WorkBuddy, model.CodeBuddy:
+		return ui.Hex("#6C5CE7")
+	case model.Hermes:
+		return ui.Hex("#C9A227")
 	}
 	return Anon
 }
@@ -92,16 +112,29 @@ var harnessIcons = func() map[model.Harness]brandMark {
 		return ui.MustParseSVG(b)
 	}
 	return map[model.Harness]brandMark{
-		model.ClaudeCode: {load("claudecode-color"), true, false},
-		model.Codex:      {load("openai"), false, false},
-		model.Gemini:     {load("gemini-color"), true, false},
-		model.DSH:        {load("deepseek-color"), true, false},
-		model.OpenCode:   {load("opencode"), false, false},
-		model.Cline:      {load("cline"), false, false},
-		model.Roo:        {load("roocode"), false, false},
-		model.Kilo:       {load("kilocode"), false, false},
-		model.Pi:         {load("pi"), false, false},
-		model.Crush:      {icon(`<path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10z"/>`), false, false},
+		model.ClaudeCode:    {load("claudecode-color"), true, false},
+		model.Codex:         {load("openai"), false, false},
+		model.Gemini:        {load("gemini-color"), true, false},
+		model.DSH:           {load("deepseek-color"), true, false},
+		model.OpenCode:      {load("opencode"), false, false},
+		model.Cline:         {load("cline"), false, false},
+		model.Roo:           {load("roocode"), false, false},
+		model.Kilo:          {load("kilocode"), false, false},
+		model.Pi:            {load("pi"), false, false},
+		model.Crush:         {icon(`<path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10z"/>`), false, false},
+		model.ClaudeDesktop: {load("claude-color"), true, false},
+		model.CodeBuddy:     {load("codebuddy-color"), true, true},
+		model.Hermes:        {load("hermesagent"), false, false},
+		model.Qwen:          {load("qwen-color"), true, false},
+		model.Kimi:          {load("kimi-color"), true, false},
+		model.Grok:          {load("grok"), false, false},
+		model.OpenClaw:      {load("openclaw-color"), true, false},
+		model.Goose:         {load("goose"), false, false},
+		// No published marks for these: drawn in the app's line style.
+		model.WorkBuddy:  {icon(`<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3.5 12.5h17"/>`), false, false},
+		model.Droid:      {icon(`<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4.5M9.5 13h.01M14.5 13h.01M9.5 16.5h5"/>`), false, false},
+		model.Forge:      {icon(`<path d="M4 9h12l4-3v4l-4 2H8M8 12v3M14 12v3M6.5 19h11M9 15h6l1 4H8z"/>`), false, false},
+		model.OpenClaude: {icon(`<path d="M8 5 3.5 12 8 19M16 5l4.5 7-4.5 7M12 8v8M8.5 10l7 4M15.5 10l-7 4"/>`), false, false},
 	}
 }()
 

@@ -16,3 +16,11 @@ to identify each tool.
 | roocode.svg | Roo Code |
 | kilocode.svg | Kilo Code |
 | pi.svg | Pi |
+| claude-color.svg | Claude Desktop |
+| codebuddy-color.svg | CodeBuddy |
+| hermesagent.svg | Hermes Agent |
+| qwen-color.svg | Qwen Code |
+| kimi-color.svg | Kimi CLI |
+| grok.svg | Grok CLI |
+| openclaw-color.svg | OpenClaw |
+| goose.svg | Goose |

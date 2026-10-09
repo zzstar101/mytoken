@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/pricing"
 	"github.com/zzstar101/mytoken/internal/query"
 )
 
@@ -381,6 +382,22 @@ func (d *demoSettings) SetPriceRules(_ context.Context, r []query.PriceRule) err
 	return nil
 }
 func (d *demoSettings) ImportCCSwitch(context.Context) (int, error) { return 0, nil }
+func (d *demoSettings) RelayRules(context.Context) ([]query.PriceRule, error) {
+	out := []query.PriceRule{}
+	for _, r := range d.rules {
+		if strings.HasPrefix(r.Source, "relay:") {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+func (d *demoSettings) AppendRelayRules(_ context.Context, rules []pricing.Rule) error {
+	for _, r := range rules {
+		d.rules = append(d.rules, query.PriceRule{Provider: r.Provider, Model: r.Model, Multiplier: r.Multiplier,
+			Input: r.Input, Output: r.Output, CacheRead: r.CacheRead, CacheWrite: r.CacheWrite, Source: r.Source, From: r.From})
+	}
+	return nil
+}
 func (d *demoSettings) Providers(context.Context) ([]string, error) {
 	return []string{"anthropic", "kami-cn", "nerv-base", "openai", "deepseek", "moonshot"}, nil
 }

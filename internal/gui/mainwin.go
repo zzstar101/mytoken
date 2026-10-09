@@ -27,6 +27,8 @@ func (s *State) MainView(c *ui.Context) {
 						s.rankingPage(c, pal)
 					case "projects":
 						s.projectsPage(c, pal)
+					case "relays":
+						s.relaysPage(c, pal)
 					case "settings":
 						s.settingsPage(c, pal)
 					default:
@@ -44,7 +46,7 @@ var navItems = []struct {
 	id  string
 	ic  *ui.SVG
 	col ui.Color
-}{{"overview", icOverview, Tomori}, {"sessions", icSessions, Anon}, {"ranking", icRanking, Rana}, {"projects", icProjects, Soyo}, {"settings", icSettings, Taki}}
+}{{"overview", icOverview, Tomori}, {"sessions", icSessions, Anon}, {"ranking", icRanking, Rana}, {"projects", icProjects, Soyo}, {"relays", icScale, relayColor}, {"settings", icSettings, Taki}}
 
 func (s *State) sidebar(c *ui.Context, pal palette) {
 	bar := c.TitleBar()

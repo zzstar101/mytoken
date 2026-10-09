@@ -88,6 +88,9 @@ func main() {
 			log.Printf("mytoken: scanner: %v", err)
 		}
 	}()
+	// Keeps the relays the user turned on in sync; nothing is sent for a
+	// relay that is off, and by default every relay is off.
+	a.StartRelaySync()
 
 	dataDir, _ := paths.DataDir()
 	var state *gui.State
@@ -113,6 +116,7 @@ func main() {
 		SetOpenAtLogin: func(on bool) { _ = mygo.App.SetOpenAtLogin(on) },
 		DataDir:        dataDir,
 		Settings:       a.Settings,
+		Relays:         a.Relays,
 		OpenMain:       func() { main.Update(openMain) },
 		Quit:           func() { mygo.App.Quit() },
 		Visible: func() bool {
