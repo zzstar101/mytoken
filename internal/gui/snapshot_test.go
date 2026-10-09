@@ -11,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zzstar/mytoken/internal/model"
+	"github.com/zzstar/mytoken/internal/query"
 )
 
 // TestSnapshots renders every page with demo data to MYTOKEN_SNAPSHOTS
@@ -57,6 +58,30 @@ func TestSnapshots(t *testing.T) {
 			}
 			shot(t, filepath.Join(dir, name+".png"), s.TrayView, TrayWidth, TrayHeight, dark)
 		}
+		// Empty states: a fresh install, and a search that finds nothing.
+		empty := NewState(&demo{events: map[string][]query.AttributedEvent{}}, Hooks{Settings: NewDemoSettings(), Now: func() time.Time { return now }, DataDir: "~/Library/Application Support/MyToken",
+			Progress: func() (int, int) { return 10, 10 }}, nil)
+		empty.Start()
+		views := []struct {
+			name string
+			prep func()
+			view func(*ui.Context)
+			w, h int
+		}{
+			{"empty-overview", func() { empty.page = "overview" }, empty.MainView, 1280, 860},
+			{"empty-ranking", func() { empty.page = "ranking" }, empty.MainView, 1280, 860},
+			{"empty-sessions", func() { empty.page = "sessions" }, empty.MainView, 1280, 860},
+			{"empty-search", func() { empty.page = "sessions"; empty.search = "春日影" }, empty.MainView, 1280, 860},
+			{"empty-tray", func() {}, empty.TrayView, TrayWidth, TrayHeight},
+		}
+		for _, v := range views {
+			name := lang + "-" + v.name
+			if only := os.Getenv("MYTOKEN_SNAP_ONLY"); only != "" && !strings.Contains(name, only) {
+				continue
+			}
+			v.prep()
+			shot(t, filepath.Join(dir, name+".png"), v.view, v.w, v.h, false)
+		}
 	}
 	_ = model.ClaudeCode
 }
@@ -83,6 +108,23 @@ func shot(t *testing.T, path string, view func(*ui.Context), w, h int, dark bool
 	}
 	defer f.Close()
 	if err := png.Encode(f, tt.Image()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestIcon writes the app icon: MYTOKEN_ICON=resources/icon.png.
+func TestIcon(t *testing.T) {
+	path := os.Getenv("MYTOKEN_ICON")
+	if path == "" {
+		t.Skip("set MYTOKEN_ICON to write the icon")
+	}
+	img := ui.Render(IconView, 512, 512, 2)
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -27,7 +27,7 @@ func (s *State) rankingPage(c *ui.Context, pal palette) {
 				bs = ov.Models
 			}
 			if len(bs) == 0 {
-				pane(c, pal).Padding(40).Children(func() { emptyState(c, pal, tr("noData"), tr("noSessionsSub")) })
+				pane(c, pal).Padding(40).Children(func() { emptyState(c, pal, artStaff, tr("noData"), tr("noDataSub")) })
 				return
 			}
 			// Podium for the top three, then a table.
@@ -89,7 +89,7 @@ func (s *State) rankTable(c *ui.Context, pal palette, bs []query.Bucket) {
 	})
 	ui.Divider(c)
 	for i, b := range bs {
-		row := ui.Row(c.Key(b.Key)).Gap(12).Padding(8, 4).Radius(8).AlignItems(ui.Center)
+		row := ui.Row(c.Key(b.Key)).Gap(12).Padding(8, 4).Radius(8).AlignItems(ui.Center).Transition(hoverFade)
 		if row.Hovered() {
 			row.Background(pal.hover)
 		}
@@ -125,7 +125,7 @@ func (s *State) projectsPage(c *ui.Context, pal palette) {
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Padding(8, 8, 16, 8).Gap(12).Children(func() {
 			if len(ov.Projects) == 0 {
-				pane(c, pal).Padding(40).Children(func() { emptyState(c, pal, tr("noData"), tr("noSessionsSub")) })
+				pane(c, pal).Padding(40).Children(func() { emptyState(c, pal, artStaff, tr("noData"), tr("noDataSub")) })
 				return
 			}
 			var top int64 = 1

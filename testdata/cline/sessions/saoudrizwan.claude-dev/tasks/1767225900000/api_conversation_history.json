@@ -1,0 +1,13 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Orchestrate the migration\n\n# Current Workspace Directory (/home/user/proj-gamma) Files\nmigrations/\n"}
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [{"type": "text", "text": "I'll split this across subagents."}],
+    "model": {"id": "claude-sonnet-4-5-20250929", "providerId": "anthropic"}
+  }
+]

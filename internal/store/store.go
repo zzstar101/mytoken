@@ -52,7 +52,7 @@ func Open(path string) (*Store, error) {
 	st := &Store{db: db, subscribers: make(map[chan struct{}]struct{})}
 	// Keep bulk-index pages and temporary journals in memory without changing
 	// WAL durability. A negative cache_size is a KiB budget, allocated on demand.
-	if _, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-131072;
+	if _, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-8192;
  CREATE TABLE IF NOT EXISTS events (
  harness TEXT NOT NULL,dedup_key TEXT NOT NULL,session_id TEXT NOT NULL,parent_id TEXT NOT NULL DEFAULT '',project TEXT NOT NULL DEFAULT '',timestamp INTEGER NOT NULL,
  model TEXT NOT NULL,provider TEXT NOT NULL DEFAULT '',base_url TEXT NOT NULL DEFAULT '',input INTEGER NOT NULL,output INTEGER NOT NULL,cache_read INTEGER NOT NULL,cache_write INTEGER NOT NULL,reasoning INTEGER NOT NULL,
@@ -160,6 +160,11 @@ func (s *Store) CommitMany(ctx context.Context, writes []Write) error {
 		return stmt, err
 	}
 	for _, w := range writes {
+		if len(w.Batch.Events) > 0 && len(w.Resolutions) == 0 {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM settings WHERE key='pricing_fingerprint'"); err != nil {
+				return err
+			}
+		}
 		if err := s.commit(ctx, w.Harness, w.Path, w.Batch, w.Resolutions, prepare); err != nil {
 			return err
 		}

@@ -21,7 +21,7 @@
 // ui_messages.json is a JSON array rewritten in place (Roo writes it through
 // safeWriteJson: lockfile + temp file + rename, Cline through its own atomic
 // writer), so the cursor is the per-file ModTime/Size/Fingerprint plus an Extra
-// counter recording how many api_req_started entries were already emitted.
+// counter recording how many usage entries were already emitted.
 //
 // Usage comes exclusively from entries of the shape
 //
@@ -29,6 +29,35 @@
 //	 "text":"{\"tokensIn\":..,\"tokensOut\":..,\"cacheWrites\":..,
 //	          \"cacheReads\":..,\"cost\":..,\"apiProtocol\":..}",
 //	 "modelInfo":{"providerId":..,"modelId":..,"mode":..}}
+//
+// Two more say kinds carry the same token fields and are counted alongside it,
+// mirroring Cline's own accounting (apps/vscode/src/shared/getApiMetrics.ts:
+// "It includes 'api_req_started' messages …, 'deleted_api_reqs' messages, which
+// are aggregated from deleted messages, 'subagent_usage' messages, which are
+// aggregated usage snapshots emitted by subagent batches"):
+//
+//	{"ts":..,"type":"say","say":"subagent_usage",
+//	 "text":"{\"source\":\"subagents\",\"tokensIn\":..,\"tokensOut\":..,
+//	          \"cacheWrites\":0,\"cacheReads\":0,\"cost\":..}"}
+//	{"ts":..,"type":"say","say":"deleted_api_reqs",
+//	 "text":"{\"tokensIn\":..,\"tokensOut\":..,\"cacheWrites\":..,
+//	          \"cacheReads\":..,\"cost\":..}"}
+//
+// deleted_api_reqs is written when a checkpoint restore truncates the array:
+// src/core/task/index.ts keeps the messages before the restore point, drops the
+// rest and appends the aggregate of what it dropped — "aggregate deleted api
+// reqs info so we don't lose costs/tokens". Those requests were billed and are
+// gone from the file, so counting the aggregate is what keeps our totals equal
+// to the totals Cline itself reports for the live array.
+//
+// subagent_usage is written once per iteration when every spawn_agent call of
+// that iteration has finished (apps/vscode/src/sdk/message-translator.ts:
+// "When all done, emit subagent_usage for cost accounting"). The subagents
+// themselves are never persisted as sessions of the task — their SDK ids are
+// "<rootSessionId>__<agentId>" and only the aggregate reaches ui_messages.json
+// — so the usage is attributed to one synthetic child session per task, named
+// "<taskId>:subagents", whose ParentID is the task. That way it nests under the
+// task as a child session and its tokens roll up into the task's totals.
 //
 // Roo Code additionally stores apiProtocol on the message itself; neither
 // current Cline nor current Roo writes modelInfo, so the model usually comes
@@ -350,6 +379,20 @@ func (e uiEntry) providerID() string {
 
 func (e uiEntry) isAPIReq() bool { return e.Type == "say" && e.Say == "api_req_started" }
 
+// isSubagentUsage reports whether the entry is the aggregate usage snapshot of
+// a task's spawn_agent subagents.
+func (e uiEntry) isSubagentUsage() bool { return e.Type == "say" && e.Say == "subagent_usage" }
+
+// isDeletedAPIReqs reports whether the entry is the aggregate of the requests a
+// checkpoint restore removed from this task.
+func (e uiEntry) isDeletedAPIReqs() bool { return e.Type == "say" && e.Say == "deleted_api_reqs" }
+
+// isUsage reports whether the entry carries request usage, which is the set of
+// say kinds Cline's own getApiMetrics sums.
+func (e uiEntry) isUsage() bool {
+	return e.isAPIReq() || e.isSubagentUsage() || e.isDeletedAPIReqs()
+}
+
 // isTaskStart reports whether the entry carries the task prompt, which Cline
 // writes as say:"task" for the first user message of a task (see
 // apps/vscode/src/sdk/message-translator.ts: `say: clineMessages.length === 0
@@ -398,19 +441,23 @@ func parseTask(path string, data []byte, emitted int, opts Options) ([]model.Usa
 	histModel, histWorkspace := readHistoryMeta(filepath.Join(dir, FileHistory))
 	metaModel, metaProvider := readTaskMetadata(filepath.Join(dir, FileTaskMetadata))
 	item := readHistoryItem(filepath.Join(dir, FileHistoryItem))
+	parentID := taskParentID(taskID, item.ParentTaskID, item.RootTaskID)
 
 	// Cline writes an api_req_started entry as a bare {apiProtocol} placeholder
 	// and later rewrites the very same array element with the usage payload
 	// (src/core/task/Task.ts: `JSON.stringify({apiProtocol})` then the update in
 	// the same message). The counter therefore only counts entries that
 	// actually carried usage, so a placeholder that is later filled in is still
-	// emitted on the next scan.
+	// emitted on the next scan. The same rule covers subagent_usage and
+	// deleted_api_reqs: both are written once, in final form.
 	var (
-		events []model.UsageEvent
-		title  string
-		first  time.Time
-		last   time.Time
-		seen   int
+		events  []model.UsageEvent
+		title   string
+		first   time.Time
+		last    time.Time
+		seen    int
+		subFrom time.Time
+		subTo   time.Time
 	)
 	for _, e := range entries {
 		if ts := e.TS.Time(); !ts.IsZero() {
@@ -424,12 +471,20 @@ func parseTask(path string, data []byte, emitted int, opts Options) ([]model.Usa
 		if title == "" && e.isTaskStart() {
 			title = harness.Title(e.Text)
 		}
-		if !e.isAPIReq() {
+		if !e.isUsage() {
 			continue
 		}
-		ev, ok := buildEvent(opts, taskID, e, histModel, metaModel, metaProvider)
+		ev, ok := buildEvent(opts, taskID, parentID, e, histModel, metaModel, metaProvider)
 		if !ok {
 			continue
+		}
+		if e.isSubagentUsage() {
+			if subFrom.IsZero() || ev.Timestamp.Before(subFrom) {
+				subFrom = ev.Timestamp
+			}
+			if ev.Timestamp.After(subTo) {
+				subTo = ev.Timestamp
+			}
 		}
 		seen++
 		if seen <= emitted {
@@ -445,7 +500,6 @@ func parseTask(path string, data []byte, emitted int, opts Options) ([]model.Usa
 		last = first
 	}
 
-	parentID := taskParentID(taskID, item.ParentTaskID, item.RootTaskID)
 	project := firstNonEmpty(item.Workspace, histWorkspace)
 	session := model.SessionMeta{
 		Harness:   opts.Harness,
@@ -456,18 +510,51 @@ func parseTask(path string, data []byte, emitted int, opts Options) ([]model.Usa
 		StartedAt: first,
 		UpdatedAt: last,
 	}
-	// Backfill the session identity onto every event, the way the other
-	// parsers do, so a consumer that only looks at UsageEvent still sees which
-	// session, subagent tree and project a request belongs to.
+	// buildEvent already stamped the session identity — the task itself for
+	// api_req_started and deleted_api_reqs, the synthetic subagent session for
+	// subagent_usage — so only the project is filled in here. A consumer that
+	// only looks at UsageEvent still sees which session, subagent tree and
+	// project a request belongs to.
 	for i := range events {
-		events[i].SessionID = taskID
-		events[i].ParentID = parentID
 		events[i].ProjectPath = project
 	}
-	return events, []model.SessionMeta{session}, seen
+	sessions := []model.SessionMeta{session}
+	if !subFrom.IsZero() {
+		sessions = append(sessions, model.SessionMeta{
+			Harness:   opts.Harness,
+			SessionID: subagentSessionID(taskID),
+			ParentID:  taskID,
+			Title:     subagentSessionTitle,
+			Project:   project,
+			StartedAt: subFrom,
+			UpdatedAt: subTo,
+		})
+	}
+	return events, sessions, seen
 }
 
-func buildEvent(opts Options, taskID string, e uiEntry, histModel, metaModel, metaProvider string) (model.UsageEvent, bool) {
+// subagentSessionSuffix names the synthetic session that carries a task's
+// subagent usage. Cline's spawn_agent subagents run inside the task's own
+// process and are never persisted as sessions of their own — their SDK ids are
+// "<rootSessionId>__<agentId>" (sdk/packages/core/src/session/models/
+// session-graph.ts, makeSubSessionId) and only the aggregate say:"subagent_usage"
+// message reaches ui_messages.json — so the task is the only stable identity
+// left. One child session per task keeps the ids stable across scans and the
+// session tree shallow.
+const subagentSessionSuffix = ":subagents"
+
+// subagentSessionTitle is the title of that synthetic session.
+const subagentSessionTitle = "Subagents"
+
+// subagentSessionID is the session id a task's subagent usage belongs to.
+func subagentSessionID(taskID string) string { return taskID + subagentSessionSuffix }
+
+// buildEvent turns one usage-carrying entry into an event, stamping the session
+// it belongs to. api_req_started and deleted_api_reqs belong to the task
+// itself; subagent_usage belongs to the task's synthetic subagent session, so
+// the usage nests under the task in the session tree instead of inflating the
+// task's own request count.
+func buildEvent(opts Options, taskID, parentID string, e uiEntry, histModel, metaModel, metaProvider string) (model.UsageEvent, bool) {
 	var p apiReqPayload
 	if err := json.Unmarshal([]byte(e.Text), &p); err != nil {
 		// Malformed payload: skip this request, the next one still parses.
@@ -481,6 +568,11 @@ func buildEvent(opts Options, taskID string, e uiEntry, histModel, metaModel, me
 	ts := e.TS.Time()
 	if ts.IsZero() {
 		return model.UsageEvent{}, false
+	}
+
+	sessionID, parent := taskID, parentID
+	if e.isSubagentUsage() {
+		sessionID, parent = subagentSessionID(taskID), taskID
 	}
 
 	protocol := strings.TrimSpace(p.APIProtocol)
@@ -514,8 +606,9 @@ func buildEvent(opts Options, taskID string, e uiEntry, histModel, metaModel, me
 
 	ev := model.UsageEvent{
 		Harness:   opts.Harness,
-		DedupKey:  fmt.Sprintf("%s:%s:%d", opts.Harness, taskID, ts.UnixMilli()),
-		SessionID: taskID,
+		DedupKey:  fmt.Sprintf("%s:%s:%d", opts.Harness, sessionID, ts.UnixMilli()),
+		SessionID: sessionID,
+		ParentID:  parent,
 		Timestamp: ts.UTC(),
 		Model:     modelID,
 		Provider:  firstNonEmpty(protocol, providerID),

@@ -4,6 +4,7 @@
 //	mytoken                 run the app (tray + main window)
 //	mytoken stats [--json]  print usage without a window
 //	mytoken scan            index the logs once
+//	mytoken help            list every command (see docs/CLI.md)
 package main
 
 import (
@@ -27,6 +28,12 @@ import (
 )
 
 func main() {
+	// `mygo build` cannot pass -ldflags, but it embeds mygo.json's version.
+	if cli.Version == "dev" {
+		if v := mygo.App.Version(); v != "" {
+			cli.Version = v
+		}
+	}
 	if len(os.Args) > 1 && os.Args[1] != "--hidden" {
 		os.Exit(cli.Run(os.Args[1:]))
 	}

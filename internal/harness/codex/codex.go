@@ -28,6 +28,7 @@ package codex
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -38,6 +39,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zzstar/mytoken/internal/harness"
@@ -240,6 +242,8 @@ type rawUsage struct {
 	TotalTokens           int64 `json:"total_tokens"`
 }
 
+var readers = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, 1<<20) }}
+
 // Parse implements harness.Parser.
 func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Cursor) (harness.Batch, error) {
 	b := harness.Batch{}
@@ -257,6 +261,9 @@ func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Curs
 		return b, err
 	}
 
+	if cur.Fingerprint == fp && cur.Size == st.Size() && cur.ModTime.Equal(st.ModTime()) {
+		return harness.Batch{Next: cur}, nil
+	}
 	start := cur.Offset
 	stt := state{}
 	if cur.Fingerprint != "" && cur.Fingerprint != fp {
@@ -276,19 +283,57 @@ func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Curs
 	if _, err := f.Seek(start, io.SeekStart); err != nil {
 		return b, err
 	}
-	br := bufio.NewReaderSize(f, 1<<20)
+	br := readers.Get().(*bufio.Reader)
+	br.Reset(f)
+	defer func() {
+		br.Reset(nil)
+		readers.Put(br)
+	}()
+	var pending []byte
+	var skipped int64
+	var skippedTime time.Time
 	off := start
 	for {
 		if err := ctx.Err(); err != nil {
 			return b, err
 		}
-		line, rerr := br.ReadBytes('\n')
+		line, rerr := br.ReadSlice('\n')
+		if rerr == bufio.ErrBufferFull {
+			// Tool output can span many MiB. Once the envelope identifies an
+			// irrelevant record, count its chunks without retaining its body.
+			if skipped > 0 {
+				skipped += int64(len(line))
+			} else if ts, ok := skippable(line); len(pending) == 0 && ok {
+				skipped = int64(len(line))
+				skippedTime = ts
+			} else {
+				pending = append(pending, line...)
+			}
+			continue
+		}
 		if rerr != nil {
 			break // never consume a trailing incomplete line
 		}
+		if skipped > 0 {
+			off += skipped + int64(len(line))
+			acc.observe(skippedTime)
+			skipped = 0
+			continue
+		}
+		if len(pending) > 0 {
+			line = append(pending, line...)
+		}
 		off += int64(len(line))
+		pending = pending[:0]
+		if cap(pending) > 1<<20 {
+			pending = nil
+		}
 		line = trimEOL(line)
 		if len(line) == 0 {
+			continue
+		}
+		if ts, ok := skippable(line); ok {
+			acc.observe(ts)
 			continue
 		}
 		var cl combinedLine
@@ -314,6 +359,79 @@ func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Curs
 		Extra:       acc.encodeState(),
 	}
 	return b, nil
+}
+
+var (
+	tsPrefix      = []byte(`{"timestamp":"`)
+	payloadPrefix = []byte(`"payload":{"type":"`)
+)
+
+// skippable recognises, without decoding, the rollout lines whose only effect is
+// advancing the session's last-activity time: tool calls/outputs, reasoning and
+// other non-message response items, and event_msg records other than
+// token_count/user_message. They are the bulk of a rollout's bytes. Codex
+// writes compact JSON with timestamp first and type before payload; any other
+// layout is not recognised and takes the full decode path.
+func skippable(line []byte) (time.Time, bool) {
+	if !bytes.HasPrefix(line, tsPrefix) {
+		return time.Time{}, false
+	}
+	rest := line[len(tsPrefix):]
+	end := bytes.IndexByte(rest, '"')
+	if end < 0 {
+		return time.Time{}, false
+	}
+	stamp := rest[:end]
+	rest = rest[end+1:]
+	// Only cross the known numeric ordinal field. Searching for a type key
+	// could mistake a nested object's type for the record's own type.
+	if bytes.HasPrefix(rest, []byte(`,"ordinal":`)) {
+		rest = rest[len(`,"ordinal":`):]
+		n := 0
+		for n < len(rest) && rest[n] >= '0' && rest[n] <= '9' {
+			n++
+		}
+		if n == 0 {
+			return time.Time{}, false
+		}
+		rest = rest[n:]
+	}
+	if !bytes.HasPrefix(rest, []byte(`,"type":"`)) {
+		return time.Time{}, false
+	}
+	head := rest[len(`,"type":"`):]
+	end = bytes.IndexByte(head, '"')
+	if end < 0 {
+		return time.Time{}, false
+	}
+	typ := string(head[:end])
+	head = head[end+1:]
+	if !bytes.HasPrefix(head, []byte(`,`)) || !bytes.HasPrefix(head[1:], payloadPrefix) {
+		return time.Time{}, false
+	}
+	head = head[1+len(payloadPrefix):]
+	end = bytes.IndexByte(head, '"')
+	if end < 0 {
+		return time.Time{}, false
+	}
+	if bytes.IndexByte(head[:end], '\\') >= 0 {
+		return time.Time{}, false
+	}
+	ptype := string(head[:end])
+	switch typ {
+	case "response_item":
+		if ptype == "message" {
+			return time.Time{}, false
+		}
+	case "event_msg":
+		if ptype == "token_count" || ptype == "user_message" {
+			return time.Time{}, false
+		}
+	default:
+		return time.Time{}, false
+	}
+	ts, _ := parseTime(string(stamp))
+	return ts, true
 }
 
 // combinedLine decodes a rollout line and its payload in a single JSON pass.

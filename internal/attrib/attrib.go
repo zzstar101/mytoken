@@ -63,8 +63,46 @@ func NewWithPaths(st *store.Store, home, ccPath string) (*Resolver, error) {
 	if e := r.Refresh(context.Background()); e != nil {
 		return nil, e
 	}
+	if err := r.migrateGenericProviders(context.Background()); err != nil {
+		r.Close()
+		return nil, err
+	}
 	return r, nil
 }
+func (r *Resolver) migrateGenericProviders(ctx context.Context) error {
+	done, err := r.st.Setting(ctx, "attribution.generic-host.v1")
+	if err != nil || done == "1" {
+		return err
+	}
+	rows, err := r.st.DB().QueryContext(ctx, `SELECT DISTINCT resolved_provider,base_url FROM events WHERE lower(trim(resolved_provider)) IN ('','custom','openai-compatible','default','proxy') AND base_url!='' AND attrib!=?`, model.AttribUserRule)
+	if err != nil {
+		return err
+	}
+	type change struct{ old, base, next string }
+	var changes []change
+	for rows.Next() {
+		var old, base string
+		if err = rows.Scan(&old, &base); err != nil {
+			rows.Close()
+			return err
+		}
+		if next := displayProvider(old, base); next != old {
+			changes = append(changes, change{old, base, next})
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	for _, c := range changes {
+		if err = r.st.Exec(ctx, "UPDATE events SET resolved_provider=? WHERE resolved_provider=? AND base_url=? AND attrib!=?", c.next, c.old, c.base, model.AttribUserRule); err != nil {
+			return err
+		}
+	}
+	return r.st.SetSetting(ctx, "attribution.generic-host.v1", "1")
+}
+
 func (r *Resolver) Close() error {
 	r.refresh.Lock()
 	defer r.refresh.Unlock()
@@ -92,8 +130,8 @@ func (r *Resolver) Resolve(_ context.Context, e model.UsageEvent) (string, model
 			return v.Provider, model.AttribUserRule
 		}
 	}
-	if e.Provider != "" {
-		return e.Provider, model.AttribLog
+	if provider := displayProvider(e.Provider, e.BaseURL); provider != "" {
+		return provider, model.AttribLog
 	}
 	key := matchKey{appType(e.Harness), e.Model, e.Tokens.Input, e.Tokens.Output + e.Tokens.Reasoning, e.Tokens.CacheRead, e.Tokens.CacheWrite}
 	best := int64(121)
@@ -109,17 +147,38 @@ func (r *Resolver) Resolve(_ context.Context, e model.UsageEvent) (string, model
 		}
 	}
 	if provider != "" {
-		return provider, model.AttribCCSwitch
+		return displayProvider(provider, e.BaseURL), model.AttribCCSwitch
 	}
 	configs := r.configs[e.Harness]
 	at := e.Timestamp.UnixNano()
 	for i := len(configs) - 1; i >= 0; i-- {
 		if configs[i].from <= at && configs[i].provider != "" {
-			return configs[i].provider, model.AttribConfig
+			return displayProvider(configs[i].provider, e.BaseURL), model.AttribConfig
 		}
 	}
 	return Infer(e.Model), model.AttribInferred
 }
+
+// displayProvider preserves named providers and identifies generic relays by host.
+func displayProvider(provider, base string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "", "custom", "openai-compatible", "default", "proxy":
+		u, err := url.Parse(base)
+		if err == nil && u.Hostname() != "" && (u.Scheme == "https" || u.Scheme == "http") {
+			host := strings.ToLower(u.Hostname())
+			if strings.Contains(host, ":") {
+				host = "[" + host + "]"
+			}
+			port := u.Port()
+			if port != "" && !(u.Scheme == "https" && port == "443") && !(u.Scheme == "http" && port == "80") {
+				host += ":" + port
+			}
+			return host
+		}
+	}
+	return provider
+}
+
 func Infer(name string) string {
 	name = strings.ToLower(name)
 	if i := strings.LastIndex(name, "/"); i >= 0 {

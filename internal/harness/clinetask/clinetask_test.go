@@ -301,6 +301,150 @@ func TestParseIgnoresSiblingFormats(t *testing.T) {
 	}
 }
 
+// TestParseSubagentAndDeletedUsage checks the two extra say kinds Cline's own
+// getApiMetrics sums — subagent_usage and deleted_api_reqs — against
+// api_req_started: they share one positional counter, follow the same cache
+// rule, and subagent_usage becomes a child session of the task.
+func TestParseSubagentAndDeletedUsage(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ExtensionIDCline, "tasks", "9001")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(body string) {
+		if err := os.WriteFile(filepath.Join(dir, FileUIMessages), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// One of each kind, plus the say:"subagent" status message that carries the
+	// same numbers as the aggregate and must not be counted twice, plus a
+	// malformed payload of each new kind.
+	body := `[{"ts":1767225900000,"type":"say","say":"task","text":"Orchestrate"},` +
+		`{"ts":1767225901000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":100,\"tokensOut\":10,\"cacheWrites\":5,\"cacheReads\":7,\"cost\":0.01}"},` +
+		`{"ts":1767225902000,"type":"say","say":"subagent_usage","text":"{\"source\":\"subagents\",\"tokensIn\":900,\"tokensOut\":90,\"cacheWrites\":0,\"cacheReads\":0,\"cost\":0.09}"},` +
+		`{"ts":1767225903000,"type":"say","say":"subagent","text":"{\"status\":\"running\",\"inputTokens\":900,\"outputTokens\":90}"},` +
+		`{"ts":1767225904000,"type":"say","say":"subagent_usage","text":"not-json"},` +
+		`{"ts":1767225905000,"type":"say","say":"deleted_api_reqs","text":"{\"tokensIn\":400,\"tokensOut\":40,\"cacheWrites\":4,\"cacheReads\":3,\"cost\":0.04}"},` +
+		`{"ts":1767225906000,"type":"say","say":"deleted_api_reqs","text":"{}"},` +
+		`{"ts":1767225907000,"type":"say","say":"completion_result","text":"done"}]`
+	write(body)
+	src := harness.Source{Path: filepath.Join(dir, FileUIMessages), Kind: KindJSON}
+	opts := Options{
+		Harness:            model.Cline,
+		ExtensionID:        ExtensionIDCline,
+		InputIncludesCache: func(string, string, string) bool { return true },
+	}
+
+	b, err := Parse(src, harness.Cursor{}, opts)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	// Three usage entries survived; the two malformed ones did not count
+	// towards the cursor either, so a later repair still gets parsed.
+	if len(b.Events) != 3 {
+		t.Fatalf("got %d events, want 3: %+v", len(b.Events), b.Events)
+	}
+	if b.Next.Extra != "json:3" {
+		t.Errorf("cursor Extra = %q, want json:3", b.Next.Extra)
+	}
+	want := []model.Tokens{
+		{Input: 88, Output: 10, CacheRead: 7, CacheWrite: 5},  // api_req_started
+		{Input: 900, Output: 90},                              // subagent_usage
+		{Input: 393, Output: 40, CacheRead: 3, CacheWrite: 4}, // deleted_api_reqs
+	}
+	for i, tc := range want {
+		if b.Events[i].Tokens != tc {
+			t.Errorf("event %d tokens = %+v, want %+v", i, b.Events[i].Tokens, tc)
+		}
+	}
+	// No modelInfo and no siblings → provider-less, so the input bucket is the
+	// prompt size minus the cache buckets, exactly as for api_req_started.
+	if got := b.Events[0].DedupKey; got != "cline:9001:1767225901000" {
+		t.Errorf("api dedup key = %q", got)
+	}
+	if got := b.Events[1].DedupKey; got != "cline:9001:subagents:1767225902000" {
+		t.Errorf("subagent dedup key = %q", got)
+	}
+	if got := b.Events[2].DedupKey; got != "cline:9001:1767225905000" {
+		t.Errorf("deleted dedup key = %q", got)
+	}
+
+	// The subagent session is a child of the task, and only it exists when the
+	// task actually ran subagents.
+	if len(b.Sessions) != 2 {
+		t.Fatalf("got %d sessions, want 2: %+v", len(b.Sessions), b.Sessions)
+	}
+	sub := b.Sessions[1]
+	if sub.SessionID != "9001:subagents" || sub.ParentID != "9001" || sub.Title != "Subagents" {
+		t.Errorf("subagent session = %+v", sub)
+	}
+	if sub.StartedAt.UnixMilli() != 1767225902000 || sub.UpdatedAt.UnixMilli() != 1767225902000 {
+		t.Errorf("subagent window = %v..%v, want the subagent_usage span", sub.StartedAt, sub.UpdatedAt)
+	}
+	task := b.Sessions[0]
+	if task.SessionID != "9001" || task.ParentID != "" || task.Title != "Orchestrate" {
+		t.Errorf("task session = %+v", task)
+	}
+	if task.StartedAt.UnixMilli() != 1767225900000 || task.UpdatedAt.UnixMilli() != 1767225907000 {
+		t.Errorf("task window = %v..%v", task.StartedAt, task.UpdatedAt)
+	}
+
+	// Incremental: appending one more of each kind emits exactly those two.
+	write(body[:len(body)-1] + `,` +
+		`{"ts":1767225908000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":50,\"tokensOut\":5}"},` +
+		`{"ts":1767225909000,"type":"say","say":"subagent_usage","text":"{\"tokensIn\":10,\"tokensOut\":1}"}]`)
+	b2, err := Parse(src, b.Next, opts)
+	if err != nil {
+		t.Fatalf("Parse (incremental): %v", err)
+	}
+	if len(b2.Events) != 2 {
+		t.Fatalf("incremental: got %d events, want 2: %+v", len(b2.Events), b2.Events)
+	}
+	if b2.Next.Extra != "json:5" {
+		t.Errorf("incremental cursor Extra = %q, want json:5", b2.Next.Extra)
+	}
+	if b2.Sessions[1].UpdatedAt.UnixMilli() != 1767225909000 {
+		t.Errorf("subagent window after append = %v..%v", b2.Sessions[1].StartedAt, b2.Sessions[1].UpdatedAt)
+	}
+
+	// Resuming with a counter that already covers the file emits nothing, which
+	// is the documented behaviour for an in-place edit.
+	b3, err := Parse(src, b2.Next, opts)
+	if err != nil {
+		t.Fatalf("Parse (no-op): %v", err)
+	}
+	if len(b3.Events) != 0 {
+		t.Errorf("no-op rescan emitted %d events", len(b3.Events))
+	}
+	if b3.Next.Extra != "json:5" {
+		t.Errorf("no-op cursor Extra = %q, want json:5", b3.Next.Extra)
+	}
+}
+
+// TestParseNoSubagentSession checks that a task without subagent_usage gets no
+// synthetic child session, so only real subagent usage shows up in the tree.
+func TestParseNoSubagentSession(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ExtensionIDRoo, "tasks", "9002")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `[{"ts":1767225900000,"type":"say","say":"task","text":"t"},` +
+		`{"ts":1767225910000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":1,\"tokensOut\":1}"}]`
+	if err := os.WriteFile(filepath.Join(dir, FileUIMessages), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Parse(harness.Source{Path: filepath.Join(dir, FileUIMessages), Kind: KindJSON}, harness.Cursor{},
+		Options{Harness: model.Roo, ExtensionID: ExtensionIDRoo})
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(b.Events) != 1 || len(b.Sessions) != 1 {
+		t.Fatalf("got %d events, %d sessions, want 1 and 1", len(b.Events), len(b.Sessions))
+	}
+	if b.Sessions[0].SessionID != "9002" {
+		t.Errorf("session = %+v, want only the task", b.Sessions[0])
+	}
+}
+
 // TestParseMissingFile checks that a file that vanished between Discover and
 // Parse is not an error.
 func TestParseMissingFile(t *testing.T) {

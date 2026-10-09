@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"sort"
 	"strings"
 	"time"
@@ -23,6 +24,30 @@ func (s *Store) RecomputePrices(ctx context.Context, cost func(model.UsageEvent)
 func (s *Store) ReplacePricing(ctx context.Context, settings map[string]string, cost func(model.UsageEvent) (float64, bool)) error {
 	s.writer.Lock()
 	defer s.writer.Unlock()
+	// External settings writes must not leave a stale price checkpoint behind.
+	if settings == nil {
+		settings = map[string]string{}
+	}
+	settings["pricing_fingerprint"] = ""
+	return s.replacePricing(ctx, settings, cost)
+}
+
+// EnsurePrices avoids full-index passes when the catalog and settings are unchanged.
+func (s *Store) EnsurePrices(ctx context.Context, fingerprint string, cost func(model.UsageEvent) (float64, bool)) error {
+	s.writer.Lock()
+	defer s.writer.Unlock()
+	var previous string
+	err := s.db.QueryRowContext(ctx, "SELECT value FROM settings WHERE key='pricing_fingerprint'").Scan(&previous)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if previous == fingerprint {
+		return nil
+	}
+	return s.replacePricing(ctx, map[string]string{"pricing_fingerprint": fingerprint}, cost)
+}
+
+func (s *Store) replacePricing(ctx context.Context, settings map[string]string, cost func(model.UsageEvent) (float64, bool)) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

@@ -35,7 +35,7 @@ func (s *State) TrayView(c *ui.Context) {
 			})
 			if t.Totals.Tokens.Total() == 0 {
 				ui.Column(c).Grow(1).Center().Children(func() {
-					emptyState(c, pal, tr("nothingToday"), tr("nothingTodaySub"))
+					emptyState(c, pal, artStage, tr("nothingToday"), tr("nothingTodaySub"))
 				})
 			} else {
 				// Last 24 hours.
@@ -84,7 +84,7 @@ func (s *State) TrayView(c *ui.Context) {
 }
 
 func trayButton(c *ui.Context, pal palette, ic *ui.SVG, label string, col ui.Color) ui.Element {
-	b := ui.Row(c.Key(label)).Padding(9, 12).Gap(6).Radius(10).Center().Cursor(ui.CursorPointer).Role(ui.RoleButton).Label(label)
+	b := ui.Row(c.Key(label)).Padding(9, 12).Gap(6).Radius(10).Center().Cursor(ui.CursorPointer).Role(ui.RoleButton).Label(label).Transition(hoverFade)
 	if b.Hovered() {
 		b.Background(col.Alpha(0.22))
 	} else {

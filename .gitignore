@@ -2,3 +2,5 @@
 /dist/
 *.test
 .DS_Store
+/build/
+/app.test

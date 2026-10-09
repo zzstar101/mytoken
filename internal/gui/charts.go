@@ -95,7 +95,7 @@ func classRows(t model.Tokens) ([][2]string, []ui.Color) {
 func stackedBars(c *ui.Context, pal palette, pts []query.Point, hourly bool, height float32) ui.Element {
 	el := ui.Box(c).FillWidth().Height(height)
 	hx, _, hover := el.PointerPosition()
-	grow := el.Animate("grow", 1, 700*time.Millisecond)
+	grow := entrance(el, 700*time.Millisecond)
 	el.Draw(func(p *ui.Painter, r ui.Rect) {
 		if len(pts) == 0 {
 			return
@@ -116,7 +116,7 @@ func stackedBars(c *ui.Context, pal palette, pts []query.Point, hourly bool, hei
 			if i > 0 {
 				p.Line(plot.X, y, plot.X+plot.W, y, 1, pal.faint)
 			}
-			if !hourly {
+			if !hourly && (mx > 0 || i == 0) {
 				s := fmtTokens(int64(top * float64(i) / 4))
 				w, _ := p.MeasureText(0, ui.Span{Text: s, Size: 10.5})
 				p.RichText(r.X+left-8-w, y-7, 0, ui.Span{Text: s, Size: 10.5, Color: pal.muted, Features: "tnum"})
@@ -311,7 +311,7 @@ func arc(cx, cy, ro, ri float32, a0, a1 float64) *ui.Path {
 func donut(c *ui.Context, pal palette, t model.Tokens, size float32) ui.Element {
 	el := ui.Box(c).Size(size, size).Shrink(0)
 	hx, hy, hover := el.PointerPosition()
-	sweep := el.Animate("sweep", 1, 900*time.Millisecond)
+	sweep := entrance(el, 900*time.Millisecond)
 	el.Draw(func(p *ui.Painter, r ui.Rect) {
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
 		ro := r.W / 2
@@ -475,10 +475,10 @@ func heatLegend(c *ui.Context, pal palette) {
 // rankBar draws a rounded progress track for a share in 0..1.
 func rankBar(c *ui.Context, pal palette, frac float64, col ui.Color, height float32) ui.Element {
 	el := ui.Box(c).FillWidth().Height(height)
-	g := el.Animate("w", float32(frac), 600*time.Millisecond)
+	g := entrance(el, 600*time.Millisecond)
 	return el.Draw(func(p *ui.Painter, r ui.Rect) {
 		p.Fill(r, pal.well, r.H/2)
-		w := r.W * g
+		w := r.W * g * float32(frac)
 		if w > 0 && w < r.H {
 			w = r.H
 		}

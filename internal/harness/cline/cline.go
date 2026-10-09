@@ -122,8 +122,8 @@ func (p *Parser) Discover(ctx context.Context) ([]harness.Source, error) {
 
 // Parse reads one task file incrementally. Task files are JSON documents
 // rewritten in place, so the cursor records the file fingerprint plus how many
-// api_req_started entries were already emitted; a changed fingerprint means the
-// whole file is re-read and only the entries past that counter are emitted.
+// usage entries were already emitted; a changed fingerprint means the whole file
+// is re-read and only the entries past that counter are emitted.
 func (p *Parser) Parse(ctx context.Context, src harness.Source, cur harness.Cursor) (harness.Batch, error) {
 	if err := ctx.Err(); err != nil {
 		return harness.Batch{}, err

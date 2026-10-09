@@ -12,6 +12,27 @@ import (
 	"time"
 )
 
+func TestGenericProviderHost(t *testing.T) {
+	r := &Resolver{}
+	for _, provider := range []string{"custom", "openai-compatible", "default", "proxy", "", " CUSTOM "} {
+		for _, tt := range []struct{ base, want string }{{"https://api.relay.example:443/v1", "api.relay.example"}, {"http://api.relay.example:80/v1", "api.relay.example"}, {"https://api.relay.example:8443/v1", "api.relay.example:8443"}, {"https://api.openai.com/v1", "api.openai.com"}, {"http://[::1]:8080/v1", "[::1]:8080"}} {
+			got, _ := r.Resolve(t.Context(), model.UsageEvent{Provider: provider, BaseURL: tt.base, Model: "gpt-5"})
+			if got != tt.want {
+				t.Errorf("%q %q: got %q want %q", provider, tt.base, got, tt.want)
+			}
+		}
+	}
+	got, _ := r.Resolve(t.Context(), model.UsageEvent{Provider: "Named", BaseURL: "https://api.relay.example"})
+	if got != "Named" {
+		t.Fatal(got)
+	}
+	r.rules = []Rule{{Provider: "custom"}}
+	got, kind := r.Resolve(t.Context(), model.UsageEvent{BaseURL: "https://api.relay.example"})
+	if got != "custom" || kind != model.AttribUserRule {
+		t.Fatal(got, kind)
+	}
+}
+
 func TestResolutionChain(t *testing.T) {
 	dir := t.TempDir()
 	dbpath := filepath.Join(dir, "cc.db")

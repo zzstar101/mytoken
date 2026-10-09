@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+func TestCommandSurface(t *testing.T) {
+	t.Setenv("MYTOKEN_HOME", t.TempDir())
+	for _, args := range [][]string{{"version"}, {"help"}, {"sessions", "--limit", "2", "--json"}, {"doctor", "--json"}, {"stats", "--by", "harness", "--json"}} {
+		var out, errout bytes.Buffer
+		if code := run(args, &out, &errout); code != 0 {
+			t.Errorf("%v: code=%d stderr=%s", args, code, &errout)
+		}
+		if len(args) > 1 && args[len(args)-1] == "--json" && !json.Valid(out.Bytes()) {
+			t.Errorf("%v: invalid JSON %s", args, &out)
+		}
+	}
+	for _, args := range [][]string{{"version", "extra"}, {"help", "extra"}, {"sessions", "--limit", "-1"}, {"doctor", "extra"}} {
+		var out, errout bytes.Buffer
+		if code := run(args, &out, &errout); code != 2 {
+			t.Errorf("%v: code=%d", args, code)
+		}
+	}
+}
+
 func TestPricesCLI(t *testing.T) {
 	t.Setenv("MYTOKEN_HOME", t.TempDir())
 	var out, errout bytes.Buffer

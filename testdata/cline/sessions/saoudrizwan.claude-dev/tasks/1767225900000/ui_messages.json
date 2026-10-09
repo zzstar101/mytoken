@@ -1,0 +1,14 @@
+[
+  {"ts":1767225900000,"type":"say","say":"task","text":"Orchestrate the migration"},
+  {"ts":1767225901000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":700,\"tokensOut\":90,\"cacheWrites\":0,\"cacheReads\":200,\"cost\":0.008}","modelInfo":{"modelId":"claude-sonnet-4-5-20250929","providerId":"anthropic","mode":"act"}},
+  {"ts":1767225902000,"type":"say","say":"subagent_usage","text":"{\"source\":\"subagents\",\"tokensIn\":5000,\"tokensOut\":800,\"cacheWrites\":0,\"cacheReads\":0,\"cost\":0.05}"},
+  {"ts":1767225903000,"type":"say","say":"subagent_usage","text":"not-json"},
+  {"ts":1767225904000,"type":"say","say":"subagent_usage","text":"{}"},
+  {"ts":0,"type":"say","say":"subagent_usage","text":"{\"tokensIn\":1,\"tokensOut\":1}"},
+  {"ts":1767225905000,"type":"say","say":"subagent_usage","text":"{\"source\":\"subagents\",\"tokensIn\":3000,\"tokensOut\":400,\"cacheWrites\":0,\"cacheReads\":0,\"cost\":0.03}"},
+  {"ts":1767225906000,"type":"say","say":"subagent","text":"{\"status\":\"running\",\"total\":3,\"completed\":2,\"successes\":2,\"failures\":0,\"toolCalls\":11,\"inputTokens\":8000,\"outputTokens\":1200,\"maxContextTokens\":200000,\"items\":[{\"index\":0,\"prompt\":\"Map the schema\",\"status\":\"done\",\"toolCalls\":4,\"inputTokens\":3000,\"outputTokens\":500,\"totalCost\":0.03},{\"index\":1,\"prompt\":\"Write the migration\",\"status\":\"done\",\"toolCalls\":7,\"inputTokens\":2000,\"outputTokens\":300,\"totalCost\":0.02}]}"},
+  {"ts":1767225907000,"type":"say","say":"api_req_started","text":"{\"tokensIn\":600,\"tokensOut\":80,\"cacheWrites\":0,\"cacheReads\":0,\"cost\":0.007}","modelInfo":{"modelId":"claude-sonnet-4-5-20250929","providerId":"anthropic","mode":"act"}},
+  {"ts":1767225908000,"type":"say","say":"deleted_api_reqs","text":"{\"tokensIn\":4000,\"tokensOut\":500,\"cacheWrites\":200,\"cacheReads\":300,\"cost\":0.06}"},
+  {"ts":1767225909000,"type":"say","say":"deleted_api_reqs","text":"garbage"},
+  {"ts":1767225910000,"type":"say","say":"completion_result","text":"Migration script is ready."}
+]

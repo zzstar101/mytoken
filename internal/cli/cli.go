@@ -20,36 +20,28 @@ import (
 func Run(args []string) int { return run(args, os.Stdout, os.Stderr) }
 func run(args []string, out, errout io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errout, "usage: mytoken stats [--json] [--since 7d|30d|YYYY-MM-DD] [--by session|provider|model|project|day] | scan")
+		fmt.Fprint(errout, usage)
 		return 2
 	}
 	ctx := context.Background()
 	switch args[0] {
-	case "scan":
-		if len(args) > 1 {
-			fmt.Fprintln(errout, "usage: mytoken scan")
+	case "version", "help":
+		if len(args) != 1 {
+			fmt.Fprint(errout, usage)
 			return 2
 		}
-		a, e := app.Open()
-		if e != nil {
-			fmt.Fprintln(errout, e)
-			return 1
+		if args[0] == "version" {
+			fmt.Fprintln(out, Version)
+		} else {
+			fmt.Fprint(out, usage)
 		}
-		defer a.Close()
-		start := time.Now()
-		e = a.Scanner.Scan(ctx)
-		if e != nil {
-			fmt.Fprintln(errout, e)
-			return 1
-		}
-		tot, e := a.Query.Totals(ctx, query.Filter{})
-		if e != nil {
-			fmt.Fprintln(errout, e)
-			return 1
-		}
-		done, total := a.Scanner.Progress()
-		fmt.Fprintf(out, "Scanned %d/%d sources: %d events, %d sessions in %s\n", done, total, tot.Requests, tot.Sessions, time.Since(start).Round(time.Millisecond))
 		return 0
+	case "sessions":
+		return runSessions(ctx, args[1:], out, errout)
+	case "doctor":
+		return runDoctor(ctx, args[1:], out, errout)
+	case "scan":
+		return runScan(ctx, args[1:], out, errout)
 	case "prices":
 		return runPrices(ctx, args[1:], out, errout)
 	case "stats":
@@ -66,7 +58,7 @@ func run(args []string, out, errout io.Writer) int {
 			fmt.Fprintln(errout, e)
 			return 2
 		}
-		a, e := app.Open()
+		a, e := app.OpenLocal()
 		if e != nil {
 			fmt.Fprintln(errout, e)
 			return 1
@@ -88,6 +80,8 @@ func run(args []string, out, errout io.Writer) int {
 			rows, e = a.Query.ByModel(ctx, f)
 		case "project":
 			rows, e = a.Query.ByProject(ctx, f)
+		case "harness":
+			rows, e = a.Query.ByHarness(ctx, f)
 		case "day":
 			rows, e = a.Query.Daily(ctx, f)
 		default:

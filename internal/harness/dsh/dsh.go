@@ -279,10 +279,11 @@ func (p *Parser) parseJSONL(src harness.Source, st os.FileInfo, fp string, cur h
 }
 
 func (p *Parser) parseZstd(src harness.Source, st os.FileInfo, fp string) (harness.Batch, error) {
-	raw, err := os.ReadFile(src.Path)
+	f, err := os.Open(src.Path)
 	if err != nil {
 		return harness.Batch{}, err
 	}
+	defer f.Close()
 	next := harness.Cursor{
 		Offset:      0,
 		Size:        st.Size(),
@@ -290,12 +291,15 @@ func (p *Parser) parseZstd(src harness.Source, st os.FileInfo, fp string) (harne
 		Fingerprint: fp,
 		Extra:       kindJSONLzs,
 	}
+	// The decoder reads frame headers and blocks in small pieces; buffer the
+	// file so that is not one syscall per header.
+	in := bufio.NewReaderSize(f, 256<<10)
 	var dec *zstd.Decoder
 	if pooled := decoderPool.Get(); pooled != nil {
 		dec = pooled.(*zstd.Decoder)
-		err = dec.Reset(bytes.NewReader(raw))
+		err = dec.Reset(in)
 	} else {
-		dec, err = zstd.NewReader(bytes.NewReader(raw), zstd.WithDecoderConcurrency(1))
+		dec, err = zstd.NewReader(in, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
 	}
 	if err != nil {
 		// Not a decodable frame (yet): the log is probably mid-rewrite. Report
@@ -365,7 +369,12 @@ func readCompleteLines(r io.Reader, fn func(line []byte) error) (int64, error) {
 				return n, e
 			}
 			n += int64(len(line))
-			pending = nil
+			if len(pending) > 0 {
+				pending = line[:0]
+				if cap(pending) > 256<<10 {
+					pending = nil
+				}
+			}
 			continue
 		}
 		if errors.Is(err, io.EOF) {
@@ -400,6 +409,12 @@ func newSession(path string) *session {
 func (s *session) consume(line []byte) error {
 	line = bytes.TrimSpace(line)
 	if len(line) == 0 {
+		return nil
+	}
+	if t, ok := skippable(line); ok {
+		if t.After(s.updatedAt) {
+			s.updatedAt = t
+		}
 		return nil
 	}
 	var fast struct {

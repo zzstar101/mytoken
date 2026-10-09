@@ -54,7 +54,7 @@ func (s *State) sidebar(c *ui.Context, pal palette) {
 		}{{"overview", icOverview, Tomori}, {"sessions", icSessions, Anon}, {"ranking", icRanking, Rana}, {"projects", icProjects, Soyo}, {"settings", icSettings, Taki}}
 		for _, it := range items {
 			on := s.page == it.id
-			row := ui.Row(c.Key(it.id)).Padding(8, 10).Gap(10).Radius(10).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleTab).Label(tr(it.id))
+			row := ui.Row(c.Key(it.id)).Padding(8, 10).Gap(10).Radius(10).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleTab).Label(tr(it.id)).Transition(hoverFade)
 			if on {
 				row.Background(it.col.Alpha(0.16))
 			} else if row.Hovered() {
@@ -124,7 +124,10 @@ func (s *State) scanStatus(c *ui.Context, pal palette) {
 func pageHeader(c *ui.Context, pal palette, title, sub string, right func()) {
 	ui.Row(c).Padding(14, 8, 4, 8).AlignItems(ui.End).Gap(12).DragWindow().Children(func() {
 		ui.Column(c).Gap(2).Children(func() {
-			ui.Text(c, title).FontSize(26).FontWeight(800).TextColor(pal.ink).LetterSpacing(-0.4)
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, title).FontSize(26).FontWeight(800).TextColor(pal.ink).LetterSpacing(-0.4)
+				flourish(c)
+			})
 			if sub != "" {
 				ui.Text(c, sub).FontSize(12).TextColor(pal.muted)
 			}
@@ -357,7 +360,7 @@ func (s *State) bucketList(c *ui.Context, pal palette, bs []query.Bucket, max in
 func (s *State) recentCard(c *ui.Context, pal palette, rows []query.SessionRow) {
 	card(c, pal, tr("recent"), nil, func() {
 		if len(rows) == 0 {
-			emptyState(c, pal, tr("noSessions"), tr("noSessionsSub"))
+			emptyState(c, pal, artStaff, tr("noSessions"), tr("noSessionsSub"))
 			return
 		}
 		ui.Column(c).Gap(2).Children(func() {

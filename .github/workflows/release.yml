@@ -1,0 +1,104 @@
+# Tag a release: build every platform with the pinned MyGo CLI and attach the
+# artifacts to a draft GitHub release.
+#
+# The draft is created before the builds start so that every matrix job
+# uploads into the same release, which is the layout MyGo's
+# docs/github-actions.md describes. This project has no `updates`
+# configuration (which would need an update-signing key), so `mygo build
+# -upload` has nowhere to upload to; the files are attached with `gh release
+# upload` instead and the draft is published by hand from the GitHub UI.
+#
+# Signing needs no secrets: macOS bundles are ad-hoc signed by default
+# (`macos.signingIdentity` is "-") and the Windows installer is unsigned.
+# To ship signed and notarized builds, add the secrets below, set
+# `macos.signingIdentity` and a `macos.notarize` block in mygo.json, and
+# import the certificate into a keychain before the build step — see
+# docs/github-actions.md in the MyGo repository.
+#
+#   secrets.MACOS_CERTIFICATE           base64 .p12 signing certificate
+#   secrets.MACOS_CERTIFICATE_PASSWORD  its password
+#   secrets.APPLE_ID                    notarization account
+#   secrets.APPLE_TEAM_ID               notarization team
+#   secrets.APPLE_APP_PASSWORD          app-specific password
+#   secrets.WINDOWS_CERTIFICATE         base64 .pfx, plus its password
+#
+# `go tool mygo build` takes the version from mygo.json, never from a flag,
+# so each build job rewrites it from the tag that started the run.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  draft-release:
+    name: draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --draft --verify-tag --title "MyToken!!!!! ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
+
+  build:
+    name: ${{ matrix.name }}
+    needs: draft-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS, os: macos-latest, platform: "darwin/universal" }
+          - { name: Windows, os: ubuntu-latest, platform: "windows/amd64,windows/arm64" }
+          - { name: Linux, os: ubuntu-latest, platform: "linux/amd64,linux/arm64" }
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Take the version from the tag
+        run: go run ./scripts/setversion "$GITHUB_REF_NAME"
+      - name: Install NSIS, for the Windows installers
+        if: matrix.name == 'Windows'
+        run: sudo apt-get update && sudo apt-get install -y nsis
+      - name: Build
+        run: go tool mygo build -platform "${{ matrix.platform }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            build/*/*.dmg
+            build/*/*.tar.gz
+            build/*/*.deb
+            build/*/*Setup*.exe
+            build/*/install.sh
+      - name: Attach the files to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=()
+          for pattern in 'build/*/*.dmg' 'build/*/*.tar.gz' 'build/*/*.deb' 'build/*/*Setup*.exe' 'build/*/install.sh'; do
+            for f in $pattern; do
+              [ -e "$f" ] && files+=("$f")
+            done
+          done
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no release artifacts were produced"
+            exit 1
+          fi
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"

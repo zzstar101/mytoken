@@ -21,7 +21,11 @@ func (s *State) sessionsPage(c *ui.Context, pal palette) {
 			ui.SearchField(c, &s.search).FillWidth().Label(tr("search"))
 			if len(rows) == 0 {
 				ui.Column(c).Grow(1).Center().Children(func() {
-					emptyState(c, pal, tr("noSessions"), tr("noSessionsSub"))
+					if s.search != "" {
+						emptyState(c, pal, artPicks, tr("noResults"), tr("noResultsSub"))
+					} else {
+						emptyState(c, pal, artStaff, tr("noSessions"), tr("noSessionsSub"))
+					}
 				})
 				return
 			}
@@ -41,7 +45,7 @@ func (s *State) sessionsPage(c *ui.Context, pal palette) {
 		ui.Column(c).Grow(1).Basis(0).FillHeight().Children(func() {
 			if s.sel == "" {
 				pane(c, pal).Fill().Center().Children(func() {
-					emptyState(c, pal, tr("pickSession"), tr("pickSub"))
+					emptyState(c, pal, artStage, tr("pickSession"), tr("pickSub"))
 				})
 				return
 			}
@@ -54,7 +58,7 @@ func (s *State) sessionsPage(c *ui.Context, pal palette) {
 // thin class bar.
 func (s *State) sessionRow(c *ui.Context, pal palette, r query.SessionRow, selected bool, onClick func()) {
 	col := harnessColor(r.Harness)
-	row := ui.Row(c).Padding(9, 10).Gap(10).Radius(12).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleButton)
+	row := ui.Row(c).Padding(9, 10).Gap(10).Radius(12).AlignItems(ui.Center).Cursor(ui.CursorPointer).Role(ui.RoleButton).Transition(hoverFade)
 	switch {
 	case selected:
 		row.Background(col.Alpha(0.15)).Border(1, col.Alpha(0.35))

@@ -159,6 +159,9 @@ var strs = map[string][2]string{ // key: {zh, en}
 	"streak":           {"连续活跃", "Streak"},
 	"days":             {"%d 天", "%d days"},
 	"noData":           {"暂无数据", "No data"},
+	"noDataSub":        {"这段时间舞台上很安静", "The stage has been quiet for this span"},
+	"noResults":        {"什么都没找到", "Nothing found"},
+	"noResultsSub":     {"拨片掉了一地，也没找到它——换个关键词试试", "Picks everywhere, but not that one — try another word"},
 	"allHarnesses":     {"全部工具", "All harnesses"},
 	"heavy":            {"为什么要烧这么多 token！", "Why burn so many tokens?!"},
 }

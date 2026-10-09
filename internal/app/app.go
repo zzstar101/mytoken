@@ -34,7 +34,12 @@ type App struct {
 	Pricing  *pricing.Pricer
 }
 
-func Open() (*App, error) {
+func Open() (*App, error) { return open(true) }
+
+// OpenLocal uses the loaded offline prices without starting a network worker.
+func OpenLocal() (*App, error) { return open(false) }
+
+func open(refresh bool) (*App, error) {
 	dir, e := paths.DataDir()
 	if e != nil {
 		return nil, e
@@ -61,9 +66,12 @@ func Open() (*App, error) {
 	}
 	a.Scanner = scan.New(st, resolver, prices)
 	a.Query = query.NewService(st)
-	if e = st.RecomputePrices(context.Background(), prices.Evaluate); e != nil {
+	if e = st.EnsurePrices(context.Background(), prices.Fingerprint(), prices.Evaluate); e != nil {
 		a.Close()
 		return nil, e
+	}
+	if !refresh {
+		return a, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
@@ -78,7 +86,7 @@ func Open() (*App, error) {
 			if ctx.Err() != nil {
 				return
 			}
-			_ = st.RecomputePrices(ctx, prices.Evaluate)
+			_ = st.EnsurePrices(ctx, prices.Fingerprint(), prices.Evaluate)
 			select {
 			case <-ctx.Done():
 				return

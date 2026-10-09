@@ -2,6 +2,7 @@ package gui
 
 import (
 	"math"
+	"time"
 
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
@@ -45,27 +46,75 @@ func aurora(pal palette) func(p *ui.Painter, r ui.Rect) {
 			rad := fr * float32(math.Max(float64(r.W), float64(r.H)))
 			// A blurred circular shadow is a soft glow at the cost of one
 			// draw; stacks of path rings swamp the renderer's path budget.
-			core := rad * 0.45
-			p.Shadow(ui.Rect{X: cx - core, Y: cy - core, W: core * 2, H: core * 2}, core, 0, 0, rad*0.9, 0, c.Alpha(alpha*1.6))
+			softGlow(p, cx, cy, rad, c.Alpha(alpha*1.3))
 		}
 		blob(0.08, 0.10, 0.42, Tomori, a)
 		blob(0.92, 0.05, 0.38, Anon, a*0.9)
 		blob(0.55, 0.55, 0.36, Taki, a*0.7)
 		blob(0.12, 0.95, 0.40, Rana, a*0.8)
 		blob(0.95, 0.90, 0.36, Soyo, a*0.9)
-		// Faint music dust: tiny stars and notes, fixed in place.
+		// Faint music dust: tiny stars, notes and the odd pick, fixed in place.
 		seed := uint32(42)
 		rnd := func() float32 { seed = seed*1664525 + 1013904223; return float32(seed>>8) / float32(1<<24) }
 		for i := 0; i < 18; i++ {
 			x, y := r.X+rnd()*r.W, r.Y+rnd()*r.H
 			col := bandAt(i).Alpha(0.22)
-			if i%3 == 0 {
+			switch {
+			case i%3 == 0:
 				note(p, x, y, 9+rnd()*6, col)
-			} else {
+			case i%5 == 2:
+				pick(p, x, y, 8+rnd()*4, rnd()-0.5, col)
+			default:
 				star(p, x, y, 3+rnd()*4, col)
 			}
 		}
 	}
+}
+
+// pick fills a guitar pick of height h centred at x, y and turned by rot
+// radians: a wide rounded top tapering to a blunt tip, drawn point down.
+func pick(p *ui.Painter, x, y, h, rot float32, c ui.Color) {
+	sn, cs := float32(math.Sin(float64(rot))), float32(math.Cos(float64(rot)))
+	at := func(u, v float32) (float32, float32) {
+		u, v = u*h, v*h
+		return x + u*cs - v*sn, y + u*sn + v*cs
+	}
+	path := new(ui.Path)
+	path.MoveTo(at(0, -0.46))
+	// Down the right side to the tip, then back up the mirrored left side.
+	c1x, c1y := at(0.62, -0.50)
+	c2x, c2y := at(0.38, 0.22)
+	tx, ty := at(0, 0.50)
+	path.CubeTo(c1x, c1y, c2x, c2y, tx, ty)
+	c1x, c1y = at(-0.38, 0.22)
+	c2x, c2y = at(-0.62, -0.50)
+	tx, ty = at(0, -0.46)
+	path.CubeTo(c1x, c1y, c2x, c2y, tx, ty)
+	p.FillPath(path.Close(), c)
+}
+
+// flourish is a small star, note and pick set beside a page title.
+func flourish(c *ui.Context) ui.Element {
+	return ui.Box(c).Size(50, 26).Shrink(0).Draw(func(p *ui.Painter, r ui.Rect) {
+		star(p, r.X+7, r.Y+14, 5, Soyo.Alpha(0.7))
+		note(p, r.X+22, r.Y+21, 14, Tomori.Alpha(0.55))
+		pick(p, r.X+40, r.Y+13, 12, 0.4, Anon.Alpha(0.55))
+		star(p, r.X+31, r.Y+4, 2.5, Taki.Alpha(0.6))
+	})
+}
+
+// hoverFade eases row and pill backgrounds as the pointer comes and goes.
+var hoverFade = ui.ElementTransition{Colors: true, Duration: 140 * time.Millisecond}
+
+// entrance is 0 on the frame el first appears and then eases to 1, so charts
+// grow in when a page opens. (Animate on its own starts at its target, and
+// with reduced motion this jumps straight to 1.)
+func entrance(el ui.Element, d time.Duration) float32 {
+	var target float32 = 1
+	if b := el.Bounds(); b.W == 0 && b.H == 0 {
+		target = 0 // not laid out last frame: new
+	}
+	return el.Animate("entrance", target, d)
 }
 
 // star fills a four-pointed sparkle centered at x, y.
@@ -157,7 +206,7 @@ func segmented(c *ui.Context, pal palette, sel *int, labels ...string) bool {
 	ui.Row(c).Padding(3).Gap(2).Radius(99).Background(pal.well).Children(func() {
 		for i, l := range labels {
 			on := *sel == i
-			b := ui.Row(c.Key(l)).Padding(5, 12).Radius(99).Cursor(ui.CursorPointer).Label(l).Role(ui.RoleButton)
+			b := ui.Row(c.Key(l)).Padding(5, 12).Radius(99).Cursor(ui.CursorPointer).Label(l).Role(ui.RoleButton).Transition(hoverFade)
 			if on {
 				b.Background(pal.pane.Alpha(0.95)).Shadow(0, 1, 3, 0, ui.RGBA(0, 0, 0, 0.12))
 			} else if b.Hovered() {
@@ -196,23 +245,56 @@ func delta(c *ui.Context, pal palette, cur, prev float64) {
 	})
 }
 
-// emptyState is a centered illustration with a line of copy.
-func emptyState(c *ui.Context, pal palette, title, sub string) {
-	ui.Column(c).Grow(1).Center().Gap(10).Padding(24).Children(func() {
-		ui.Box(c).Size(120, 84).Draw(func(p *ui.Painter, r ui.Rect) {
-			// Five notes on a staff, one per member.
-			for i := 0; i < 5; i++ {
-				y := r.Y + 22 + float32(i)*10
-				p.Line(r.X+4, y, r.X+r.W-4, y, 1, pal.faint)
-			}
-			for i, col := range []ui.Color{Tomori, Anon, Rana, Soyo, Taki} {
-				x := r.X + 16 + float32(i)*22
-				y := r.Y + 62 - float32((i*7)%4)*9
-				note(p, x, y, 26, col)
-			}
-			star(p, r.X+r.W-8, r.Y+8, 6, Soyo)
+// art is the drawing above an empty state's copy.
+type art int
+
+const (
+	artStaff art = iota // five notes on a staff: nothing recorded yet
+	artPicks            // five dropped picks: a search found nothing
+	artStage            // a spotlight and stars: nothing yet today
+)
+
+// emptyState is a centered illustration with a title and a line of copy. It
+// rises in gently when it appears.
+func emptyState(c *ui.Context, pal palette, kind art, title, sub string) {
+	band := []ui.Color{Tomori, Anon, Rana, Soyo, Taki}
+	ui.Column(c).FillWidth().Center().Gap(10).Padding(24).
+		Transition(ui.ElementTransition{Duration: 280 * time.Millisecond, Enter: &ui.Motion{Y: 10}}).
+		Children(func() {
+			ui.Box(c).Size(132, 84).Draw(func(p *ui.Painter, r ui.Rect) {
+				switch kind {
+				case artPicks:
+					// One pick per member, scattered with a soft drop shadow.
+					for i, sp := range [][3]float32{{0.15, 0.62, -0.5}, {0.35, 0.36, 0.3}, {0.54, 0.68, -0.15}, {0.73, 0.40, 0.6}, {0.88, 0.70, -0.35}} {
+						x, y := r.X+r.W*sp[0], r.Y+r.H*sp[1]
+						pick(p, x+1, y+2, 24, sp[2], ui.RGBA(0, 0, 0, 0.07))
+						pick(p, x, y, 24, sp[2], band[i].Alpha(0.85))
+					}
+					star(p, r.X+r.W*0.55, r.Y+10, 5, Soyo)
+				case artStage:
+					// An empty stage: one warm spotlight and five stars.
+					cx, cy := r.X+r.W*0.5, r.Y+r.H*0.55
+					softGlow(p, cx, cy, 34, Soyo.Alpha(0.35))
+					star(p, cx, cy, 13, Soyo.Alpha(0.9))
+					for i, sp := range [][3]float32{{0.14, 0.30, 6}, {0.28, 0.80, 4}, {0.80, 0.22, 7}, {0.90, 0.66, 4.5}, {0.66, 0.88, 3.5}} {
+						star(p, r.X+r.W*sp[0], r.Y+r.H*sp[1], sp[2], band[i])
+					}
+				default:
+					// Five notes on a staff, one per member.
+					for i := 0; i < 5; i++ {
+						y := r.Y + 22 + float32(i)*10
+						p.Line(r.X+4, y, r.X+r.W-4, y, 1, pal.faint)
+					}
+					for i, col := range band {
+						x := r.X + 18 + float32(i)*23
+						y := r.Y + 62 - float32((i*7)%4)*9
+						note(p, x, y, 26, col)
+					}
+					star(p, r.X+r.W-8, r.Y+8, 6, Soyo)
+					pick(p, r.X+8, r.Y+10, 12, -0.4, Anon.Alpha(0.7))
+				}
+			})
+			ui.Text(c, title).FontSize(15).FontWeight(700).TextColor(pal.ink).TextAlign(ui.Center)
+			ui.Text(c, sub).FontSize(12).TextColor(pal.muted).TextAlign(ui.Center).MaxWidth(320)
 		})
-		ui.Text(c, title).FontSize(15).FontWeight(700).TextColor(pal.ink)
-		ui.Text(c, sub).FontSize(12).TextColor(pal.muted).TextAlign(ui.Center)
-	})
 }

@@ -37,7 +37,13 @@ func New(st *store.Store, resolver *attrib.Resolver, pricer *pricing.Pricer, par
 	if len(parsers) == 0 {
 		parsers = harness.All()
 	}
-	return &Scanner{st: st, resolver: resolver, pricer: pricer, parsers: parsers, workers: runtime.NumCPU(), interval: 2 * time.Minute, debounce: 250 * time.Millisecond}
+	workers := runtime.NumCPU()
+	// Parsing many large JSONL files concurrently multiplies decoder buffers. A
+	// bounded pool keeps peak RSS predictable while retaining parallel IO.
+	if workers > 4 {
+		workers = 4
+	}
+	return &Scanner{st: st, resolver: resolver, pricer: pricer, parsers: parsers, workers: workers, interval: 2 * time.Minute, debounce: 250 * time.Millisecond}
 }
 func (s *Scanner) Progress() (done, total int) {
 	s.mu.Lock()
@@ -54,14 +60,24 @@ type source struct {
 	size   int64
 }
 
-func (s *Scanner) Scan(ctx context.Context) error {
+func (s *Scanner) Scan(ctx context.Context) (err error) {
 	s.scanMu.Lock()
 	defer s.scanMu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.lastError = err
+		s.mu.Unlock()
+	}()
 	if s.resolver != nil {
 		if e := s.resolver.Refresh(ctx); e != nil {
 			return e
 		}
 	}
+	restoreIndexes, err := s.st.DeferEmptyIndexes(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, restoreIndexes()) }()
 	var work []source
 	var errs []error
 	for _, p := range s.parsers {
@@ -164,18 +180,14 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		errs = append(errs, e)
 	}
 	if s.pricer != nil {
-		if e := s.st.RecomputePrices(ctx, s.pricer.Evaluate); e != nil {
+		if e := s.st.EnsurePrices(ctx, s.pricer.Fingerprint(), s.pricer.Evaluate); e != nil {
 			errs = append(errs, e)
 		}
 	}
 	if e := ctx.Err(); e != nil {
 		errs = append(errs, e)
 	}
-	err := errors.Join(errs...)
-	s.mu.Lock()
-	s.lastError = err
-	s.mu.Unlock()
-	return err
+	return errors.Join(errs...)
 }
 func (s *Scanner) scanOne(ctx context.Context, item source) (*store.Write, error) {
 	h := item.parser.Harness()

@@ -70,6 +70,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -157,6 +158,14 @@ func dataDirCandidates() []string {
 	}
 	if v := os.Getenv("XDG_DATA_HOME"); v != "" {
 		return []string{filepath.Join(v, crushDataDir)}
+	}
+	if runtime.GOOS == "windows" {
+		if v := os.Getenv("LOCALAPPDATA"); v != "" {
+			return []string{filepath.Join(v, crushDataDir)}
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			return []string{filepath.Join(home, "AppData", "Local", crushDataDir)}
+		}
 	}
 	return []string{harness.EnvOr("XDG_DATA_HOME", ".local", "share", crushDataDir)}
 }

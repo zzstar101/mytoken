@@ -94,7 +94,7 @@ func TestDiscover(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	// Four ui_messages.json task files (one of them malformed) plus one Cline
+	// Five ui_messages.json task files (one of them malformed) plus one Cline
 	// CLI session file. _index.json, task_metadata.json,
 	// api_conversation_history.json and history_item.json are not sources.
 	want := map[string]string{
@@ -104,6 +104,7 @@ func TestDiscover(t *testing.T) {
 		filepath.Join(fixtureRoot(t), "saoudrizwan.claude-dev", "tasks", "1767225600000", "ui_messages.json"): "json",
 		filepath.Join(fixtureRoot(t), "saoudrizwan.claude-dev", "tasks", "1767225700000", "ui_messages.json"): "json",
 		filepath.Join(fixtureRoot(t), "saoudrizwan.claude-dev", "tasks", "1767225800000", "ui_messages.json"): "json",
+		filepath.Join(fixtureRoot(t), "saoudrizwan.claude-dev", "tasks", "1767225900000", "ui_messages.json"): "json",
 	}
 	if len(srcs) != len(want) {
 		var got []string
@@ -152,25 +153,67 @@ func TestMissingRoot(t *testing.T) {
 // tree. Cline's own SDK writes a DISJOINT tokensIn (cache already removed) for
 // Anthropic-style providers, so those requests keep tokensIn verbatim; the
 // OpenAI-style task subtracts the cache buckets from tokensIn.
+//
+// Task 1767225900000 is the subagent/deleted-API case: its totals are exactly
+// what Cline's getApiMetrics reports for the same array — the api_req_started
+// requests plus the subagent_usage aggregates plus the deleted_api_reqs
+// aggregate, with the say:"subagent" status message and the malformed payloads
+// contributing nothing.
 func TestParseTotals(t *testing.T) {
 	events, sessions := parseAll(t, NewWithRoot(fixtureRoot(t)))
-	if len(events) != 8 {
+	if len(events) != 13 {
 		var keys []string
 		for _, e := range events {
 			keys = append(keys, e.DedupKey)
 		}
-		t.Fatalf("got %d events, want 8: %v", len(events), keys)
+		t.Fatalf("got %d events, want 13: %v", len(events), keys)
 	}
-	if len(sessions) != 5 {
-		t.Fatalf("got %d sessions, want 5", len(sessions))
+	if len(sessions) != 7 {
+		t.Fatalf("got %d sessions, want 7", len(sessions))
 	}
 	got := sumDedup(events)
-	want := model.Tokens{Input: 23957, Output: 2441, CacheRead: 5850, CacheWrite: 700}
+	want := model.Tokens{Input: 37257, Output: 4311, CacheRead: 6350, CacheWrite: 900}
 	if got != want {
 		t.Errorf("dedup totals = %+v, want %+v", got, want)
 	}
 	if sum(events) != want {
 		t.Errorf("raw totals = %+v, want %+v (fixture must not contain duplicates)", sum(events), want)
+	}
+}
+
+// TestTaskTotals pins the per-task split of the aggregate above, which is how
+// the session tree rolls the subagent usage up into its task.
+func TestTaskTotals(t *testing.T) {
+	events, _ := parseAll(t, NewWithRoot(fixtureRoot(t)))
+	perSession := map[string]model.Tokens{}
+	for _, e := range events {
+		t := perSession[e.SessionID]
+		perSession[e.SessionID] = t.Add(e.Tokens)
+	}
+	cases := []struct {
+		session string
+		want    model.Tokens
+	}{
+		// Two api_req_started requests plus the deleted_api_reqs aggregate,
+		// which is the task's own session because the requests it stands for
+		// belonged to the task.
+		{"1767225900000", model.Tokens{Input: 5300, Output: 670, CacheRead: 500, CacheWrite: 200}},
+		// Two subagent_usage aggregates; the say:"subagent" status message
+		// carries the same numbers and must not be counted on top of them.
+		{"1767225900000:subagents", model.Tokens{Input: 8000, Output: 1200, CacheRead: 0, CacheWrite: 0}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.session, func(t *testing.T) {
+			if got := perSession[tc.session]; got != tc.want {
+				t.Errorf("%s totals = %+v, want %+v", tc.session, got, tc.want)
+			}
+		})
+	}
+	// Task + subagent session is exactly what Cline's getApiMetrics reports for
+	// this task's array.
+	rollup := perSession["1767225900000"].Add(perSession["1767225900000:subagents"])
+	if want := (model.Tokens{Input: 13300, Output: 1870, CacheRead: 500, CacheWrite: 200}); rollup != want {
+		t.Errorf("task rollup = %+v, want %+v", rollup, want)
 	}
 }
 
@@ -223,6 +266,26 @@ func TestTokenClasses(t *testing.T) {
 			name: "cli session manifest model fallback",
 			key:  "cline-cli:9f1c2b3a-1111-4222-8333-444455556666:m3",
 			want: model.Tokens{Input: 7700, Output: 200, CacheRead: 100, CacheWrite: 400},
+		},
+		{
+			// spawn_agent aggregate, attributed to the task's subagent session.
+			// Cline writes cacheWrites/cacheReads as 0 for it, and the
+			// Anthropic-style task model leaves tokensIn untouched.
+			name: "subagent usage aggregate",
+			key:  "cline:1767225900000:subagents:1767225902000",
+			want: model.Tokens{Input: 5000, Output: 800, CacheRead: 0, CacheWrite: 0},
+		},
+		{
+			name: "second subagent usage aggregate",
+			key:  "cline:1767225900000:subagents:1767225905000",
+			want: model.Tokens{Input: 3000, Output: 400, CacheRead: 0, CacheWrite: 0},
+		},
+		{
+			// Checkpoint-restore aggregate of requests that were deleted from
+			// the array: billed, and no longer present anywhere else.
+			name: "deleted api reqs aggregate",
+			key:  "cline:1767225900000:1767225908000",
+			want: model.Tokens{Input: 4000, Output: 500, CacheRead: 300, CacheWrite: 200},
 		},
 	}
 	for _, tc := range cases {
@@ -329,6 +392,73 @@ func TestEventFields(t *testing.T) {
 	}
 	if sb.Title != "" {
 		t.Errorf("broken-task title = %q, want empty", sb.Title)
+	}
+}
+
+// TestSubagentSession pins how spawn_agent usage nests: one synthetic child
+// session per task, whose ParentID is the task and whose window is the span of
+// the subagent_usage entries rather than the whole task.
+func TestSubagentSession(t *testing.T) {
+	_, sessions := parseAll(t, NewWithRoot(fixtureRoot(t)))
+
+	// The event carries the child session id and the task as its parent, which
+	// is what makes the store create the task's session row and roll the
+	// subagent tokens up into it.
+	events, _ := parseAll(t, NewWithRoot(fixtureRoot(t)))
+	for _, key := range []string{"cline:1767225900000:subagents:1767225902000", "cline:1767225900000:subagents:1767225905000"} {
+		ev, ok := eventByDedupKey(events, key)
+		if !ok {
+			t.Fatalf("no event with DedupKey %q", key)
+		}
+		if ev.SessionID != "1767225900000:subagents" {
+			t.Errorf("%s: SessionID = %q, want %q", key, ev.SessionID, "1767225900000:subagents")
+		}
+		if ev.ParentID != "1767225900000" {
+			t.Errorf("%s: ParentID = %q, want the task id", key, ev.ParentID)
+		}
+		if ev.ProjectPath != "/home/user/proj-gamma" {
+			t.Errorf("%s: ProjectPath = %q, want /home/user/proj-gamma", key, ev.ProjectPath)
+		}
+		if ev.CostUSD == nil || *ev.CostUSD == 0 {
+			t.Errorf("%s: CostUSD = %v, want the aggregate's cost", key, ev.CostUSD)
+		}
+	}
+	// A plain request of the same task stays on the task session.
+	if ev, _ := eventByDedupKey(events, "cline:1767225900000:1767225908000"); ev.SessionID != "1767225900000" ||
+		ev.ParentID != "" {
+		t.Errorf("deleted_api_reqs event = %+v, want it on the task session", ev)
+	}
+
+	sub, ok := sessionByID(sessions, "1767225900000:subagents")
+	if !ok {
+		t.Fatal("subagent session missing")
+	}
+	if sub.ParentID != "1767225900000" {
+		t.Errorf("parentID = %q, want 1767225900000", sub.ParentID)
+	}
+	if sub.Title != "Subagents" {
+		t.Errorf("title = %q, want Subagents", sub.Title)
+	}
+	if sub.Project != "/home/user/proj-gamma" {
+		t.Errorf("project = %q, want /home/user/proj-gamma", sub.Project)
+	}
+	if sub.StartedAt.UnixMilli() != 1767225902000 || sub.UpdatedAt.UnixMilli() != 1767225905000 {
+		t.Errorf("window = %v..%v, want the subagent_usage span", sub.StartedAt, sub.UpdatedAt)
+	}
+	if sub.Harness != model.Cline {
+		t.Errorf("harness = %v", sub.Harness)
+	}
+
+	// The task's own window still covers every entry of the file.
+	task, ok := sessionByID(sessions, "1767225900000")
+	if !ok {
+		t.Fatal("task session missing")
+	}
+	if task.Title != "Orchestrate the migration" {
+		t.Errorf("title = %q", task.Title)
+	}
+	if task.StartedAt.UnixMilli() != 1767225900000 || task.UpdatedAt.UnixMilli() != 1767225910000 {
+		t.Errorf("window = %v..%v", task.StartedAt, task.UpdatedAt)
 	}
 }
 
