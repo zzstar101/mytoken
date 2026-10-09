@@ -1,7 +1,7 @@
 {
   "name": "mytoken",
   "identifier": "dev.zzstar.mytoken",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "copyright": "© 2026 zzstar101",
   "icon": "resources/icon.png",
   "main": ".",

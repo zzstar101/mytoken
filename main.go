@@ -37,6 +37,25 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] != "--hidden" {
 		os.Exit(cli.Run(os.Args[1:]))
 	}
+
+	// One instance at a time: a second launch hands its command line over to
+	// this process and exits, so the database is only ever opened once.
+	var main, panel *mygo.Window
+	openMain := func() {
+		if main == nil {
+			return // another instance arrived before the windows exist
+		}
+		if panel != nil {
+			panel.Hide()
+		}
+		main.Show()
+		main.Focus()
+	}
+	if !mygo.App.RequestSingleInstanceLock() {
+		return
+	}
+	mygo.App.OnSecondInstance(func([]string, string) { openMain() })
+
 	a, err := app.Open()
 	if err != nil {
 		log.Fatalf("mytoken: %v", err)
@@ -52,7 +71,6 @@ func main() {
 	}()
 
 	dataDir, _ := paths.DataDir()
-	var main, panel *mygo.Window
 	var state *gui.State
 
 	// Both windows show the same state; a change redraws both.
@@ -64,13 +82,6 @@ func main() {
 		if panel != nil {
 			panel.Update(func() {})
 		}
-	}
-	openMain := func() {
-		if panel != nil {
-			panel.Hide()
-		}
-		main.Show()
-		main.Focus()
 	}
 	hooks := gui.Hooks{
 		Progress: a.Scanner.Progress,
@@ -96,6 +107,10 @@ func main() {
 
 	mygo.App.WhenReady(func() {
 		hidden := mygo.App.WasOpenedAtLogin() || len(os.Args) > 1
+		// The state must exist before the first window: a window that is
+		// not hidden builds and draws its content synchronously inside
+		// NewWindow, so a nil state panics on that first frame.
+		state = gui.NewState(a.Query, hooks, post)
 		main = mygo.NewWindow(mygo.WindowOptions{
 			Title:         "MyToken!!!!!",
 			Width:         1280,
@@ -130,7 +145,6 @@ func main() {
 		})
 		panel.OnBlur(func() { panel.Hide() })
 
-		state = gui.NewState(a.Query, hooks, post)
 		state.Start()
 
 		tray, err := mygo.NewTray(mygo.TrayOptions{Icon: trayIcon(), IconIsTemplate: true, ToolTip: "MyToken!!!!!"})
