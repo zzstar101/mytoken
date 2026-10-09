@@ -139,19 +139,13 @@ func (s *State) scanStatus(c *ui.Context, pal palette) {
 	})
 }
 
-// pageTitles are the pages' display titles, set in the serif in either
-// language, like a magazine's section heads.
-var pageTitles = map[string]string{"overview": "Overview", "sessions": "Sessions", "ranking": "Rankings", "projects": "Projects", "settings": "Settings"}
-
 // pageHeader is a page's title with a kicker above it and optional
 // controls on the right.
 func pageHeader(c *ui.Context, pal palette, page, sub string, right func()) {
 	ui.Row(c).Padding(12, 6, 6, 6).AlignItems(ui.End).Gap(12).DragWindow().Children(func() {
 		ui.Column(c).Gap(0).Children(func() {
 			k := tr(page)
-			if Lang() != "zh" { // the serif title already says it
-				k = ""
-			}
+			k = "" // the title says it
 			if sub != "" {
 				if k != "" {
 					k += "  ·  "
@@ -159,7 +153,7 @@ func pageHeader(c *ui.Context, pal palette, page, sub string, right func()) {
 				k += sub
 			}
 			kicker(c, pal, k)
-			ui.Text(c, pageTitles[page]).Font(serif).Italic().FontSize(46).TextColor(pal.ink).LetterSpacing(-0.8).SingleLine()
+			ui.Text(c, tr(page)).Font(display).FontSize(30).FontWeight(750).TextColor(pal.ink).LetterSpacing(-0.6).SingleLine().Margin(4, 0, 0, 0)
 		})
 		ui.Spacer(c)
 		if right != nil {
@@ -297,7 +291,7 @@ func classLegend(c *ui.Context, pal palette) {
 }
 
 // hero is the overview's headline: the span's tokens counting up in large
-// serif, three more figures beside them, and the days drawn as one melody
+// type, three more figures beside them, and the days drawn as one melody
 // along the bottom.
 func (s *State) hero(c *ui.Context, pal palette, ov Overview) {
 	t, pv := ov.Totals, ov.Prev
@@ -308,7 +302,7 @@ func (s *State) hero(c *ui.Context, pal palette, ov Overview) {
 					dot(c, Tomori, 7)
 					kicker(c, pal, tr("tokens")+"  ·  "+tr(spanKeys[clampSpan(s.span)]))
 				})
-				countUp(c, pal, float64(t.Tokens.Total()), func(v float64) string { return fmtTokens(int64(v)) }, 84)
+				countUp(c, pal, float64(t.Tokens.Total()), func(v float64) string { return fmtTokens(int64(v)) }, 72)
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Height(18).Children(func() {
 					delta(c, pal, float64(t.Tokens.Total()), float64(pv.Tokens.Total()))
 					ui.Text(c, fmtInt(t.Tokens.Total())+" tokens").FontSize(11).TextColor(pal.muted).FontFeatures("tnum")

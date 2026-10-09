@@ -33,7 +33,7 @@ func (s *State) rankingPage(c *ui.Context, pal palette) {
 				pane(c, pal).Padding(40).Children(func() { emptyState(c, pal, artStaff, tr("noData"), tr("noDataSub")) })
 				return
 			}
-			// The top three on a stage: lit steps with serif numerals, then
+			// The top three on a stage: lit steps with big numerals, then
 			// everyone in a table.
 			pane(c, pal).Clip().Padding(22, 26, 0, 26).Children(func() {
 				ui.Row(c).Gap(18).AlignItems(ui.End).Children(func() {
@@ -76,7 +76,7 @@ func (s *State) rankTable(c *ui.Context, pal palette, bs []query.Bucket) {
 			row.Background(pal.hover)
 		}
 		row.Children(func() {
-			num := ui.Text(c, fmt.Sprint(i+1)).Font(serif).Italic().FontSize(20).TextColor(pal.muted).Width(22)
+			num := ui.Text(c, fmt.Sprint(i+1)).Font(display).FontSize(15).FontWeight(700).TextColor(pal.muted).Width(22).FontFeatures("tnum")
 			if i < 3 {
 				num.TextColor(bandAt(i))
 			}
@@ -137,7 +137,7 @@ func (s *State) projectsPage(c *ui.Context, pal palette) {
 					}
 					card.Children(func() {
 						ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-							ui.Text(c, fmt.Sprintf("No. %02d", i+1)).Font(serif).Italic().FontSize(16).TextColor(col)
+							ui.Text(c, fmt.Sprintf("%02d", i+1)).Font(display).FontSize(13).FontWeight(750).TextColor(col).FontFeatures("tnum")
 							ui.Spacer(c)
 							ui.Text(c, fmtPct(share)).FontSize(11).FontWeight(650).TextColor(pal.muted).FontFeatures("tnum")
 						})
@@ -235,7 +235,7 @@ func (s *State) settingsPage(c *ui.Context, pal palette) {
 					kicker(c, pal, tr("about"))
 					logo(c, pal, 30)
 					ui.Text(c, "v0.1 · MIT").FontSize(12).TextColor(pal.muted).FontFeatures("tnum")
-					ui.Text(c, "春日影は、もう演奏しない").Font(serif).Italic().FontSize(15).TextColor(pal.ink.Alpha(0.8))
+					ui.Text(c, "春日影は、もう演奏しない").FontSize(13.5).FontWeight(600).TextColor(pal.ink.Alpha(0.8))
 					ui.Text(c, "Built with MyGo").FontSize(11).TextColor(pal.muted)
 				})
 			})
@@ -261,7 +261,7 @@ func exists(p string) bool {
 }
 
 // podiumPlace is one of the top three: name and figures over a lit step
-// whose height follows the place, its numeral painted large in serif.
+// whose height follows the place, its numeral painted large.
 func (s *State) podiumPlace(c *ui.Context, pal palette, b query.Bucket, i int) {
 	col := bandAt(i)
 	step := []float32{96, 72, 56}[i]
@@ -298,7 +298,7 @@ func (s *State) podiumPlace(c *ui.Context, pal palette, b query.Bucket, i int) {
 			}
 			p.FillGradient(sr, ui.LinearGradient{From: col.Alpha(0.30), To: col.Alpha(0.04), Angle: 180}, 14)
 			p.Fill(ui.Rect{X: sr.X + 14, Y: sr.Y, W: sr.W - 28, H: 2}, col.Alpha(0.9), 1)
-			n := ui.Span{Text: fmt.Sprint(i + 1), Size: []float32{60, 50, 40}[i], Font: serif, Italic: true, Color: col.Alpha(0.9)}
+			n := ui.Span{Text: fmt.Sprint(i + 1), Size: []float32{60, 50, 40}[i], Font: display, Weight: 800, Color: col.Alpha(0.85)}
 			w, _ := p.MeasureText(0, n)
 			p.Clip(r, 0, func() { p.RichText(sr.X+(sr.W-w)/2, sr.Y+4, 0, n) })
 		})

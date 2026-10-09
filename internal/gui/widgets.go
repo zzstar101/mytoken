@@ -33,44 +33,20 @@ var (
 	icSparkle  = icon(`<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>`)
 )
 
-// aurora paints the window's backdrop as a darkened live house: a wash of
-// house light from above, five stage beams in the member colors and a warm
-// spill on the floor, which the glass panes above refract.
+// aurora paints the window's backdrop: a calm field with a few large, soft
+// pools of the members' colors for the glass panes above to pick up.
 func aurora(pal palette) func(p *ui.Painter, r ui.Rect) {
 	return func(p *ui.Painter, r ui.Rect) {
 		p.Fill(r, pal.base, 0)
 		big := float32(math.Max(float64(r.W), float64(r.H)))
-		beam, wash, floor := float32(0.10), float32(0.10), float32(0.16)
+		a := float32(0.16)
 		if pal.dark {
-			beam, wash, floor = 0.20, 0.12, 0.20
+			a = 0.22
 		}
-		// House light: a broad haze over the top edge.
-		softGlow(p, r.X+r.W*0.5, r.Y-big*0.18, big*0.55, Taki.Mix(Tomori, 0.5).Alpha(wash))
-		// Five beams fanning down from rigs above the window, crossing.
-		for i, b := range [][3]float32{{0.10, 0.34, 0}, {0.30, 0.62, 1}, {0.52, 0.18, 4}, {0.72, 0.82, 3}, {0.92, 0.50, 2}} {
-			top, bottom := r.X+r.W*b[0], r.X+r.W*b[1]
-			col := bandAt(int(b[2]))
-			half := r.W * 0.012
-			spread := r.W * (0.13 + 0.02*float32(i%2))
-			// Three nested cones for a soft-edged beam.
-			for _, k := range []float32{1, 0.66, 0.36} {
-				path := new(ui.Path).MoveTo(top-half*k, r.Y-4).LineTo(top+half*k, r.Y-4).
-					LineTo(bottom+spread*k, r.Y+r.H).LineTo(bottom-spread*k, r.Y+r.H).Close()
-				p.FillPathGradient(path, ui.LinearGradient{From: col.Alpha(beam / 3), To: col.Alpha(0), Angle: 180, End: 0.9})
-			}
-		}
-		// Spill on the stage floor.
-		softGlow(p, r.X+r.W*0.18, r.Y+r.H*1.05, big*0.32, Anon.Alpha(floor*0.7))
-		softGlow(p, r.X+r.W*0.62, r.Y+r.H*1.08, big*0.36, Tomori.Alpha(floor*0.8))
-		softGlow(p, r.X+r.W*0.98, r.Y+r.H*0.92, big*0.26, Soyo.Alpha(floor*0.6))
-		// A few rig lights twinkling in the dark.
-		if pal.dark {
-			seed := uint32(7)
-			rnd := func() float32 { seed = seed*1664525 + 1013904223; return float32(seed>>8) / float32(1<<24) }
-			for i := 0; i < 14; i++ {
-				star(p, r.X+rnd()*r.W, r.Y+rnd()*r.H*0.4, 1.2+rnd()*2.4, ui.RGBA(255, 255, 255, 0.10+rnd()*0.25))
-			}
-		}
+		softGlow(p, r.X+r.W*0.08, r.Y+r.H*0.02, big*0.42, Tomori.Alpha(a))
+		softGlow(p, r.X+r.W*0.92, r.Y+r.H*0.10, big*0.38, Taki.Alpha(a*0.8))
+		softGlow(p, r.X+r.W*0.78, r.Y+r.H*1.02, big*0.40, Anon.Alpha(a*0.7))
+		softGlow(p, r.X+r.W*0.20, r.Y+r.H*0.98, big*0.30, Rana.Alpha(a*0.5))
 	}
 }
 
@@ -183,11 +159,11 @@ func chipOn(c *ui.Context, pal palette, text string, col ui.Color) ui.Element {
 	})
 }
 
-// logo sets "MyToken" in the display serif, followed by five exclamation
+// logo sets "MyToken" in the display face, followed by five exclamation
 // marks drawn as the band: one bar and dot per member.
 func logo(c *ui.Context, pal palette, size float32) ui.Element {
 	return ui.Row(c).AlignItems(ui.End).Gap(size * 0.12).Shrink(0).Children(func() {
-		ui.Text(c, "MyToken").Font(serif).Italic().FontSize(size * 1.18).TextColor(pal.ink).LetterSpacing(-0.3).SingleLine()
+		ui.Text(c, "MyToken").Font(display).FontSize(size * 1.06).FontWeight(800).TextColor(pal.ink).LetterSpacing(-0.4).SingleLine()
 		bangs(c, size*0.86, false).Margin(0, 0, size*0.26, 0)
 	})
 }
@@ -217,21 +193,21 @@ func bangs(c *ui.Context, h float32, live bool) ui.Element {
 	})
 }
 
-// bigNumber is a large figure in the display serif, its unit (万, M, %…)
+// bigNumber is a large figure in the display face, its unit (万, M, %…)
 // set small beside it.
 func bigNumber(c *ui.Context, pal palette, s string, size float32) ui.Element {
 	return ui.RichText(c, figure(pal, s, size)...).SingleLine()
 }
 
 // figure splits a formatted value into spans: a leading currency sign and
-// the digits in the serif, a trailing unit small in the interface face.
+// the digits in the display face, a trailing unit small in the interface face.
 func figure(pal palette, s string, size float32) []ui.Span {
 	lead, num, unit := splitFigure(s)
 	var spans []ui.Span
 	if lead != "" {
-		spans = append(spans, ui.Span{Text: lead, Font: serif, Size: size * 0.66, Color: pal.muted})
+		spans = append(spans, ui.Span{Text: lead, Font: display, Size: size * 0.6, Weight: 600, Color: pal.muted})
 	}
-	spans = append(spans, ui.Span{Text: num, Font: serif, Size: size, Color: pal.ink, LetterSpacing: -0.02 * size})
+	spans = append(spans, ui.Span{Text: num, Font: display, Size: size, Weight: 700, Color: pal.ink, LetterSpacing: -0.03 * size, Features: "tnum"})
 	if unit != "" {
 		spans = append(spans, ui.Span{Text: " " + unit, Size: size * 0.34, Weight: 650, Color: pal.muted})
 	}

@@ -94,7 +94,7 @@ func (s *State) sessionRow(c *ui.Context, pal palette, r query.SessionRow, selec
 			})
 		})
 		ui.Column(c).Gap(1).AlignItems(ui.End).Shrink(0).Children(func() {
-			bigNumber(c, pal, fmtTokens(r.Tokens.Total()), 21)
+			bigNumber(c, pal, fmtTokens(r.Tokens.Total()), 17)
 			ui.Text(c, fmtAgo(s.Hooks.Now(), r.UpdatedAt)).FontSize(10.5).TextColor(pal.muted).FontFeatures("tnum")
 		})
 	})

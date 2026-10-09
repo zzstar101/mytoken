@@ -17,7 +17,7 @@ func (s *State) TrayView(c *ui.Context) {
 			ui.Row(c).AlignItems(ui.Center).Children(func() {
 				logo(c, pal, 17)
 				ui.Spacer(c)
-				ui.Text(c, s.Hooks.Now().Format("Mon · Jan 2")).Font(serif).Italic().FontSize(14).TextColor(pal.muted)
+				ui.Text(c, s.Hooks.Now().Format("Mon, Jan 2")).FontSize(11.5).FontWeight(600).TextColor(pal.muted)
 			})
 			// Today, large.
 			ui.Column(c).Gap(6).Children(func() {

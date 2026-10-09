@@ -7,7 +7,6 @@ package gui
 
 import (
 	"embed"
-	"sync"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zzstar/mytoken/internal/model"
@@ -129,26 +128,9 @@ func harnessBadge(c *ui.Context, h model.Harness, box float32) ui.Element {
 	})
 }
 
-// serif is the display face for big figures and page titles: Instrument
-// Serif (SIL OFL, see fonts/OFL.txt), embedded so it looks the same anywhere.
-const serif = "Instrument Serif"
-
-//go:embed fonts/*.ttf
-var fontFS embed.FS
-
-var fontsOnce sync.Once
-
-// loadFonts registers the embedded faces once. A failure only means the
-// system serif stands in.
-func loadFonts() {
-	fontsOnce.Do(func() {
-		for _, name := range []string{"InstrumentSerif-Regular.ttf", "InstrumentSerif-Italic.ttf"} {
-			if b, err := fontFS.ReadFile("fonts/" + name); err == nil {
-				_ = ui.RegisterFont(b, serif)
-			}
-		}
-	})
-}
+// display is the face for big figures and page titles: the system's display
+// cut (SF Pro Display on macOS), falling back to the interface face.
+const display = "SF Pro Display, system-ui"
 
 // palette is one appearance's colors beyond the ui.Theme.
 type palette struct {
@@ -168,7 +150,7 @@ func paletteFor(dark bool) palette {
 	if dark {
 		return palette{
 			dark:   true,
-			base:   ui.Hex("#0B0A10"),
+			base:   ui.Hex("#0F0F14"),
 			ink:    ui.Hex("#F4F2F8"),
 			muted:  ui.RGBA(240, 236, 250, 0.54),
 			faint:  ui.RGBA(255, 255, 255, 0.075),
@@ -181,14 +163,14 @@ func paletteFor(dark bool) palette {
 		}
 	}
 	return palette{
-		base:   ui.Hex("#F2EFE9"),
+		base:   ui.Hex("#F3F4F7"),
 		ink:    ui.Hex("#17161C"),
 		muted:  ui.RGBA(23, 22, 28, 0.55),
 		faint:  ui.RGBA(23, 22, 28, 0.075),
 		well:   ui.RGBA(23, 22, 28, 0.05),
 		pane:   ui.RGBA(255, 255, 255, 0.56),
 		edge:   ui.RGBA(255, 255, 255, 0.80),
-		lift:   ui.RGBA(60, 45, 30, 0.08),
+		lift:   ui.RGBA(30, 35, 60, 0.07),
 		hover:  ui.RGBA(23, 22, 28, 0.04),
 		raised: ui.RGBA(255, 255, 255, 0.92),
 	}
@@ -196,7 +178,6 @@ func paletteFor(dark bool) palette {
 
 // applyTheme sets MyToken's theme on c and returns its palette.
 func applyTheme(c *ui.Context) palette {
-	loadFonts()
 	base := c.Theme()
 	pal := paletteFor(base.Dark)
 	t := *base
