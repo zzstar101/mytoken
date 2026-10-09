@@ -7,9 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pelletier/go-toml/v2"
-	"github.com/zzstar101/mytoken/internal/model"
-	"github.com/zzstar101/mytoken/internal/store"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +14,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
+	"github.com/zzstar101/mytoken/internal/model"
+	"github.com/zzstar101/mytoken/internal/sqlitedsn"
+	"github.com/zzstar101/mytoken/internal/store"
 )
 
 type matchKey struct {
@@ -324,8 +326,7 @@ func (r *Resolver) loadCC(ctx context.Context) {
 		return
 	}
 	if r.cc == nil {
-		u := url.URL{Scheme: "file", Path: r.ccPath, RawQuery: "mode=ro"}
-		r.cc, e = sql.Open("sqlite", u.String())
+		r.cc, e = sql.Open("sqlite", sqlitedsn.URI(r.ccPath, "mode=ro"))
 		if e != nil {
 			return
 		}

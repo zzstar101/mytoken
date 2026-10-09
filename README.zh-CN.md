@@ -122,20 +122,23 @@ Linux 是 `~/.config/<编辑器>/User/globalStorage`（或 `$XDG_CONFIG_HOME/…
 
 ### macOS（磁盘映像）
 
-从 [Releases](../../releases) 下载 `mytoken <版本>.dmg`，打开后把 **MyToken!!!!!** 拖进
+从 [Releases](../../releases) 下载 `mytoken-<版本>-darwin-universal.dmg`，打开后把 **MyToken!!!!!** 拖进
 *应用程序*。这个 bundle 是 ad-hoc 签名、未公证的，所以第一次启动需要右键 → *打开*（或者执行
 `xattr -dr com.apple.quarantine /Applications/mytoken.app`）。应用文件名是 `mytoken.app`，Finder
 和菜单栏显示 `MyToken!!!!!`。
 
 ### Windows（安装包）
 
-下载 `mytoken Setup <版本>.exe` 并运行。安装包未签名，首次运行 SmartScreen 会要求 *更多信息* →
+下载 `mytoken-<版本>-windows-amd64-setup.exe`（ARM 选 `-arm64-`） 并运行。安装包未签名，首次运行 SmartScreen 会要求 *更多信息* →
 *仍要运行*。它会安装 `mytoken.exe`、开始菜单项和卸载程序。
 
 ### Linux（安装脚本）
 
 ```sh
-curl -fsSL https://github.com/zzstar101/mytoken/releases/latest/download/install.sh | sh
+v=0.1.0 arch=amd64   # or arm64
+curl -fLO https://github.com/zzstar101/mytoken/releases/download/v$v/mytoken-$v-linux-$arch.tar.gz
+curl -fLO https://github.com/zzstar101/mytoken/releases/download/v$v/install.sh
+sh install.sh mytoken-$v-linux-$arch.tar.gz
 ```
 
 按用户安装，不需要 root：应用放在 `~/.local/mytoken.app`，`mytoken` 命令放在 `~/.local/bin`，并写入

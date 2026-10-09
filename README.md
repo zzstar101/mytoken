@@ -137,21 +137,24 @@ the app against a scratch index); delete the directory to reset.
 
 ### macOS (disk image)
 
-Download `mytoken <version>.dmg` from [Releases](../../releases), open it and drag **MyToken!!!!!**
+Download `mytoken-<version>-darwin-universal.dmg` from [Releases](../../releases), open it and drag **MyToken!!!!!**
 into *Applications*. The bundle is ad-hoc signed rather than notarized, so the first launch needs
 right-click → *Open* (or `xattr -dr com.apple.quarantine /Applications/mytoken.app`). The app's file
 name is `mytoken.app`; Finder and the menu bar show `MyToken!!!!!`.
 
 ### Windows (installer)
 
-Download `mytoken Setup <version>.exe` and run it. The installer is unsigned, so SmartScreen asks
+Download `mytoken-<version>-windows-amd64-setup.exe` (or `-arm64-`) and run it. The installer is unsigned, so SmartScreen asks
 for *More info* → *Run anyway* the first time. It installs `mytoken.exe`, a Start Menu entry and the
 uninstaller.
 
 ### Linux (install script)
 
 ```sh
-curl -fsSL https://github.com/zzstar101/mytoken/releases/latest/download/install.sh | sh
+v=0.1.0 arch=amd64   # or arm64
+curl -fLO https://github.com/zzstar101/mytoken/releases/download/v$v/mytoken-$v-linux-$arch.tar.gz
+curl -fLO https://github.com/zzstar101/mytoken/releases/download/v$v/install.sh
+sh install.sh mytoken-$v-linux-$arch.tar.gz
 ```
 
 Installs per user, without root: the app in `~/.local/mytoken.app`, the `mytoken` command in

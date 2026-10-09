@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/zzstar101/mytoken/internal/pricing"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
+
+	"github.com/zzstar101/mytoken/internal/pricing"
+	"github.com/zzstar101/mytoken/internal/sqlitedsn"
 )
 
 func ccColumns(ctx context.Context, tx *sql.Tx, table string) (map[string]bool, error) {
@@ -34,10 +35,8 @@ func importCCSwitch(ctx context.Context, path string) ([]PriceRule, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, err
 	}
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
 	q := url.Values{"mode": {"ro"}, "_pragma": {"busy_timeout(1500)"}}
-	u.RawQuery = q.Encode()
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedsn.URI(path, q.Encode()))
 	if err != nil {
 		return nil, err
 	}

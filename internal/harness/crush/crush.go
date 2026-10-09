@@ -76,6 +76,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zzstar101/mytoken/internal/sqlitedsn"
+
 	_ "modernc.org/sqlite"
 
 	"github.com/zzstar101/mytoken/internal/harness"
@@ -408,8 +410,7 @@ func openWithPragmas(path string, params ...string) (*sql.DB, error) {
 		}
 		q.Set(kv[0], kv[1])
 	}
-	u := url.URL{Scheme: "file", Path: abs, RawQuery: q.Encode()}
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedsn.URI(abs, q.Encode()))
 	if err != nil {
 		return nil, err
 	}

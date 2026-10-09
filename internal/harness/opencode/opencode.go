@@ -71,6 +71,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zzstar101/mytoken/internal/sqlitedsn"
+
 	_ "modernc.org/sqlite"
 
 	"github.com/zzstar101/mytoken/internal/harness"
@@ -287,16 +289,12 @@ func openReadOnly(path string) (*sql.DB, error) {
 	if err != nil {
 		abs = path
 	}
-	u := url.URL{
-		Scheme: "file",
-		Path:   abs,
-		RawQuery: url.Values{
-			"mode":      {"ro"},
-			"immutable": {"0"},
-			"_pragma":   {fmt.Sprintf("busy_timeout(%d)", busyTimeoutMS)},
-		}.Encode(),
+	q := url.Values{
+		"mode":      {"ro"},
+		"immutable": {"0"},
+		"_pragma":   {fmt.Sprintf("busy_timeout(%d)", busyTimeoutMS)},
 	}
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedsn.URI(abs, q.Encode()))
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,8 @@
 # docs/github-actions.md describes. This project has no `updates`
 # configuration (which would need an update-signing key), so `mygo build
 # -upload` has nowhere to upload to; the files are attached with `gh release
-# upload` instead and the draft is published by hand from the GitHub UI.
+# upload` instead, by one publish job once every build is done (parallel
+# uploads of same-named files race), which then publishes the release.
 #
 # Signing needs no secrets: macOS bundles are ad-hoc signed by default
 # (`macos.signingIdentity` is "-") and the Windows installer is unsigned.
@@ -87,18 +88,35 @@ jobs:
             build/*/*.deb
             build/*/*Setup*.exe
             build/*/install.sh
-      - name: Attach the files to the draft release
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+      # Each platform directory carries its own installer and install.sh, and
+      # a two-arch build gives them the same names, so the files are renamed
+      # after their platform directory and one install.sh is kept.
+      - name: Attach the files and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          files=()
-          for pattern in 'build/*/*.dmg' 'build/*/*.tar.gz' 'build/*/*.deb' 'build/*/*Setup*.exe' 'build/*/install.sh'; do
-            for f in $pattern; do
-              [ -e "$f" ] && files+=("$f")
-            done
-          done
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "::error::no release artifacts were produced"
-            exit 1
-          fi
-          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+          set -euo pipefail
+          mkdir -p out
+          version="${GITHUB_REF_NAME#v}"
+          while IFS= read -r -d '' f; do
+            base="$(basename "$f")"
+            plat="$(basename "$(dirname "$f")")"
+            case "$base" in
+              install.sh) [ -e out/install.sh ] || cp "$f" out/install.sh ;;
+              *Setup*.exe) cp "$f" "out/mytoken-${version}-${plat}-setup.exe" ;;
+              *.dmg) cp "$f" "out/mytoken-${version}-${plat}.dmg" ;;
+              *) cp "$f" "out/$base" ;;
+            esac
+          done < <(find dist -type f -print0)
+          ls -l out
+          gh release upload "$GITHUB_REF_NAME" out/* --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest --repo "$GITHUB_REPOSITORY"

@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/zzstar101/mytoken/internal/sqlitedsn"
 
 	"github.com/zzstar101/mytoken/internal/harness"
 	"github.com/zzstar101/mytoken/internal/model"
@@ -42,7 +43,7 @@ func Open(path string) (*Store, error) {
 	}
 	dsn := path
 	if path != ":memory:" {
-		dsn = (&url.URL{Scheme: "file", Path: path}).String()
+		dsn = sqlitedsn.URI(path, "")
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
