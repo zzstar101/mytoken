@@ -199,7 +199,8 @@ func (c *CCSwitch) CurrentConfigs() []CurrentConfig {
 }
 
 // Providers lists the providers known to cc-switch. It never returns keys:
-// HasKey only records that a credential is configured.
+// HasKey only records that a credential is configured, and Origin/KeyID are the
+// gateway's normalized address and a one-way id for the key.
 func (c *CCSwitch) Providers() []ProviderInfo {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -217,9 +218,70 @@ func (c *CCSwitch) Providers() []ProviderInfo {
 		if err := rows.Scan(&app, &name, &cfg, &meta); err != nil {
 			return out
 		}
-		out = append(out, ProviderInfo{Name: name, App: app, BaseURL: ccBaseURL(cfg, meta), HasKey: hasCCKey(cfg, meta), Source: "cc-switch"})
+		out = append(out, providerInfo("cc-switch", app, name, ccBaseURL(cfg, meta), ccKey(cfg, meta)))
 	}
 	return out
+}
+
+// providerInfo fills a ProviderInfo, deriving the gateway origin and key id
+// from the base URL and the key. The key itself is only used to derive its id.
+func providerInfo(sourceName, app, name, base, key string) ProviderInfo {
+	info := ProviderInfo{Name: name, App: app, BaseURL: base, HasKey: key != "", Source: sourceName}
+	if base != "" {
+		if origin, ok := Origin(base); ok {
+			info.Origin = origin
+		}
+	}
+	if key != "" {
+		info.KeyID = KeyID(key)
+	}
+	return info
+}
+
+// Credentials enumerates the gateway credentials cc-switch holds, read fresh on
+// every call: a provider selected, enabled or re-keyed in cc-switch must be
+// visible to the next reconciliation without a restart. The key is only kept
+// inside the returned Secret and never written to disk by this package.
+func (c *CCSwitch) Credentials(ctx context.Context) ([]Credential, error) {
+	_ = ctx
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if _, err := os.Stat(c.path); err != nil {
+		return nil, nil
+	}
+	if c.db == nil {
+		return nil, nil
+	}
+	rows, err := c.db.Query(`SELECT app_type,name,COALESCE(settings_config,''),COALESCE(meta,'') FROM providers ORDER BY app_type,name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Credential
+	for rows.Next() {
+		var app, name, cfg, meta string
+		if err := rows.Scan(&app, &name, &cfg, &meta); err != nil {
+			return out, err
+		}
+		key := ccKey(cfg, meta)
+		base := ccBaseURL(cfg, meta)
+		if key == "" || base == "" {
+			continue
+		}
+		origin, ok := Origin(base)
+		if !ok || origin == LocalProxyOrigin {
+			continue // cc-switch's own proxy is not a gateway
+		}
+		out = append(out, Credential{
+			Origin:   origin,
+			KeyID:    KeyID(key),
+			Provider: name,
+			Harness:  harnessForApp(app),
+			Source:   "cc-switch",
+			Secret:   NewSecret(key),
+		})
+	}
+	return out, rows.Err()
 }
 
 // PriceRules imports the prices stored in the database. Model entries become
@@ -268,14 +330,24 @@ func ccBaseURL(cfg, meta string) string {
 	return jsonString(meta, "base_url")
 }
 
-// hasCCKey reports whether a credential is configured, without reading it.
-func hasCCKey(cfg, meta string) bool {
+// ccKey returns the credential configured for a provider, or "". Callers must
+// not store or print it: it exists so Credentials can derive the gateway origin
+// and a one-way key id, and to hand the reconciliation client a Secret.
+func ccKey(cfg, meta string) string {
 	for _, key := range []string{"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "apiKey", "api_key", "token", "access_token"} {
-		if jsonString(cfg, key) != "" || jsonString(meta, key) != "" {
-			return true
+		if v := jsonString(cfg, key); v != "" {
+			return v
+		}
+		if v := jsonString(meta, key); v != "" {
+			return v
 		}
 	}
-	return false
+	return ""
+}
+
+// hasCCKey reports whether a credential is configured, without reading it.
+func hasCCKey(cfg, meta string) bool {
+	return ccKey(cfg, meta) != ""
 }
 
 // jsonString reads a nested JSON string field, searching env/options/auth first

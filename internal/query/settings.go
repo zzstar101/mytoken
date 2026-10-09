@@ -3,6 +3,8 @@ package query
 import (
 	"context"
 	"time"
+
+	"github.com/zzstar101/mytoken/internal/pricing"
 )
 
 // PriceRule adjusts computed costs (docs/SPEC.md §7). Rules never touch a
@@ -65,6 +67,14 @@ type Settings interface {
 	PriceRules(ctx context.Context) ([]PriceRule, error)
 	// SetPriceRules replaces all rules.
 	SetPriceRules(ctx context.Context, rules []PriceRule) error
+	// RelayRules returns the rules imported from gateways (Source "relay:*"),
+	// most recently effective first.
+	RelayRules(ctx context.Context) ([]PriceRule, error)
+	// AppendRelayRules merges gateway rules into the stored rules: a rule for
+	// the same selector and source is replaced only when one of its prices
+	// moved by more than 1%, so a jittering ratio does not rewrite the table.
+	// Reprices and notifies when anything changed.
+	AppendRelayRules(ctx context.Context, rules []pricing.Rule) error
 	// ImportCCSwitch reads cc-switch's pricing (read-only) and upserts rules
 	// with Source "cc-switch"; returns how many rules it imported.
 	ImportCCSwitch(ctx context.Context) (int, error)

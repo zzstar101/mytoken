@@ -22,10 +22,19 @@ type ProviderInfo struct {
 	Harness model.Harness `json:"harness,omitempty"`
 	App     string        `json:"app,omitempty"` // source-native app id ("claude", "codex")
 	BaseURL string        `json:"baseUrl,omitempty"`
-	HasKey  bool          `json:"hasKey"`
-	Current bool          `json:"current,omitempty"`
-	Source  string        `json:"source"` // Name() of the source that reported it
+	// Origin is BaseURL normalized to scheme://host[:port], and KeyID is a
+	// stable, non-reversible id for the key configured for it. Together they
+	// identify a gateway for 0.2 reconciliation without exposing the key.
+	Origin  string `json:"origin,omitempty"`
+	KeyID   string `json:"keyId,omitempty"`
+	HasKey  bool   `json:"hasKey"`
+	Current bool   `json:"current,omitempty"`
+	Source  string `json:"source"` // Name() of the source that reported it
 }
+
+// LocalProxyOrigin is the address cc-switch itself listens on. It is a local
+// proxy, not a gateway, so it is never reconciled against.
+const LocalProxyOrigin = "http://127.0.0.1:15721"
 
 // Status is a snapshot of a source's state, for doctor and the GUI. Err is the
 // last load problem, which is informational: a broken source never stops

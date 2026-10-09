@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -239,5 +240,186 @@ func TestHarnessConfigSource(t *testing.T) {
 	}
 	if len(empty.CurrentConfigs()) != 0 {
 		t.Fatalf("configs=%+v", empty.CurrentConfigs())
+	}
+}
+
+// cc-switch's credentials: one per provider with both a key and a base URL,
+// identified by a one-way key id, with the key itself never in the output.
+func TestCCSwitchCredentials(t *testing.T) {
+	path, _ := newCC(t)
+	c := NewCCSwitch(path)
+	defer c.Close()
+	if err := c.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	creds, err := c.Credentials(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Backup has no key, so only Gateway yields a credential.
+	if len(creds) != 1 {
+		t.Fatalf("creds=%+v", creds)
+	}
+	got := creds[0]
+	if got.Origin != "https://relay.example" || got.Provider != "Gateway" || got.Source != "cc-switch" {
+		t.Fatalf("cred=%+v", got)
+	}
+	if got.Harness != model.ClaudeCode {
+		t.Fatalf("harness=%v", got.Harness)
+	}
+	if got.KeyID != KeyID("secret-token") {
+		t.Fatalf("keyID=%q", got.KeyID)
+	}
+	if got.Secret.Reveal() != "secret-token" {
+		t.Fatalf("secret=%q", got.Secret.Reveal())
+	}
+	// The key must not survive any formatting path.
+	for _, s := range []string{got.Secret.String(), fmt.Sprintf("%v", got.Secret), fmt.Sprintf("%#v", got.Secret)} {
+		if strings.Contains(s, "secret-token") {
+			t.Fatalf("secret leaked as %q", s)
+		}
+	}
+	// Providers() exposes the same identity without the key.
+	infos := c.Providers()
+	for _, p := range infos {
+		if strings.Contains(p.Name, "secret") {
+			t.Fatalf("provider name leaked a key: %q", p.Name)
+		}
+	}
+	var found bool
+	for _, p := range infos {
+		if p.Name == "Gateway" {
+			found = true
+			if p.Origin != "https://relay.example" || p.KeyID != KeyID("secret-token") || !p.HasKey {
+				t.Fatalf("gateway info=%+v", p)
+			}
+		}
+		if p.Name == "Backup" && (p.Origin != "https://backup.example" || p.HasKey || p.KeyID != "") {
+			t.Fatalf("backup info=%+v", p)
+		}
+	}
+	if !found {
+		t.Fatal("gateway not listed")
+	}
+}
+
+// A cc-switch database pointing at its own local proxy yields no credential:
+// that is a proxy, not a gateway.
+func TestCCSwitchCredentialsSkipLocalProxy(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cc-switch.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(ccSchema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`INSERT INTO providers VALUES
+		('p1','claude','Local','{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:15721","ANTHROPIC_AUTH_TOKEN":"secret-token"}}','{}','1',1)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	c := NewCCSwitch(path)
+	defer c.Close()
+	if err := c.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	creds, err := c.Credentials(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(creds) != 0 {
+		t.Fatalf("creds=%+v, want none for a local proxy", creds)
+	}
+	// The provider is still listed for attribution and pickers.
+	if len(c.Providers()) != 1 {
+		t.Fatalf("providers=%+v", c.Providers())
+	}
+}
+
+// The harness config files hand over the key they already send, wrapped so it
+// redacts itself everywhere else.
+func TestHarnessConfigCredentials(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".claude", "settings.json"), []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://relay.example/v1","ANTHROPIC_AUTH_TOKEN":"claude-key"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".codex"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".codex", "config.toml"), []byte("model_provider = \"relay\"\n[model_providers.relay]\nbase_url = \"https://relay.example/v1\"\nenv_key = \"MYTOKEN_TEST_CODEX_KEY\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MYTOKEN_TEST_CODEX_KEY", "codex-key")
+	h := NewHarnessConfig(dir)
+	defer h.Close()
+	if err := h.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	creds, err := h.Credentials(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(creds) != 2 {
+		t.Fatalf("creds=%+v", creds)
+	}
+	// Both harnesses point at the same gateway, so they share one origin but
+	// have their own key ids.
+	seen := map[model.Harness]string{}
+	for _, c := range creds {
+		if c.Origin != "https://relay.example" || c.Source != "harness-config" {
+			t.Fatalf("cred=%+v", c)
+		}
+		seen[c.Harness] = c.KeyID
+	}
+	if seen[model.ClaudeCode] != KeyID("claude-key") || seen[model.Codex] != KeyID("codex-key") {
+		t.Fatalf("key ids=%v", seen)
+	}
+	if !strings.Contains(h.Status().Detail, "relay.example") || strings.Contains(h.Status().Detail, "key") {
+		t.Fatalf("detail=%q", h.Status().Detail)
+	}
+	// An empty home yields nothing.
+	empty := NewHarnessConfig(t.TempDir())
+	defer empty.Close()
+	if creds, err = empty.Credentials(context.Background()); err != nil || len(creds) != 0 {
+		t.Fatalf("creds=%+v err=%v", creds, err)
+	}
+}
+
+// Credentials are re-read on every call: changing the key in the config file
+// must be visible without restarting anything.
+func TestHarnessConfigCredentialsAreFresh(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	settings := filepath.Join(dir, ".claude", "settings.json")
+	write := func(token string) {
+		if err := os.WriteFile(settings, []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://relay.example/v1","ANTHROPIC_AUTH_TOKEN":"`+token+`"}}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("first-key")
+	h := NewHarnessConfig(dir)
+	defer h.Close()
+	creds, err := h.Credentials(context.Background())
+	if err != nil || len(creds) != 1 {
+		t.Fatalf("creds=%+v err=%v", creds, err)
+	}
+	first := creds[0].KeyID
+	write("second-key")
+	creds, err = h.Credentials(context.Background())
+	if err != nil || len(creds) != 1 {
+		t.Fatalf("creds=%+v err=%v", creds, err)
+	}
+	if creds[0].KeyID == first || creds[0].KeyID != KeyID("second-key") {
+		t.Fatalf("keyID=%q, want the new key's id", creds[0].KeyID)
+	}
+	if creds[0].Secret.Reveal() != "second-key" {
+		t.Fatal("secret not refreshed")
 	}
 }

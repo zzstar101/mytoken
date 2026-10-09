@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/zzstar101/mytoken/internal/pricing"
+	"github.com/zzstar101/mytoken/internal/relay"
 	"github.com/zzstar101/mytoken/internal/source"
 	"github.com/zzstar101/mytoken/internal/store"
 	"math"
@@ -85,6 +86,43 @@ func LoadPricingSettings(ctx context.Context, st *store.Store, p *pricing.Pricer
 	return nil
 }
 func validRate(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
+
+// relayRulePrefix marks rules that came from a gateway's own ratios
+// (docs/RELAY.md §5.5). They sit between user rules and cc-switch imports.
+const relayRulePrefix = "relay:"
+
+// RelayRules lists the gateway-derived rules, most recently effective first.
+func (s *settingsService) RelayRules(ctx context.Context) ([]PriceRule, error) {
+	rules, err := s.PriceRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []PriceRule{}
+	for _, r := range rules {
+		if strings.HasPrefix(r.Source, relayRulePrefix) {
+			out = append(out, r)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].From.After(out[j].From) })
+	return out, nil
+}
+
+// AppendRelayRules merges gateway rules into the stored set. A stored rule for
+// the same selector and source is kept when the new prices agree within 1%, so
+// a ratio that jitters does not rewrite the table (docs/RELAY.md §5.5).
+func (s *settingsService) AppendRelayRules(ctx context.Context, rules []pricing.Rule) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	old, err := s.PriceRules(ctx)
+	if err != nil {
+		return err
+	}
+	merged := relay.MergeRelayRules(pricingRules(old), rules)
+	// The merge only rewrites rules a gateway reported; anything else keeps
+	// exactly what the user or cc-switch import stored.
+	return s.setPriceRules(ctx, fromPricingRules(merged))
+}
+
 func (s *settingsService) SetPriceRules(ctx context.Context, rules []PriceRule) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -106,7 +144,7 @@ func (s *settingsService) setPriceRules(ctx context.Context, rules []PriceRule) 
 		if r.Provider == "" && r.Model == "" {
 			return fmt.Errorf("price rule requires provider or model")
 		}
-		if r.Source != "user" && r.Source != "cc-switch" {
+		if r.Source != "user" && r.Source != "cc-switch" && !strings.HasPrefix(r.Source, relayRulePrefix) {
 			return fmt.Errorf("invalid price source %q", r.Source)
 		}
 		if !validRate(r.Multiplier) {

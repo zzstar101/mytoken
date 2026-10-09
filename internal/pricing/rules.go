@@ -39,10 +39,12 @@ func (p *Pricer) SetRules(rules []Rule) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.rules = map[[2]string][]Rule{}
-	// User rules win ties against imported rules regardless of list ordering.
-	for _, user := range []bool{false, true} {
+	// Rules are appended least authoritative first, so a later append wins a
+	// tie and the stable sort below stays deterministic: cc-switch's import,
+	// then a gateway's own ratios, then the user's own rules.
+	for _, rank := range []int{0, 1, 2} {
 		for _, r := range rules {
-			if (r.Source != "cc-switch") != user {
+			if sourceRank(r) != rank {
 				continue
 			}
 			r.Input = cloneFloat(r.Input)
@@ -56,16 +58,31 @@ func (p *Pricer) SetRules(rules []Rule) {
 		}
 	}
 	for key, list := range p.rules {
-		// Ascending From with user rules last, so ruleAt picks the latest rule
-		// effective at a moment and prefers the user rule on a tie.
+		// Authority first (user over a gateway over the cc-switch import), then
+		// ascending From inside an authority level, so ruleAt picks the newest
+		// rule effective at a moment within the most authoritative level that
+		// has one. Authority comes first because a user's own price must stay
+		// an override no matter when a gateway reported its ratios.
 		sort.SliceStable(list, func(i, j int) bool {
-			if !list[i].From.Equal(list[j].From) {
-				return list[i].From.Before(list[j].From)
+			if ri, rj := sourceRank(list[i]), sourceRank(list[j]); ri != rj {
+				return ri < rj
 			}
-			return list[i].Source == "cc-switch" && list[j].Source != "cc-switch"
+			return list[i].From.Before(list[j].From)
 		})
 		p.rules[key] = list
 	}
+}
+
+// sourceRank orders rules by how much the user's own edits outrank them: the
+// user's rules win, a gateway's ratios come next, and cc-switch's import last.
+func sourceRank(r Rule) int {
+	switch {
+	case strings.HasPrefix(r.Source, "relay:"):
+		return 1
+	case r.Source == "cc-switch":
+		return 0
+	}
+	return 2
 }
 func (p *Pricer) SetAliases(aliases map[[2]string]string) {
 	p.mu.Lock()

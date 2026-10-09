@@ -360,3 +360,78 @@ func sonnetCost(p *Pricer) float64 {
 	catalog, _ := p.Lookup("claude-sonnet-4-5")
 	return catalog.Input
 }
+
+// A gateway's own ratios outrank cc-switch's import but never the user's rules,
+// at every level of the lookup chain.
+func TestRuleSourcePrecedence(t *testing.T) {
+	p := New("")
+	cc, relay, user := 1.0, 2.0, 3.0
+	at := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	p.SetRules([]Rule{
+		{Model: "m", Input: &cc, Source: "cc-switch", From: at},
+		{Model: "m", Input: &relay, Source: "relay:https://relay.example", From: at},
+		{Model: "m", Input: &user, Source: "user", From: at},
+	})
+	e := event("", "m", at)
+	if cost, ok := p.Evaluate(e); !ok || cost != 3 {
+		t.Fatalf("user cost=%v known=%v", cost, ok)
+	}
+	// Drop the user rule: the gateway's ratio applies.
+	p.SetRules([]Rule{
+		{Model: "m", Input: &cc, Source: "cc-switch", From: at},
+		{Model: "m", Input: &relay, Source: "relay:https://relay.example", From: at},
+	})
+	if cost, _ := p.Evaluate(e); cost != 2 {
+		t.Fatalf("relay cost=%v", cost)
+	}
+	// Drop both: the import applies.
+	p.SetRules([]Rule{{Model: "m", Input: &cc, Source: "cc-switch", From: at}})
+	if cost, _ := p.Evaluate(e); cost != 1 {
+		t.Fatalf("cc-switch cost=%v", cost)
+	}
+	// The same ordering holds for multipliers.
+	p.SetRules([]Rule{
+		{Provider: "relay", Multiplier: 0.5, Source: "cc-switch", From: at},
+		{Provider: "relay", Multiplier: 0.6, Source: "relay:https://relay.example", From: at},
+	})
+	p.SetRules([]Rule{{Model: "m", Input: &user, Source: "cc-switch", From: at}})
+	p.SetRules([]Rule{
+		{Model: "m", Input: &user, Source: "cc-switch", From: at},
+		{Provider: "relay", Multiplier: 0.5, Source: "cc-switch", From: at},
+		{Provider: "relay", Multiplier: 0.6, Source: "relay:https://relay.example", From: at},
+	})
+	if cost, _ := p.Evaluate(event("relay", "m", at)); math.Abs(cost-1.8) > 1e-9 {
+		t.Fatalf("relay multiplier cost=%v, want 1.8 (3*0.6)", cost)
+	}
+}
+
+// TestRuleAuthorityBeatsStartTime keeps the 0.1.x promise that a user's own
+// rule stays an override: a dated gateway snapshot must not outrank an
+// undated user rule, even for events that happened after the snapshot.
+func TestRuleAuthorityBeatsStartTime(t *testing.T) {
+	p := New("")
+	cc, relay, user := 1.0, 2.0, 3.0
+	snap := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	later := snap.AddDate(0, 2, 0)
+	p.SetRules([]Rule{
+		{Model: "m", Input: &cc, Source: "cc-switch", From: snap},
+		{Model: "m", Input: &relay, Source: "relay:https://relay.example", From: snap},
+		{Model: "m", Input: &user, Source: "user"},
+	})
+	if cost, ok := p.Evaluate(event("", "m", later)); !ok || cost != 3 {
+		t.Fatalf("cost=%v known=%v, want the undated user rule (3)", cost, ok)
+	}
+	// Without the user rule, the newest snapshot the moment knows about wins,
+	// and one that starts later only applies to events after it.
+	next := 4.0
+	p.SetRules([]Rule{
+		{Model: "m", Input: &relay, Source: "relay:https://relay.example", From: snap},
+		{Model: "m", Input: &next, Source: "relay:https://relay.example", From: later},
+	})
+	if cost, _ := p.Evaluate(event("", "m", later)); cost != 4 {
+		t.Fatalf("cost=%v, want the newer snapshot (4)", cost)
+	}
+	if cost, _ := p.Evaluate(event("", "m", snap)); cost != 2 {
+		t.Fatalf("cost=%v, want the snapshot effective then (2)", cost)
+	}
+}

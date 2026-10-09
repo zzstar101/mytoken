@@ -90,20 +90,7 @@ type Pricer struct {
 }
 
 func New(dataDir string) *Pricer {
-	p := &Pricer{dir: dataDir, prices: map[string]Price{}, overrides: map[string]map[string]Price{}, multipliers: map[string]float64{}, client: &http.Client{Timeout: 8 * time.Second}, modelsURL: "https://models.dev/api.json", litellmURL: "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"}
-	var compact struct {
-		Prices []Price        `json:"prices"`
-		Models map[string]int `json:"models"`
-	}
-	if json.Unmarshal(snapshot, &compact) == nil && len(compact.Models) > 0 {
-		for k, i := range compact.Models {
-			if i >= 0 && i < len(compact.Prices) {
-				p.prices[k] = compact.Prices[i]
-			}
-		}
-	} else {
-		_ = json.Unmarshal(snapshot, &p.prices)
-	}
+	p := &Pricer{dir: dataDir, prices: snapshotPrices(), overrides: map[string]map[string]Price{}, multipliers: map[string]float64{}, client: &http.Client{Timeout: 8 * time.Second}, modelsURL: "https://models.dev/api.json", litellmURL: "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"}
 	p.index()
 	if raw, e := os.ReadFile(filepath.Join(dataDir, "prices.json")); e == nil {
 		var c diskCache
@@ -117,6 +104,53 @@ func New(dataDir string) *Pricer {
 	}
 	return p
 }
+
+// snapshotPrices decodes the embedded catalog into a flat model→price map. It
+// accepts the compact form gen writes (a shared price list plus an index) and
+// falls back to a plain object of prices, so an older snapshot still loads.
+func snapshotPrices() map[string]Price {
+	var compact struct {
+		Prices []Price        `json:"prices"`
+		Models map[string]int `json:"models"`
+	}
+	if json.Unmarshal(snapshot, &compact) == nil && len(compact.Models) > 0 {
+		out := make(map[string]Price, len(compact.Models))
+		for k, i := range compact.Models {
+			if i >= 0 && i < len(compact.Prices) {
+				out[k] = compact.Prices[i]
+			}
+		}
+		return out
+	}
+	out := map[string]Price{}
+	_ = json.Unmarshal(snapshot, &out)
+	return out
+}
+
+// BuiltinLookup resolves a model name against the embedded catalog alone.
+//
+// Unlike Pricer.Lookup it applies no rules, aliases, overrides, multipliers or
+// disk cache and it never refreshes, so it answers one narrow question: what
+// does the bundled catalog say this model costs? That is the baseline a
+// reconciliation pass compares a gateway's own charge against, and it is safe
+// to call from a context that must not touch the network or the disk.
+//
+// Names are matched with the same normalization and date-suffix stripping
+// Lookup uses, and ties between the many provider-qualified spellings of one
+// model break the same way, so the two agree on every name in the snapshot.
+//
+// The first call builds and caches the index (tens of milliseconds for the
+// bundled catalog); every later call is a map hit.
+func BuiltinLookup(name string) (Price, bool) {
+	builtinOnce.Do(func() { builtinPrices = indexCatalog(snapshotPrices()) })
+	v, ok := builtinPrices[Normalize(name)]
+	return v, ok
+}
+
+var (
+	builtinOnce   sync.Once
+	builtinPrices map[string]Price
+)
 
 var dateSuffix = regexp.MustCompile(`[-:]\d{4}-?\d{2}-?\d{2}$`)
 
@@ -140,8 +174,11 @@ func (p *Pricer) lookup(name string) (Price, bool) {
 	return v, ok
 }
 
-func firstParty(id string) string {
-	n := Normalize(id)
+func firstParty(id string) string { return firstPartyNormalized(Normalize(id)) }
+
+// firstPartyNormalized is firstParty for a name that is already normalized, so
+// a caller that normalizes once can ask about many names.
+func firstPartyNormalized(n string) string {
 	for _, family := range []struct{ prefix, provider string }{
 		{"claude-", "anthropic"}, {"gpt-", "openai"}, {"o1", "openai"}, {"o3", "openai"}, {"o4", "openai"},
 		{"gemini-", "google"}, {"deepseek-", "deepseek"}, {"glm-", "zhipuai"}, {"kimi-", "moonshotai"},
@@ -166,35 +203,48 @@ func (p *Pricer) merge(prices map[string]Price) {
 	}
 }
 
-func (p *Pricer) index() {
-	keys := make([]string, 0, len(p.prices))
-	for k := range p.prices {
-		keys = append(keys, k)
+// catalogRank orders the spellings of one model: the vendor's own qualified
+// entry first, a bare name next, and a reseller's qualified name last. n is the
+// already-normalized key, so a caller that normalizes once can rank many keys.
+func catalogRank(k, n string) int {
+	provider, _, qualified := strings.Cut(k, "/")
+	if !qualified {
+		return 1
 	}
-	rank := func(k string) int {
-		provider, _, qualified := strings.Cut(k, "/")
-		if qualified && provider == firstParty(k) {
-			return 0
-		}
-		if !qualified {
-			return 1
-		}
-		return 2
+	if firstPartyNormalized(n) == provider {
+		return 0
 	}
-	sort.Slice(keys, func(i, j int) bool {
-		a, b := rank(keys[i]), rank(keys[j])
-		if a != b {
-			return a < b
-		}
-		return keys[i] < keys[j]
-	})
-	p.aliases = make(map[string]Price, len(keys))
-	for _, k := range keys {
+	return 2
+}
+
+func (p *Pricer) index() { p.aliases = indexCatalog(p.prices) }
+
+// indexCatalog builds the normalized lookup table for a catalog. Each key is
+// normalized and ranked once, and the best spelling of a normalized name wins:
+// the vendor's own entry, then a bare name, then a reseller's. Resolving the
+// winner in one pass keeps indexing the whole embedded catalog in the low tens
+// of milliseconds, which matters because New pays it on every startup.
+func indexCatalog(prices map[string]Price) map[string]Price {
+	type entry struct {
+		key   string
+		rank  int
+		price Price
+	}
+	best := make(map[string]entry, len(prices))
+	for k, v := range prices {
 		n := Normalize(k)
-		if _, ok := p.aliases[n]; !ok {
-			p.aliases[n] = p.prices[k]
+		r := catalogRank(k, n)
+		prev, ok := best[n]
+		if ok && (prev.rank < r || (prev.rank == r && prev.key <= k)) {
+			continue
 		}
+		best[n] = entry{key: k, rank: r, price: v}
 	}
+	aliases := make(map[string]Price, len(best))
+	for n, e := range best {
+		aliases[n] = e.price
+	}
+	return aliases
 }
 
 // HasPrice distinguishes unknown models from legitimately free models. Rules

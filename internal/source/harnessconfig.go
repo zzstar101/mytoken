@@ -127,3 +127,86 @@ func (h *HarnessConfig) CurrentConfigs() []CurrentConfig {
 
 // Close implements Source; the config files need no handles.
 func (h *HarnessConfig) Close() error { return nil }
+
+// Credentials enumerates the gateway credentials the harness config files
+// point at. The key is read out of the same file as the base URL, used to
+// derive the key id, and handed over inside a Secret; it is never returned as
+// text by any other method and never written to disk by this package.
+func (h *HarnessConfig) Credentials(ctx context.Context) ([]Credential, error) {
+	_ = ctx
+	var out []Credential
+	if v, ok := h.readClaude(); ok && v.Base != "" {
+		origin, ok := Origin(v.Base)
+		if ok && origin != LocalProxyOrigin {
+			out = append(out, Credential{
+				Origin:   origin,
+				KeyID:    KeyID(h.claudeKey()),
+				Provider: providerName(v),
+				Harness:  v.Harness,
+				Source:   "harness-config",
+				Secret:   NewSecret(h.claudeKey()),
+			})
+		}
+	}
+	if v, ok := h.readCodex(); ok && v.Base != "" {
+		origin, ok := Origin(v.Base)
+		if ok && origin != LocalProxyOrigin {
+			out = append(out, Credential{
+				Origin:   origin,
+				KeyID:    KeyID(h.codexKey()),
+				Provider: providerName(v),
+				Harness:  v.Harness,
+				Source:   "harness-config",
+				Secret:   NewSecret(h.codexKey()),
+			})
+		}
+	}
+	return out, nil
+}
+
+// claudeKey returns the token ~/.claude/settings.json sets for the harness, or
+// "" when the harness talks to Anthropic directly.
+func (h *HarnessConfig) claudeKey() string {
+	raw, err := os.ReadFile(filepath.Join(h.home, ".claude", "settings.json"))
+	if err != nil {
+		return ""
+	}
+	var v struct {
+		Env map[string]string `json:"env"`
+	}
+	if json.Unmarshal(raw, &v) != nil {
+		return ""
+	}
+	return v.Env["ANTHROPIC_AUTH_TOKEN"]
+}
+
+// codexKey returns the API key configured for the selected codex provider.
+func (h *HarnessConfig) codexKey() string {
+	raw, err := os.ReadFile(filepath.Join(h.home, ".codex", "config.toml"))
+	if err != nil {
+		return ""
+	}
+	var v struct {
+		ModelProvider string `toml:"model_provider"`
+		Providers     map[string]struct {
+			EnvKey string `toml:"env_key"`
+		} `toml:"model_providers"`
+	}
+	if toml.Unmarshal(raw, &v) != nil || v.ModelProvider == "" {
+		return ""
+	}
+	envKey := v.Providers[v.ModelProvider].EnvKey
+	if envKey == "" {
+		return ""
+	}
+	return os.Getenv(envKey)
+}
+
+// providerName names a gateway the way the resolver would, so reconciliation
+// reports can be joined against attributed events.
+func providerName(c CurrentConfig) string {
+	if c.Provider != "" {
+		return c.Provider
+	}
+	return string(c.Harness)
+}
