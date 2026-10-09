@@ -1,0 +1,118 @@
+{
+  "harness": "grok",
+  "sources": [
+    {
+      "path": "logs/unified.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "sessions/%2FUsers%2Fdemo%2Fgrok-cache/9d3a1c2e-7b44-4f6a-8d21-5c0e7f9a1b30/updates.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "grok",
+      "dedupKey": "grok:9d3a1c2e-7b44-4f6a-8d21-5c0e7f9a1b30:t1",
+      "sessionId": "9d3a1c2e-7b44-4f6a-8d21-5c0e7f9a1b30",
+      "projectPath": "/Users/demo/grok-cache",
+      "timestamp": "2026-05-04T08:30:09Z",
+      "model": "grok-4-fast",
+      "tokens": {
+        "input": 1180,
+        "output": 160,
+        "cacheRead": 500,
+        "cacheWrite": 120,
+        "reasoning": 80
+      },
+      "requestId": "t1"
+    },
+    {
+      "harness": "grok",
+      "dedupKey": "grok:9d3a1c2e-7b44-4f6a-8d21-5c0e7f9a1b30:t2",
+      "sessionId": "9d3a1c2e-7b44-4f6a-8d21-5c0e7f9a1b30",
+      "projectPath": "/Users/demo/grok-cache",
+      "timestamp": "2026-05-04T08:30:31Z",
+      "model": "grok-4-fast",
+      "tokens": {
+        "input": 2700,
+        "output": 330,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "t2",
+      "boundary": "compact"
+    },
+    {
+      "harness": "grok",
+      "dedupKey": "grok:unified:b1f0c7d2-4e51-4a0b-9c33-6d7e8f901234:2026-05-04T09:00:05.000Z:1",
+      "sessionId": "b1f0c7d2-4e51-4a0b-9c33-6d7e8f901234",
+      "projectPath": "/Users/demo/grok-log",
+      "timestamp": "2026-05-04T09:00:05Z",
+      "model": "grok-4-fast",
+      "tokens": {
+        "input": 1100,
+        "output": 160,
+        "cacheRead": 400,
+        "cacheWrite": 0,
+        "reasoning": 60
+      }
+    },
+    {
+      "harness": "grok",
+      "dedupKey": "grok:unified:b1f0c7d2-4e51-4a0b-9c33-6d7e8f901234:2026-05-04T09:00:12.000Z:2",
+      "sessionId": "b1f0c7d2-4e51-4a0b-9c33-6d7e8f901234",
+      "projectPath": "/Users/demo/grok-log",
+      "timestamp": "2026-05-04T09:00:12Z",
+      "model": "grok-4-fast",
+      "tokens": {
+        "input": 1700,
+        "output": 220,
+        "cacheRead": 900,
+        "cacheWrite": 0,
+        "reasoning": 90
+      }
+    },
+    {
+      "harness": "grok",
+      "dedupKey": "grok:unified:c2e1a4b6-8d72-4c19-b5f0-1a2b3c4d5e6f:2026-05-04T10:00:08.000Z:1",
+      "sessionId": "c2e1a4b6-8d72-4c19-b5f0-1a2b3c4d5e6f",
+      "projectPath": "/Users/demo/grok-skipped",
+      "timestamp": "2026-05-04T10:00:08Z",
+      "model": "grok-3-mini",
+      "tokens": {
+        "input": 900,
+        "output": 140,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "grok",
+      "sessionId": "9d3a1c2e-7b44-4f6a-8d21-5c0e7f9a1b30",
+      "title": "Refactor the widget cache layer",
+      "project": "grok-cache",
+      "startedAt": "2026-05-04T08:30:00Z",
+      "updatedAt": "2026-05-04T08:32:20Z"
+    },
+    {
+      "harness": "grok",
+      "sessionId": "b1f0c7d2-4e51-4a0b-9c33-6d7e8f901234",
+      "project": "grok-log",
+      "startedAt": "2026-05-04T09:00:05Z",
+      "updatedAt": "2026-05-04T09:00:12Z"
+    },
+    {
+      "harness": "grok",
+      "sessionId": "c2e1a4b6-8d72-4c19-b5f0-1a2b3c4d5e6f",
+      "title": "Trim the release checklist",
+      "project": "grok-skipped",
+      "startedAt": "2026-05-04T10:00:08Z",
+      "updatedAt": "2026-05-04T10:00:08Z"
+    }
+  ]
+}

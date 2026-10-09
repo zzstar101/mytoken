@@ -1,0 +1,3 @@
+{"type":"session","id":"alpha-jsonl-2","timestamp":"2026-03-02T13:00:00Z","provider":"openai"}
+{"type":"message","timestamp":"2026-03-02T13:00:02Z","message":{"role":"user","content":[{"type":"text","text":"Trim the release checklist"}]}}
+{"type":"message","id":"alpha2-call-1","timestamp":"2026-03-02T13:00:09Z","message":{"role":"assistant","content":[{"type":"text","text":"Trimmed the checklist down to the three steps that actually gate a release."}],"usage":{"input":400,"output":110,"cacheRead":0,"cacheWrite":0,"cost":{"total":0.009}}}}

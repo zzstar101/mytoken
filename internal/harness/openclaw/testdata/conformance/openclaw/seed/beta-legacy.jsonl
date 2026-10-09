@@ -1,0 +1,3 @@
+{"type":"session","id":"beta-store-1","timestamp":"2026-03-02T12:00:00Z","provider":"anthropic"}
+{"type":"message","timestamp":"2026-03-02T12:00:02Z","message":{"role":"user","content":[{"type":"text","text":"Migrated into the store"}]}}
+{"type":"message","id":"legacy-should-not-count","timestamp":"2026-03-02T12:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"This legacy copy must be ignored once the store owns the session."}],"usage":{"input":9999,"output":9999,"cacheRead":0,"cacheWrite":0}}}

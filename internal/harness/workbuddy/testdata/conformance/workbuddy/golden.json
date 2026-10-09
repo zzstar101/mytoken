@@ -1,0 +1,137 @@
+{
+  "harness": "workbuddy",
+  "sources": [
+    {
+      "path": "--home-user-fixture-alpha--/01a00000-0000-7000-8000-000000000001.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "--home-user-fixture-alpha--/01a00000-0000-7000-8000-000000000001/subagents/agent-00000000000000ff.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "workbuddy",
+      "dedupKey": "msg-fixture-0001",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:06Z",
+      "model": "deepseek-v4.1-flash",
+      "tokens": {
+        "input": 80,
+        "output": 160,
+        "cacheRead": 800,
+        "cacheWrite": 120,
+        "reasoning": 40
+      },
+      "requestId": "req-fixture-0001",
+      "bill": {
+        "amount": 0.75,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "workbuddy",
+      "dedupKey": "msg-fixture-0003",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:07Z",
+      "model": "kimi-k3",
+      "tokens": {
+        "input": 190,
+        "output": 65,
+        "cacheRead": 100,
+        "cacheWrite": 10,
+        "reasoning": 25
+      },
+      "requestId": "req-fixture-0003",
+      "bill": {
+        "amount": 0.25,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "workbuddy",
+      "dedupKey": "msg-fixture-0005",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:09Z",
+      "model": "deepseek-v4.1-flash",
+      "tokens": {
+        "input": 250,
+        "output": 90,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 30
+      },
+      "requestId": "req-fixture-0004",
+      "boundary": "compact",
+      "bill": {
+        "amount": 0.5,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "workbuddy",
+      "dedupKey": "msg-fixture-0006",
+      "sessionId": "01b00000-0000-7000-8000-000000000002",
+      "parentId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:11Z",
+      "model": "deepseek-v4.1-flash",
+      "tokens": {
+        "input": 400,
+        "output": 55,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 25
+      },
+      "requestId": "req-fixture-0005",
+      "bill": {
+        "amount": 0.2,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "workbuddy",
+      "dedupKey": "msg-fixture-0007",
+      "sessionId": "01b00000-0000-7000-8000-000000000002",
+      "parentId": "01a00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-alpha",
+      "timestamp": "2026-01-02T03:04:12Z",
+      "model": "kimi-k3",
+      "tokens": {
+        "input": 250,
+        "output": 60,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "requestId": "req-fixture-0006",
+      "bill": {
+        "amount": 0.1,
+        "unit": "credit"
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "workbuddy",
+      "sessionId": "01a00000-0000-7000-8000-000000000001",
+      "title": "fixture: recompute the workbuddy totals after a compaction",
+      "project": "/home/user/fixture-alpha",
+      "startedAt": "2026-01-02T03:04:05.1Z",
+      "updatedAt": "2026-01-02T03:04:09Z"
+    },
+    {
+      "harness": "workbuddy",
+      "sessionId": "01b00000-0000-7000-8000-000000000002",
+      "parentId": "01a00000-0000-7000-8000-000000000001",
+      "title": "fixture subagent: summarize the failing conformance check",
+      "project": "/home/user/fixture-alpha",
+      "startedAt": "2026-01-02T03:04:10.1Z",
+      "updatedAt": "2026-01-02T03:04:13Z"
+    }
+  ]
+}

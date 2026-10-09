@@ -1,0 +1,170 @@
+{
+  "harness": "claude-desktop",
+  "sources": [
+    {
+      "path": "3f9c1d2e/8f2a1b4c/de4d630f/.claude/projects/session/cd-11111111-1111-1111-1111-111111111111.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "3f9c1d2e/8f2a1b4c/de4d630f/.claude/projects/session/cd-11111111-1111-1111-1111-111111111111/subagents/agent-1.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "3f9c1d2e/8f2a1b4c/usage-ledger/usage.ndjson",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:cd-11111111-1111-1111-1111-111111111111:msg_2:req-2",
+      "sessionId": "cd-11111111-1111-1111-1111-111111111111",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2025-03-19T16:00:02Z",
+      "model": "claude-opus-4-1",
+      "provider": "claude",
+      "tokens": {
+        "input": 300,
+        "output": 40,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "req-2"
+    },
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:cd-11111111-1111-1111-1111-111111111111:msg_4:req-4",
+      "sessionId": "cd-11111111-1111-1111-1111-111111111111",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2025-03-19T16:00:06Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "claude",
+      "tokens": {
+        "input": 200,
+        "output": 30,
+        "cacheRead": 50,
+        "cacheWrite": 25,
+        "reasoning": 0
+      },
+      "requestId": "req-4",
+      "boundary": "compact"
+    },
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:cd-agent-1:msg_a1:req-a1",
+      "sessionId": "cd-agent-1",
+      "parentId": "cd-11111111-1111-1111-1111-111111111111",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2025-03-19T16:00:11Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "claude",
+      "tokens": {
+        "input": 500,
+        "output": 60,
+        "cacheRead": 200,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "req-a1"
+    },
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:ledger:local_8f2a1b:2025-03-19T16:00:01Z:claude-sonnet-4-5",
+      "sessionId": "local_8f2a1b",
+      "projectPath": "demo-workspace",
+      "timestamp": "2025-03-19T16:00:01.5Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "claude",
+      "tokens": {
+        "input": 1000,
+        "output": 250,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 0
+      },
+      "costUsd": 0.03,
+      "requestId": "2025-03-19T16:00:01Z:0"
+    },
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:ledger:local_8f2a1b:2025-03-19T16:03:20Z:claude-sonnet-4-5",
+      "sessionId": "local_8f2a1b",
+      "projectPath": "demo-workspace",
+      "timestamp": "2025-03-19T16:03:20Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "claude",
+      "tokens": {
+        "input": 1200,
+        "output": 300,
+        "cacheRead": 600,
+        "cacheWrite": 150,
+        "reasoning": 0
+      },
+      "costUsd": 0.045,
+      "requestId": "2025-03-19T16:03:20Z:1"
+    },
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:ledger:local_8f2a1b:2025-03-19T16:03:30Z:claude-haiku-4-5",
+      "sessionId": "local_8f2a1b",
+      "projectPath": "demo-workspace",
+      "timestamp": "2025-03-19T16:03:30Z",
+      "model": "claude-haiku-4-5",
+      "provider": "claude",
+      "tokens": {
+        "input": 400,
+        "output": 60,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0012,
+      "requestId": "2025-03-19T16:03:30Z:2"
+    },
+    {
+      "harness": "claude-desktop",
+      "dedupKey": "claude-desktop:ledger:local_8f2a1b:2025-03-19T16:03:50Z:claude-sonnet-4-5",
+      "sessionId": "local_8f2a1b",
+      "projectPath": "demo-workspace",
+      "timestamp": "2025-03-19T16:03:50Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "claude",
+      "tokens": {
+        "input": 700,
+        "output": 120,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "costUsd": 0.02,
+      "requestId": "2025-03-19T16:03:50Z:4"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "claude-desktop",
+      "sessionId": "agent-1",
+      "parentId": "cd-11111111-1111-1111-1111-111111111111",
+      "title": "explore the token mapping",
+      "project": "/Users/demo/proj",
+      "startedAt": "2025-03-19T16:00:10Z",
+      "updatedAt": "2025-03-19T16:00:11Z"
+    },
+    {
+      "harness": "claude-desktop",
+      "sessionId": "cd-11111111-1111-1111-1111-111111111111",
+      "title": "explain the desktop ledger",
+      "project": "/Users/demo/proj",
+      "startedAt": "2025-03-19T16:00:00Z",
+      "updatedAt": "2025-03-19T16:00:06Z"
+    },
+    {
+      "harness": "claude-desktop",
+      "sessionId": "local_8f2a1b",
+      "project": "demo-workspace",
+      "startedAt": "2025-03-19T16:00:01.5Z",
+      "updatedAt": "2025-03-19T16:03:50Z"
+    }
+  ]
+}

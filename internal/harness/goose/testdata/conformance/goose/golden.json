@@ -1,0 +1,116 @@
+{
+  "harness": "goose",
+  "sources": [
+    {
+      "path": "sessions.db:goose-alpha-cache",
+      "kind": "sqlite"
+    },
+    {
+      "path": "sessions.db:goose-bravo-notes",
+      "kind": "sqlite"
+    },
+    {
+      "path": "sessions.db:goose-charlie-scratch",
+      "kind": "sqlite"
+    },
+    {
+      "path": "sessions.db:goose-delta-rollout",
+      "kind": "sqlite"
+    },
+    {
+      "path": "sessions.db:goose-echo-notes",
+      "kind": "sqlite"
+    }
+  ],
+  "events": [
+    {
+      "harness": "goose",
+      "dedupKey": "goose:goose-alpha-cache:1400:320",
+      "sessionId": "goose-alpha-cache",
+      "projectPath": "/Users/demo/goose-alpha",
+      "timestamp": "2026-03-02T10:05:00Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 1400,
+        "output": 320,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "goose",
+      "dedupKey": "goose:goose-bravo-notes:800:210",
+      "sessionId": "goose-bravo-notes",
+      "projectPath": "/Users/demo/goose-bravo",
+      "timestamp": "2026-03-03T11:00:20Z",
+      "model": "gpt-5",
+      "provider": "openai",
+      "tokens": {
+        "input": 800,
+        "output": 210,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "goose",
+      "dedupKey": "goose:goose-delta-rollout:640:90",
+      "sessionId": "goose-delta-rollout",
+      "projectPath": "/Users/demo/goose-delta",
+      "timestamp": "2026-03-02T12:00:05Z",
+      "model": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 640,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "goose",
+      "sessionId": "goose-alpha-cache",
+      "title": "Refactor the cache layer",
+      "project": "goose-alpha",
+      "startedAt": "2026-03-02T10:00:00Z",
+      "updatedAt": "2026-03-02T10:05:00Z"
+    },
+    {
+      "harness": "goose",
+      "sessionId": "goose-bravo-notes",
+      "title": "Summarise the store migration",
+      "project": "goose-bravo",
+      "startedAt": "2026-03-03T11:00:00Z",
+      "updatedAt": "2026-03-03T11:00:20Z"
+    },
+    {
+      "harness": "goose",
+      "sessionId": "goose-charlie-scratch",
+      "project": "goose-scratch",
+      "startedAt": "2026-03-02T09:00:00Z",
+      "updatedAt": "2026-03-02T09:01:00Z"
+    },
+    {
+      "harness": "goose",
+      "sessionId": "goose-delta-rollout",
+      "title": "Draft the migration notes",
+      "project": "goose-delta",
+      "startedAt": "2026-03-02T12:00:00Z",
+      "updatedAt": "2026-03-02T12:00:05Z"
+    },
+    {
+      "harness": "goose",
+      "sessionId": "goose-echo-notes",
+      "title": "Log the release checklist",
+      "project": "goose-echo",
+      "startedAt": "2026-03-03T13:00:00Z",
+      "updatedAt": "2026-03-03T13:00:04Z"
+    }
+  ]
+}

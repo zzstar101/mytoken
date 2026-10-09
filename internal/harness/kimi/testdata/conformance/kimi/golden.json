@@ -1,0 +1,184 @@
+{
+  "harness": "kimi",
+  "sources": [
+    {
+      "path": "0fddd4542d2563472d9d90ed91498f88/session-20250319-160000/subagents/agent-a/wire.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "0fddd4542d2563472d9d90ed91498f88/session-20250319-160000/wire.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "cloud_a65b9ad8a7b04adc540ca74bb1bcf433/session-20250319-170000/wire.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:agent-a:k-a1",
+      "sessionId": "agent-a",
+      "parentId": "session-20250319-160000",
+      "projectPath": "proj",
+      "timestamp": "2025-03-19T16:00:11Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 300,
+        "output": 60,
+        "cacheRead": 200,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-a1"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:agent-a:k-a2",
+      "sessionId": "agent-a",
+      "parentId": "session-20250319-160000",
+      "projectPath": "proj",
+      "timestamp": "2025-03-19T16:00:13Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 50,
+        "output": 5,
+        "cacheRead": 10,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-a2"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:session-20250319-160000:k-1",
+      "sessionId": "session-20250319-160000",
+      "projectPath": "proj",
+      "timestamp": "2025-03-19T16:00:01Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 500,
+        "output": 200,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 0
+      },
+      "requestId": "k-1"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:session-20250319-160000:k-2",
+      "sessionId": "session-20250319-160000",
+      "projectPath": "proj",
+      "timestamp": "2025-03-19T16:00:03Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 300,
+        "output": 40,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-2"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:session-20250319-160000:k-4",
+      "sessionId": "session-20250319-160000",
+      "projectPath": "proj",
+      "timestamp": "2025-03-19T16:00:06Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 200,
+        "output": 30,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-4"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:session-20250319-170000:k-b1",
+      "sessionId": "session-20250319-170000",
+      "projectPath": "other",
+      "timestamp": "2025-03-19T16:01:41Z",
+      "model": "moonshot-v1-128k",
+      "provider": "kimi",
+      "tokens": {
+        "input": 700,
+        "output": 80,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-b1"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:session-20250319-170000:k-b2",
+      "sessionId": "session-20250319-170000",
+      "projectPath": "other",
+      "timestamp": "2025-03-19T16:01:42Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 120,
+        "output": 15,
+        "cacheRead": 30,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-b2"
+    },
+    {
+      "harness": "kimi",
+      "dedupKey": "kimi:session-20250319-170000:k-b3",
+      "sessionId": "session-20250319-170000",
+      "projectPath": "other",
+      "timestamp": "2025-03-19T16:01:44Z",
+      "model": "kimi-k2-0905-preview",
+      "provider": "kimi",
+      "tokens": {
+        "input": 90,
+        "output": 12,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "k-b3"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "kimi",
+      "sessionId": "agent-a",
+      "parentId": "session-20250319-160000",
+      "title": "explore the token mapping",
+      "project": "proj",
+      "startedAt": "2025-03-19T16:00:10Z",
+      "updatedAt": "2025-03-19T16:00:13Z"
+    },
+    {
+      "harness": "kimi",
+      "sessionId": "session-20250319-160000",
+      "title": "explain the kimi wire format",
+      "project": "proj",
+      "startedAt": "2025-03-19T16:00:00Z",
+      "updatedAt": "2025-03-19T16:00:06Z"
+    },
+    {
+      "harness": "kimi",
+      "sessionId": "session-20250319-170000",
+      "title": "summarise the second work dir",
+      "project": "other",
+      "startedAt": "2025-03-19T16:01:40Z",
+      "updatedAt": "2025-03-19T16:01:44Z"
+    }
+  ]
+}

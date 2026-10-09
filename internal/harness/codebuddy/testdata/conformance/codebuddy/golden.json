@@ -1,0 +1,137 @@
+{
+  "harness": "codebuddy",
+  "sources": [
+    {
+      "path": "--home-user-fixture-bravo--/01c00000-0000-7000-8000-000000000001.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "--home-user-fixture-bravo--/01c00000-0000-7000-8000-000000000001/subagents/agent-00000000000000ff.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "codebuddy",
+      "dedupKey": "msg-codebuddy-0001",
+      "sessionId": "01c00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-bravo",
+      "timestamp": "2026-01-02T03:04:06Z",
+      "model": "deepseek-v4.1-flash",
+      "tokens": {
+        "input": 80,
+        "output": 160,
+        "cacheRead": 800,
+        "cacheWrite": 120,
+        "reasoning": 40
+      },
+      "requestId": "req-codebuddy-0001",
+      "bill": {
+        "amount": 0.75,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "codebuddy",
+      "dedupKey": "msg-codebuddy-0003",
+      "sessionId": "01c00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-bravo",
+      "timestamp": "2026-01-02T03:04:07Z",
+      "model": "glm-5.3",
+      "tokens": {
+        "input": 190,
+        "output": 65,
+        "cacheRead": 100,
+        "cacheWrite": 10,
+        "reasoning": 25
+      },
+      "requestId": "req-codebuddy-0003",
+      "bill": {
+        "amount": 0.25,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "codebuddy",
+      "dedupKey": "msg-codebuddy-0005",
+      "sessionId": "01c00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-bravo",
+      "timestamp": "2026-01-02T03:04:09Z",
+      "model": "deepseek-v4.1-flash",
+      "tokens": {
+        "input": 250,
+        "output": 90,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 30
+      },
+      "requestId": "req-codebuddy-0004",
+      "boundary": "compact",
+      "bill": {
+        "amount": 0.5,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "codebuddy",
+      "dedupKey": "msg-codebuddy-0006",
+      "sessionId": "01d00000-0000-7000-8000-000000000002",
+      "parentId": "01c00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-bravo",
+      "timestamp": "2026-01-02T03:04:11Z",
+      "model": "deepseek-v4.1-flash",
+      "tokens": {
+        "input": 400,
+        "output": 55,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 25
+      },
+      "requestId": "req-codebuddy-0005",
+      "bill": {
+        "amount": 0.2,
+        "unit": "credit"
+      }
+    },
+    {
+      "harness": "codebuddy",
+      "dedupKey": "msg-codebuddy-0007",
+      "sessionId": "01d00000-0000-7000-8000-000000000002",
+      "parentId": "01c00000-0000-7000-8000-000000000001",
+      "projectPath": "/home/user/fixture-bravo",
+      "timestamp": "2026-01-02T03:04:12Z",
+      "model": "glm-5.3",
+      "tokens": {
+        "input": 250,
+        "output": 60,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 0
+      },
+      "requestId": "req-codebuddy-0006",
+      "bill": {
+        "amount": 0.1,
+        "unit": "credit"
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "codebuddy",
+      "sessionId": "01c00000-0000-7000-8000-000000000001",
+      "title": "fixture: recompute the codebuddy totals after a compaction",
+      "project": "/home/user/fixture-bravo",
+      "startedAt": "2026-01-02T03:04:05.1Z",
+      "updatedAt": "2026-01-02T03:04:09Z"
+    },
+    {
+      "harness": "codebuddy",
+      "sessionId": "01d00000-0000-7000-8000-000000000002",
+      "parentId": "01c00000-0000-7000-8000-000000000001",
+      "title": "fixture subagent: summarize the failing conformance check",
+      "project": "/home/user/fixture-bravo",
+      "startedAt": "2026-01-02T03:04:10.1Z",
+      "updatedAt": "2026-01-02T03:04:13Z"
+    }
+  ]
+}

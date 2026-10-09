@@ -1,0 +1,4 @@
+{"type":"session_start","id":"droid-charlie-scratch","timestamp":"2026-03-02T09:00:00Z","cwd":"/Users/demo/charlie-scratch","version":"0.62.1"}
+{"type":"message","id":"charlie-m1","timestamp":"2026-03-02T09:00:04Z","message":{"role":"user","content":[{"type":"text","text":"Scratch notes"}]}}
+{"type":"message","id":"charlie-m2","timestamp":"2026-03-02T09:00:30Z","message":{"role":"assistant","content":[{"type":"text","text":"Nothing recorded here yet."}]}}
+{"type":"message","id":"charlie-m3","timestamp":"2026-03-02T09:01:00Z","message":{"role":"assistant","content":[{"type":"text","text":"Still nothing."}]}}

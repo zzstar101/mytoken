@@ -1,0 +1,5 @@
+{"surface":"cowork","sessionId":"local_8f2a1b","ts":1742400001500,"models":{"claude-sonnet-4-5":{"inputTokens":1000,"outputTokens":250,"cacheReadTokens":400,"cacheWriteTokens":100,"webSearchRequests":0,"cost":{"usd":0.03}}}}
+{"surface":"cowork","sessionId":"local_8f2a1b","ts":1742400200000,"models":{"claude-sonnet-4-5":{"inputTokens":1200,"outputTokens":300,"cacheReadTokens":600,"cacheWriteTokens":150,"webSearchRequests":0,"cost":{"usd":0.045}}}}
+{"surface":"cowork","sessionId":"local_8f2a1b","ts":1742400210000,"models":{"claude-haiku-4-5":{"inputTokens":400,"outputTokens":60,"cacheReadTokens":0,"cacheWriteTokens":0,"cost":{"usd":0.0012}}}}
+{"surface":"code","sessionId":"local_8f2a1b","ts":1742400220000,"models":{"claude-opus-4-1":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"webSearchRequests":2}}}
+{"surface":"cowork","sessionId":"local_8f2a1b","ts":1742400230000,"models":{"claude-sonnet-4-5":{"inputTokens":700,"outputTokens":120,"cacheReadTokens":200,"cacheWriteTokens":50,"cost":{"usd":0.02}}}}

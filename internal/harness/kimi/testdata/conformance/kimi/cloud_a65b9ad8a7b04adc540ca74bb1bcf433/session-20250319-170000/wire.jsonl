@@ -1,0 +1,5 @@
+{"timestamp":1742400100,"message":{"type":"TurnBegin","payload":{"user_input":"summarise the second work dir"}}}
+{"timestamp":1742400101,"message":{"type":"StatusUpdate","payload":{"message_id":"k-b1","token_usage":{"input":700,"output":80}}}}
+{"timestamp":1742400102,"message":{"type":"StatusUpdate","payload":{"message_id":"k-b2","model":"kimi-k2-0905-preview","token_usage":{"input_tokens":120,"output_tokens":15,"cached_input_tokens":30}}}}
+{"timestamp":1742400103,"message":{"type":"ToolCall","payload":{"function":{"name":"FetchURL","arguments":"{\"url\":\"https://example.invalid/SENTINEL_PRIVATE_TEXT\"}"}}}}
+{"timestamp":1742400104,"message":{"type":"StatusUpdate","payload":{"message_id":"k-b3","model":"kimi-k2-0905-preview","token_usage":{"input":90,"output":12}}}}

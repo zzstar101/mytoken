@@ -8,16 +8,28 @@ import "time"
 type Harness string
 
 const (
-	ClaudeCode Harness = "claude-code"
-	Codex      Harness = "codex"
-	Gemini     Harness = "gemini"
-	DSH        Harness = "dsh"
-	OpenCode   Harness = "opencode"
-	Crush      Harness = "crush"
-	Cline      Harness = "cline"
-	Roo        Harness = "roo"
-	Kilo       Harness = "kilo"
-	Pi         Harness = "pi"
+	ClaudeCode    Harness = "claude-code"
+	Codex         Harness = "codex"
+	Gemini        Harness = "gemini"
+	DSH           Harness = "dsh"
+	OpenCode      Harness = "opencode"
+	Crush         Harness = "crush"
+	Cline         Harness = "cline"
+	Roo           Harness = "roo"
+	Kilo          Harness = "kilo"
+	Pi            Harness = "pi"
+	Grok          Harness = "grok"
+	OpenClaw      Harness = "openclaw"
+	Droid         Harness = "droid"
+	Goose         Harness = "goose"
+	Forge         Harness = "forge"
+	ClaudeDesktop Harness = "claude-desktop"
+	Qwen          Harness = "qwen"
+	Kimi          Harness = "kimi"
+	OpenClaude    Harness = "openclaude"
+	WorkBuddy     Harness = "workbuddy"
+	CodeBuddy     Harness = "codebuddy"
+	Hermes        Harness = "hermes"
 )
 
 // DisplayName is the human label of a harness.
@@ -43,6 +55,22 @@ func (h Harness) DisplayName() string {
 		return "Kilo Code"
 	case Pi:
 		return "Pi"
+	case Grok:
+		return "Grok CLI"
+	case OpenClaw:
+		return "OpenClaw"
+	case Droid:
+		return "Droid"
+	case Goose:
+		return "Goose"
+	case Forge:
+		return "Forge"
+	case WorkBuddy:
+		return "WorkBuddy"
+	case CodeBuddy:
+		return "CodeBuddy"
+	case Hermes:
+		return "Hermes"
 	}
 	return string(h)
 }

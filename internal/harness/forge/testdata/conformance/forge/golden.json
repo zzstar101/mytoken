@@ -1,0 +1,106 @@
+{
+  "harness": "forge",
+  "sources": [
+    {
+      "path": ".forge.db:conv-a-cache",
+      "kind": "sqlite"
+    },
+    {
+      "path": ".forge.db:conv-b-rollout",
+      "kind": "sqlite"
+    },
+    {
+      "path": ".forge.db:conv-c-notes",
+      "kind": "sqlite"
+    }
+  ],
+  "events": [
+    {
+      "harness": "forge",
+      "dedupKey": "forge:conv-a-cache:call-a-1",
+      "sessionId": "conv-a-cache",
+      "projectPath": "/Users/demo/widget-cache",
+      "timestamp": "2026-03-02T10:05:00Z",
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "input": 1000,
+        "output": 300,
+        "cacheRead": 200,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "call-a-1"
+    },
+    {
+      "harness": "forge",
+      "dedupKey": "forge:conv-a-cache:claude-sonnet-4-5:900:180:3",
+      "sessionId": "conv-a-cache",
+      "projectPath": "/Users/demo/widget-cache",
+      "timestamp": "2026-03-02T10:05:00Z",
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "input": 800,
+        "output": 180,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "forge",
+      "dedupKey": "forge:conv-b-rollout:call-b-1",
+      "sessionId": "conv-b-rollout",
+      "projectPath": "1234567890123456789",
+      "timestamp": "2026-03-03T11:00:20.379Z",
+      "model": "gpt-5",
+      "tokens": {
+        "input": 640,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "call-b-1"
+    },
+    {
+      "harness": "forge",
+      "dedupKey": "forge:conv-b-rollout:gpt-5:200:40:3",
+      "sessionId": "conv-b-rollout",
+      "projectPath": "1234567890123456789",
+      "timestamp": "2026-03-03T11:00:20.379Z",
+      "model": "gpt-5",
+      "tokens": {
+        "input": 50,
+        "output": 40,
+        "cacheRead": 150,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "forge",
+      "sessionId": "conv-a-cache",
+      "title": "Refactor the widget cache",
+      "project": "/Users/demo/widget-cache",
+      "startedAt": "2026-03-02T10:00:00Z",
+      "updatedAt": "2026-03-02T10:05:00Z"
+    },
+    {
+      "harness": "forge",
+      "sessionId": "conv-b-rollout",
+      "title": "Summarise the store migration",
+      "project": "1234567890123456789",
+      "startedAt": "2026-03-03T11:00:20.379Z",
+      "updatedAt": "2026-03-03T11:00:20.379Z"
+    },
+    {
+      "harness": "forge",
+      "sessionId": "conv-c-notes",
+      "title": "Log the release checklist",
+      "startedAt": "2026-03-02T09:00:00Z",
+      "updatedAt": "2026-03-02T09:01:00Z"
+    }
+  ]
+}

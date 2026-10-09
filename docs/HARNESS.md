@@ -29,6 +29,42 @@
 - `Register(p)` 在包的 `init()` 里调用；`internal/app/app.go:7-16` 用空导入把包链进来。
   `harness.All()` / `Get(id)` 供扫描器使用。
 
+### 1.1 支持列表
+
+「子代理」一列表示该工具本身有子代理/侧链概念、且解析器把它映射成
+`Session.ParentSessionID`（golden 里能看到 `parentId`）。工具没有这个概念时留空
+即可，不要求夹具硬造；有概念就必须覆盖：夹具里要有一个带父会话的子代理日志。
+
+| harness | 子代理 | 备注 |
+| --- | --- | --- |
+| `claude-code` | 是 | 追加式 JSONL；`isSidechain` / `agentId` / `subagents/` 目录 |
+| `claude-desktop` | 是 | usage ledger + transcript；与 claude-code 的根目录不相交 |
+| `cline` | 是 | 原地重写的任务 JSON（经 `internal/harness/clinetask`） |
+| `codebuddy` | 是 | 追加式 JSONL |
+| `codex` | 是 | `thread_spawn.parent_thread_id` / `parent_thread_id` / `forked_from_id` |
+| `crush` | 是 | sqlite；会话可互相引用 |
+| `droid` | 否 | 工具无子代理概念 |
+| `dsh` | 是 | JSONL（子代理侧可能是 `.jsonl.zstd`） |
+| `forge` | 否 | sqlite；没有 cache write / reasoning / 父会话 / 请求 id 信号 |
+| `gemini` | 是 | JSON / JSONL / zstd 三种源 |
+| `goose` | 否 | 工具无子代理概念 |
+| `grok` | 否 | 工具无子代理概念 |
+| `hermes` | 是 | sqlite |
+| `kilo` | 是 | 原地重写的任务 JSON（经 `clinetask`） |
+| `kimi` | 是 | 追加式 JSONL |
+| `openclaude` | 是 | 追加式 JSONL |
+| `openclaw` | 否 | 解析器不产出 `ParentID`（`internal/harness/openclaw/openclaw.go:45`） |
+| `opencode` | 是 | sqlite；`parentID` 指向父会话 |
+| `pi` | 是 | JSONL；run-log 记录父会话 |
+| `qwen` | 否 | 工具无子代理概念 |
+| `roo` | 是 | 原地重写的任务 JSON（经 `clinetask`） |
+| `workbuddy` | 是 | 追加式 JSONL |
+
+上面 22 个 harness 都已注册进 `internal/app/app.go` 的空导入，`mytoken doctor`
+会列出它们。接入一个新 harness 的最后一步就是那次空导入：漏了它
+`harness.All()` 里就没有这个 harness，`doctor`、`scan`、`stats` 都看不见它，
+而单包测试仍然是绿的——最容易漏的一步。
+
 ## 2. 新增一个 harness
 
 1. 建包 `internal/harness/<name>/`，包内定义记录结构体、`New()` / `NewWithRoots(root string)`

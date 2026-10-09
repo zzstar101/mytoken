@@ -10,23 +10,36 @@ text each one requires. Adding an entry here is mandatory whenever code (not
 just a log format) is copied or adapted from another project — see
 docs/HARNESS.md §7.
 
-AS OF 0.1.x THIS REPOSITORY CONTAINS NO PORTED THIRD-PARTY CODE: the harness
-parsers are written from the observed log formats, and the section below is a
-FORMAT TEMPLATE (nothing in it is a real, filled-in entry yet). Delete the
-template text when the first real entry is added. Entries are kept in the order
-they were added.
+Entries are kept in the order they were added. The first real entry (codeburn,
+below) was added in 0.2, when the qwen, kimi, openclaude and claudedesktop
+harnesses were written from codeburn's provider readers.
 
 
 ================================================================================
-TEMPLATE — copy this block per upstream project (not an entry yet)
+codeburn — MIT
 ================================================================================
 
-  Upstream:   <repository URL>
+  Upstream:   https://github.com/getagentseal/codeburn
   License:    MIT
-  Used in:    <files/packages that contain ported or adapted code>
-  Ported by:  <who>, <when>
+  Used in:    internal/harness/qwen (from src/providers/qwen.ts),
+              internal/harness/kimi (src/providers/kimi.ts),
+              internal/harness/openclaude (src/providers/openclaude.ts),
+              internal/harness/claudedesktop (src/providers/claude.ts: Desktop
+              session/usage-ledger discovery and the Cowork ledger reader),
+              internal/harness/grok (src/providers/grok.ts: Grok Build session
+              and unified-log readers),
+              internal/harness/openclaw (src/providers/openclaw.ts: session
+              transcript store and legacy JSONL reader),
+              internal/harness/droid (src/providers/droid.ts: Factory session
+              reader and token-usage settings),
+              internal/harness/goose (src/providers/goose.ts: sessions.db
+              reader and accumulated-token accounting),
+              internal/harness/forge (src/providers/forge.ts: conversations
+              reader and per-message usage extraction)
+  Ported by:  flash-h2, 2026-10-09 (qwen, kimi, openclaude, claudedesktop)
+              flash-h3, 2026-10-09 (grok, openclaw, droid, goose, forge)
 
-  Copyright (c) <year> <upstream copyright holder>
+  Copyright (c) 2026 AgentSeal
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -45,22 +58,3 @@ TEMPLATE — copy this block per upstream project (not an entry yet)
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
-
-
-================================================================================
-KNOWN UPSTREAM, NOT YET PORTED — codeburn
-================================================================================
-
-  Upstream:   https://github.com/getagentseal/codeburn
-  License:    MIT
-  Copyright:  Copyright (c) 2026 AgentSeal
-  Status:     NOT INCLUDED YET. No source file in this repository is copied or
-              adapted from codeburn at 0.1.x, so no notice is owed today.
-
-  Planned port (0.2–0.5, when the corresponding harnesses are added): codeburn's
-  supervisor/provider log readers under src/providers/<tool>.ts correspond to
-  MyToken's internal/harness/<tool>/ packages. The FIRST such port must turn
-  this block into a full entry above: fill in the template with the upstream
-  URL, the copyright line above, the concrete files under internal/harness/ that
-  contain ported or adapted code, the porter and the date, and keep the MIT text
-  verbatim. Owner: the author of that port (see docs/HARNESS.md §7).

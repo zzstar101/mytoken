@@ -1,0 +1,4 @@
+default_model = "moonshot-v1-128k"
+
+[models."moonshot-v1-128k"]
+model = "moonshot-v1-128k"

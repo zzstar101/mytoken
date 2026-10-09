@@ -1,0 +1,218 @@
+{
+  "harness": "openclaw",
+  "sources": [
+    {
+      "path": "alpha/sessions/alpha-jsonl-1.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "alpha/sessions/alpha-jsonl-2.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "beta/agent/openclaw-agent.sqlite:beta-store-1",
+      "kind": "sqlite"
+    },
+    {
+      "path": "beta/agent/openclaw-agent.sqlite:beta-store-2",
+      "kind": "sqlite"
+    }
+  ],
+  "events": [
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-1:alpha-call-1",
+      "sessionId": "alpha-jsonl-1",
+      "timestamp": "2026-03-02T11:00:05Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 1200,
+        "output": 260,
+        "cacheRead": 300,
+        "cacheWrite": 80,
+        "reasoning": 0
+      },
+      "costUsd": 0.0312,
+      "requestId": "alpha-call-1"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-1:alpha-call-2",
+      "sessionId": "alpha-jsonl-1",
+      "timestamp": "2026-03-02T11:01:06Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 900,
+        "output": 180,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "alpha-call-2"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-1:alpha-call-4",
+      "sessionId": "alpha-jsonl-1",
+      "timestamp": "2026-03-02T11:03:07Z",
+      "model": "gpt-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 640,
+        "output": 150,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "alpha-call-4"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-1:alpha-call-6",
+      "sessionId": "alpha-jsonl-1",
+      "timestamp": "2026-03-02T11:05:00Z",
+      "model": "gpt-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 120,
+        "output": 40,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "alpha-call-6"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-1:h:84db4d05f7f05102:0",
+      "sessionId": "alpha-jsonl-1",
+      "timestamp": "2026-03-02T11:04:00Z",
+      "model": "gpt-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 300,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-1:h:84db4d05f7f05102:1",
+      "sessionId": "alpha-jsonl-1",
+      "timestamp": "2026-03-02T11:04:00Z",
+      "model": "gpt-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 300,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:alpha-jsonl-2:alpha2-call-1",
+      "sessionId": "alpha-jsonl-2",
+      "timestamp": "2026-03-02T13:00:09Z",
+      "model": "openclaw-auto",
+      "provider": "openai",
+      "tokens": {
+        "input": 400,
+        "output": 110,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.009,
+      "requestId": "alpha2-call-1"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:beta-store-1:beta-store-1-call-a",
+      "sessionId": "beta-store-1",
+      "timestamp": "2026-03-02T12:00:07Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 1200,
+        "output": 260,
+        "cacheRead": 300,
+        "cacheWrite": 80,
+        "reasoning": 0
+      },
+      "costUsd": 0.042,
+      "requestId": "beta-store-1-call-a"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:beta-store-1:beta-store-1-call-b",
+      "sessionId": "beta-store-1",
+      "timestamp": "2026-03-02T12:01:07Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "tokens": {
+        "input": 500,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "beta-store-1-call-b"
+    },
+    {
+      "harness": "openclaw",
+      "dedupKey": "openclaw:beta-store-2:beta-store-2-call-a",
+      "sessionId": "beta-store-2",
+      "timestamp": "2026-03-02T14:00:04Z",
+      "model": "gpt-5-mini",
+      "provider": "openai",
+      "tokens": {
+        "input": 800,
+        "output": 120,
+        "cacheRead": 40,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "costUsd": 0.0077,
+      "requestId": "beta-store-2-call-a"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "openclaw",
+      "sessionId": "alpha-jsonl-1",
+      "title": "Refactor the cache layer",
+      "project": "alpha",
+      "startedAt": "2026-03-02T11:00:00Z",
+      "updatedAt": "2026-03-02T11:05:00Z"
+    },
+    {
+      "harness": "openclaw",
+      "sessionId": "alpha-jsonl-2",
+      "title": "Trim the release checklist",
+      "project": "alpha",
+      "startedAt": "2026-03-02T13:00:00Z",
+      "updatedAt": "2026-03-02T13:00:09Z"
+    },
+    {
+      "harness": "openclaw",
+      "sessionId": "beta-store-1",
+      "title": "Summarise the store migration",
+      "project": "beta",
+      "startedAt": "2026-03-02T12:00:00Z",
+      "updatedAt": "2026-03-02T12:01:07Z"
+    },
+    {
+      "harness": "openclaw",
+      "sessionId": "beta-store-2",
+      "project": "beta",
+      "startedAt": "2026-03-02T14:00:00Z",
+      "updatedAt": "2026-03-02T14:00:04Z"
+    }
+  ]
+}

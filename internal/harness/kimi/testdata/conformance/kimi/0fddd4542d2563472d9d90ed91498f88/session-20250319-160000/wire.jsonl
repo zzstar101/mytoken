@@ -1,0 +1,8 @@
+{"timestamp":1742399999,"message":{"type":"metadata","payload":{"session_id":"session-20250319-160000"}}}
+{"timestamp":1742400000,"message":{"type":"TurnBegin","payload":{"user_input":"explain the kimi wire format"}}}
+{"timestamp":1742400001,"message":{"type":"StatusUpdate","payload":{"message_id":"k-1","model":"kimi-k2-0905-preview","token_usage":{"input":1000,"output":200,"input_cache_read":400,"input_cache_creation":100}}}}
+{"timestamp":1742400002,"message":{"type":"ToolCall","payload":{"function":{"name":"Shell","arguments":"{\"command\":\"grep -r SENTINEL_PRIVATE_TEXT .\"}"}}}}
+{"timestamp":1742400003,"message":{"type":"StatusUpdate","payload":{"message_id":"k-2","model":"kimi-k2-0905-preview","token_usage":{"input_other":300,"output":40,"input_cache_read":100}}}}
+{"timestamp":1742400004,"message":{"type":"StatusUpdate","payload":{"message_id":"k-3","model":"kimi-k2-0905-preview","token_usage":{"input":0,"output":0,"input_cache_read":0,"input_cache_creation":0}}}}
+{"timestamp":1742400005,"message":{"type":"SteerInput","payload":{"user_input":[{"text":"now check the second work dir, note SENTINEL_PRIVATE_TEXT"}]}}}
+{"timestamp":1742400006,"message":{"type":"StatusUpdate","payload":{"message_id":"k-4","model":"kimi-k2-0905-preview","text":"assistant reply SENTINEL_PRIVATE_TEXT","token_usage":{"input":250,"output":30,"input_cache_read":50}}}}

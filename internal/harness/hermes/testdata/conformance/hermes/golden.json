@@ -1,0 +1,99 @@
+{
+  "harness": "hermes",
+  "sources": [
+    {
+      "path": "state.db",
+      "kind": "sqlite"
+    }
+  ],
+  "events": [
+    {
+      "harness": "hermes",
+      "dedupKey": "20260102_030405_01a00001#deepseek-v4-pro",
+      "sessionId": "20260102_030405_01a00001",
+      "projectPath": "/home/user/fixture-hermes",
+      "timestamp": "2026-01-02T03:04:09Z",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "tokens": {
+        "input": 1000,
+        "output": 200,
+        "cacheRead": 800,
+        "cacheWrite": 120,
+        "reasoning": 40
+      }
+    },
+    {
+      "harness": "hermes",
+      "dedupKey": "20260102_030410_01b00002#gpt-5.5",
+      "sessionId": "20260102_030410_01b00002",
+      "parentId": "20260102_030405_01a00001",
+      "projectPath": "/home/user/fixture-hermes",
+      "timestamp": "2026-01-02T03:04:13Z",
+      "model": "gpt-5.5",
+      "provider": "custom",
+      "baseUrl": "https://api.example.com/v1",
+      "tokens": {
+        "input": 400,
+        "output": 80,
+        "cacheRead": 200,
+        "cacheWrite": 50,
+        "reasoning": 25
+      },
+      "costUsd": 0.25
+    },
+    {
+      "harness": "hermes",
+      "dedupKey": "20260102_030440_01e00005#deepseek-v4-pro",
+      "sessionId": "20260102_030440_01e00005",
+      "projectPath": "/home/user/fixture-hermes",
+      "timestamp": "2026-01-02T03:04:42Z",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "tokens": {
+        "input": 300,
+        "output": 90,
+        "cacheRead": 100,
+        "cacheWrite": 10,
+        "reasoning": 0
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "hermes",
+      "sessionId": "20260102_030405_01a00001",
+      "title": "fixture hermes: recompute the totals after compaction",
+      "project": "/home/user/fixture-hermes",
+      "startedAt": "2026-01-02T03:04:05Z",
+      "updatedAt": "2026-01-02T03:04:09Z"
+    },
+    {
+      "harness": "hermes",
+      "sessionId": "20260102_030410_01b00002",
+      "parentId": "20260102_030405_01a00001",
+      "title": "fixture subagent: summarize the failing hermes check",
+      "project": "/home/user/fixture-hermes",
+      "startedAt": "2026-01-02T03:04:10Z",
+      "updatedAt": "2026-01-02T03:04:13Z"
+    },
+    {
+      "harness": "hermes",
+      "sessionId": "20260102_030430_01d00004",
+      "title": "fixture hermes: empty run without usage",
+      "project": "/home/user/fixture-hermes",
+      "startedAt": "2026-01-02T03:04:30Z",
+      "updatedAt": "2026-01-02T03:04:30Z"
+    },
+    {
+      "harness": "hermes",
+      "sessionId": "20260102_030440_01e00005",
+      "title": "fixture hermes: second batch growth step",
+      "project": "/home/user/fixture-hermes",
+      "startedAt": "2026-01-02T03:04:40Z",
+      "updatedAt": "2026-01-02T03:04:42Z"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{"timestamp":1742400010,"message":{"type":"TurnBegin","payload":{"user_input":"explore the token mapping"}}}
+{"timestamp":1742400011,"message":{"type":"StatusUpdate","payload":{"message_id":"k-a1","model":"kimi-k2-0905-preview","token_usage":{"input":500,"output":60,"input_cache_read":200}}}}
+{"timestamp":1742400012,"message":{"type":"TurnEnd","payload":{}}}
+{"timestamp":1742400013,"message":{"type":"StatusUpdate","payload":{"message_id":"k-a2","model":"kimi-k2-0905-preview","token_usage":{"input_tokens":50,"output_tokens":5,"cached_input_tokens":10}}}}

@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2025-03-19T16:00:10Z","sessionId":"cd-agent-1","cwd":"/Users/demo/proj","uuid":"a-1","message":{"role":"user","content":"explore the token mapping"}}
+{"type":"assistant","timestamp":"2025-03-19T16:00:11Z","sessionId":"cd-agent-1","cwd":"/Users/demo/proj","uuid":"a-2","requestId":"req-a1","message":{"id":"msg_a1","model":"claude-sonnet-4-5","role":"assistant","usage":{"input_tokens":500,"output_tokens":60,"cache_read_input_tokens":200,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"child reply SENTINEL_PRIVATE_TEXT"}]}}

@@ -1,0 +1,118 @@
+{
+  "harness": "qwen",
+  "sources": [
+    {
+      "path": "-Users-demo-proj/chats/sess-q1.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "-Users-demo-second/chats/sess-q2.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "qwen",
+      "dedupKey": "qwen:sess-q1:q-2",
+      "sessionId": "sess-q1",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-02-01T09:00:05Z",
+      "model": "qwen3-coder-plus",
+      "provider": "qwen",
+      "tokens": {
+        "input": 80,
+        "output": 40,
+        "cacheRead": 20,
+        "cacheWrite": 0,
+        "reasoning": 12
+      },
+      "requestId": "q-2"
+    },
+    {
+      "harness": "qwen",
+      "dedupKey": "qwen:sess-q1:q-4",
+      "sessionId": "sess-q1",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-02-01T09:01:30Z",
+      "model": "qwen3-coder-plus",
+      "provider": "qwen",
+      "tokens": {
+        "input": 30,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "q-4"
+    },
+    {
+      "harness": "qwen",
+      "dedupKey": "qwen:sess-q1:q-6",
+      "sessionId": "sess-q1",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-02-01T09:03:00Z",
+      "model": "qwen3-max",
+      "provider": "qwen",
+      "tokens": {
+        "input": 60,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 5
+      },
+      "requestId": "q-6"
+    },
+    {
+      "harness": "qwen",
+      "dedupKey": "qwen:sess-q2:r-2",
+      "sessionId": "sess-q2",
+      "projectPath": "second",
+      "timestamp": "2026-02-01T10:00:20Z",
+      "model": "qwen3-max",
+      "provider": "qwen",
+      "tokens": {
+        "input": 150,
+        "output": 60,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "reasoning": 20
+      },
+      "requestId": "r-2"
+    },
+    {
+      "harness": "qwen",
+      "dedupKey": "qwen:sess-q2:r-4",
+      "sessionId": "sess-q2",
+      "projectPath": "second",
+      "timestamp": "2026-02-01T10:00:00Z",
+      "model": "qwen3-coder-plus",
+      "provider": "qwen",
+      "tokens": {
+        "input": 12,
+        "output": 4,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "r-4"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "qwen",
+      "sessionId": "sess-q1",
+      "title": "summarise the qwen token accounting",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-02-01T09:00:00Z",
+      "updatedAt": "2026-02-01T09:03:00Z"
+    },
+    {
+      "harness": "qwen",
+      "sessionId": "sess-q2",
+      "title": "plan the schema migration",
+      "project": "second",
+      "startedAt": "2026-02-01T10:00:00Z",
+      "updatedAt": "2026-02-01T10:01:00Z"
+    }
+  ]
+}

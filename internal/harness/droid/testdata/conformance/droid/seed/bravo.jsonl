@@ -1,0 +1,4 @@
+{"type":"session_start","id":"droid-bravo-notes","timestamp":"2026-03-03T11:00:00Z","cwd":"/Users/demo/bravo-notes","version":"0.62.1"}
+{"type":"message","id":"bravo-m1","timestamp":"2026-03-03T11:00:05Z","message":{"role":"user","content":[{"type":"text","text":"Summarise the store migration"}]}}
+{"type":"message","id":"bravo-m2","timestamp":"2026-03-03T11:00:12Z","message":{"role":"assistant","content":[{"type":"text","text":"The migration notes mention SENTINEL_PRIVATE_TEXT in passing."}]}}
+{"type":"message","id":"bravo-m3","timestamp":"2026-03-03T11:00:20Z","message":{"role":"assistant","content":[{"type":"text","text":"Full notes are in the pull request."}]}}

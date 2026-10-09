@@ -1,0 +1,3 @@
+{"ts":"2026-05-04T10:00:01.000Z","params":{"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"Trim the release checklist"}}}}
+{"ts":"2026-05-04T10:00:04.000Z","params":{"_meta":{"totalTokens":9000},"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Pruning stale steps."}}}}
+{"ts":"2026-05-04T10:00:08.000Z","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"t1","usage":{"inputTokens":900,"outputTokens":140,"cachedReadTokens":0,"cacheCreationTokens":0,"reasoningTokens":0}}}}

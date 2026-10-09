@@ -1,0 +1,75 @@
+{
+  "harness": "droid",
+  "sources": [
+    {
+      "path": "sessions/2026-03-02/alpha.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "sessions/2026-03-02/charlie.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "sessions/2026-03-03/bravo.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "droid",
+      "dedupKey": "droid:droid-alpha-cache:1400:320:90:480:60",
+      "sessionId": "droid-alpha-cache",
+      "projectPath": "/Users/demo/alpha-cache",
+      "timestamp": "2026-03-02T10:05:00Z",
+      "model": "GLM-5.1",
+      "tokens": {
+        "input": 1400,
+        "output": 320,
+        "cacheRead": 480,
+        "cacheWrite": 90,
+        "reasoning": 60
+      }
+    },
+    {
+      "harness": "droid",
+      "dedupKey": "droid:droid-bravo-notes:800:210:40:260:55",
+      "sessionId": "droid-bravo-notes",
+      "projectPath": "/Users/demo/bravo-notes",
+      "timestamp": "2026-03-03T11:00:20Z",
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "input": 800,
+        "output": 210,
+        "cacheRead": 260,
+        "cacheWrite": 40,
+        "reasoning": 55
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "droid",
+      "sessionId": "droid-alpha-cache",
+      "title": "Refactor the cache layer",
+      "project": "alpha-cache",
+      "startedAt": "2026-03-02T10:00:00Z",
+      "updatedAt": "2026-03-02T10:05:00Z"
+    },
+    {
+      "harness": "droid",
+      "sessionId": "droid-bravo-notes",
+      "title": "Summarise the store migration",
+      "project": "bravo-notes",
+      "startedAt": "2026-03-03T11:00:00Z",
+      "updatedAt": "2026-03-03T11:00:20Z"
+    },
+    {
+      "harness": "droid",
+      "sessionId": "droid-charlie-scratch",
+      "title": "Scratch notes",
+      "project": "charlie-scratch",
+      "startedAt": "2026-03-02T09:00:00Z",
+      "updatedAt": "2026-03-02T09:01:00Z"
+    }
+  ]
+}

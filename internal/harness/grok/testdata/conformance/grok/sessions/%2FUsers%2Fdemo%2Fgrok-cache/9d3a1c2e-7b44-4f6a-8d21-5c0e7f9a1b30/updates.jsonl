@@ -1,0 +1,12 @@
+{"ts":"2026-05-04T08:30:01.000Z","params":{"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"Refactor   the widget cache\nlayer"}}}}
+{"ts":"2026-05-04T08:30:04.000Z","params":{"_meta":{"totalTokens":12000},"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Reading the cache module."}}}}
+{"ts":"2026-05-04T08:30:09.000Z","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"t1","usage":{"inputTokens":1800,"outputTokens":240,"cachedReadTokens":500,"cacheCreationTokens":120,"reasoningTokens":80,"modelUsage":{"grok-4-fast":{"inputTokens":1800,"outputTokens":240,"cachedReadTokens":500,"cacheCreationTokens":120,"reasoningTokens":80}}}}}}
+{"ts":"2026-05-04T08:30:15.000Z","params":{"_meta":{"totalTokens":18000},"update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"The caller retries with SENTINEL_PRIVATE_TEXT so the cache must be invalidated."}}}}
+{"ts":"2026-05-04T08:30:16.000Z","params":{"_meta":{"totalTokens":18100},"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Done - SENTINEL_PRIVATE_TEXT is covered by a test now."}}}}
+{"ts":"2026-05-04T08:30:20.000Z","params":{"_meta":{"totalTokens":4000},"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Continuing after compaction."}}}}
+{"ts":"2026-05-04T08:30:26.000Z","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"t2","usage":{"inputTokens":2600,"outputTokens":310,"cachedReadTokens":0,"cacheCreationTokens":0,"reasoningTokens":0}}}}
+{"ts":"2026-05-04T08:30:31.000Z","params":{"_meta":{"promptId":"t2"},"update":{"sessionUpdate":"turn_completed","prompt_id":"t2","usage":{"inputTokens":2700,"outputTokens":330,"cachedReadTokens":0,"cacheCreationTokens":0,"reasoningTokens":0}}}}
+{"ts":"2026-05-04T08:30:32.000Z","params":{"update":{"sessionUpdate":"tool_call","title":"grep","rawInput":{"pattern":"SENTINEL_PRIVATE_TEXT"}}}}
+{"ts":"2026-05-04T08:30:35.000Z","params":{"_meta":{"promptId":"t3"},"update":{"sessionUpdate":"turn_completed","prompt_id":"t3"}}}
+{"params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"t4","usage":{"inputTokens":300}}}}
+{"ts":"2026-05-04T08:30:37.000Z","params":{"_meta":{"totalTokens":5200},"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Wrapping up."}}}}

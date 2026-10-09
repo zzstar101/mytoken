@@ -1,0 +1,128 @@
+{
+  "harness": "openclaude",
+  "sources": [
+    {
+      "path": "-Users-demo-proj/oc-main.jsonl",
+      "kind": "jsonl"
+    },
+    {
+      "path": "-Users-demo-proj/oc-other.jsonl",
+      "kind": "jsonl"
+    }
+  ],
+  "events": [
+    {
+      "harness": "openclaude",
+      "dedupKey": "openclaude:message:msg_3",
+      "sessionId": "oc-agent-1",
+      "parentId": "oc-main",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-03-01T08:02:00Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "openclaude",
+      "tokens": {
+        "input": 300,
+        "output": 60,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "msg_3"
+    },
+    {
+      "harness": "openclaude",
+      "dedupKey": "openclaude:message:msg_5",
+      "sessionId": "oc-other",
+      "projectPath": "/Users/demo/other",
+      "timestamp": "2026-03-01T08:10:00Z",
+      "model": "gpt-5",
+      "provider": "openclaude",
+      "tokens": {
+        "input": 700,
+        "output": 90,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 30
+      },
+      "requestId": "msg_5"
+    },
+    {
+      "harness": "openclaude",
+      "dedupKey": "openclaude:oc-main:msg_1:req-1",
+      "sessionId": "oc-main",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-03-01T08:00:10Z",
+      "model": "claude-sonnet-4-5",
+      "provider": "openclaude",
+      "tokens": {
+        "input": 1000,
+        "output": 150,
+        "cacheRead": 400,
+        "cacheWrite": 100,
+        "reasoning": 50
+      },
+      "requestId": "req-1"
+    },
+    {
+      "harness": "openclaude",
+      "dedupKey": "openclaude:oc-main:msg_2:req-2",
+      "sessionId": "oc-main",
+      "projectPath": "/Users/demo/proj",
+      "timestamp": "2026-03-01T08:01:05Z",
+      "model": "deepseek-chat",
+      "provider": "openclaude",
+      "tokens": {
+        "input": 500,
+        "output": 80,
+        "cacheRead": 200,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "req-2",
+      "boundary": "compact"
+    },
+    {
+      "harness": "openclaude",
+      "dedupKey": "openclaude:oc-other:msg_6:req-3",
+      "sessionId": "oc-other",
+      "projectPath": "/Users/demo/other",
+      "timestamp": "2026-03-01T08:10:00Z",
+      "model": "gpt-5",
+      "provider": "openclaude",
+      "tokens": {
+        "input": 40,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "requestId": "req-3"
+    }
+  ],
+  "sessions": [
+    {
+      "harness": "openclaude",
+      "sessionId": "oc-agent-1",
+      "parentId": "oc-main",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-03-01T08:02:00Z",
+      "updatedAt": "2026-03-01T08:02:00Z"
+    },
+    {
+      "harness": "openclaude",
+      "sessionId": "oc-main",
+      "title": "wire up the openclaude transcript reader",
+      "project": "/Users/demo/proj",
+      "startedAt": "2026-03-01T08:00:00Z",
+      "updatedAt": "2026-03-01T08:03:05Z"
+    },
+    {
+      "harness": "openclaude",
+      "sessionId": "oc-other",
+      "title": "name the second openclaude session",
+      "project": "/Users/demo/other",
+      "startedAt": "2026-03-01T08:10:00Z",
+      "updatedAt": "2026-03-01T08:10:30Z"
+    }
+  ]
+}
