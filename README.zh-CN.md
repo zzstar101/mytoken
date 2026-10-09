@@ -22,10 +22,11 @@
 **你的 token 都花在哪了？** MyToken!!!!! 读取 AI 编程 harness 已经写在磁盘上的会话日志，把每一次请求归到
 会话 × 供应商 × 模型，算出费用，然后在原生桌面应用里展示出来 —— 也可以用命令行直接拿到 JSON。
 
-一切都在你自己的机器上完成。没有账号、没有遥测、没有上传：应用唯一的网络请求就是下载价格表。
+一切都在你自己的机器上完成。没有账号、没有遥测、没有上传：默认只发一个请求（价格表）；中转站对账需逐站开启，只用你已交给该站点的 Key 访问该站点本身。
 
-- **一个窗口里看十个 harness** —— Claude Code、Codex CLI、DSH、Gemini CLI、opencode、Crush、
-  Cline、Roo Code、Kilo Code 和 pi。
+- **一个窗口里看二十二个 harness** —— Claude Code、Codex CLI、DSH、pi、Gemini CLI、opencode、Crush、
+  Cline、Roo Code、Kilo Code、Claude Desktop、WorkBuddy、CodeBuddy、Hermes、Qwen Code、Kimi、
+  OpenClaude、Grok、OpenClaw、Droid、Goose、Forge。
 - **会话 × 供应商 × 模型** —— 五类 token 分开统计（input、output、cache read、cache write、
   reasoning），同时给出缓存命中率、按项目 / 按天的拆分，以及子代理树。
 - **可审计的归因** —— 每个供应商都标注了它是怎么确定的：`log`、`cc-switch`、`config-timeline`、
@@ -68,6 +69,18 @@ MyToken!!!!! 读取每个 harness 本来就保留的日志，只读、不回写�
 | Cline | `cline` | `…/globalStorage/saoudrizwan.claude-dev/tasks`，以及 `~/.cline/data/tasks` 和 `~/.cline/data/sessions` |
 | Roo Code | `roo` | `…/globalStorage/rooveterinaryinc.roo-cline/tasks` |
 | Kilo Code | `kilo` | `…/globalStorage/kilocode.kilo-code/tasks` |
+| Claude Desktop | `claude-desktop` | `…/Claude/local-agent-mode-sessions` 及其 `Claude-3p` 兄弟目录（macOS：`~/Library/Application Support`，Windows：`%APPDATA%`），另有 Cowork usage ledger |
+| WorkBuddy | `workbuddy` | `$WORKBUDDY_HOME/projects`（默认 `~/.workbuddy/projects`） |
+| CodeBuddy | `codebuddy` | `$CODEBUDDY_HOME/projects`（默认 `~/.codebuddy/projects`） |
+| Hermes | `hermes` | `$HERMES_HOME`（默认 `~/.hermes`），SQLite |
+| Qwen Code | `qwen` | `$QWEN_DATA_DIR/projects`（默认 `~/.qwen/projects`） |
+| Kimi | `kimi` | `$KIMI_SHARE_DIR/sessions`（默认 `~/.kimi/sessions`） |
+| OpenClaude | `openclaude` | `$CODEBURN_OPENCLAUDE_DIR/projects`，否则 `~/.openclaude/projects` |
+| Grok | `grok` | `$GROK_HOME`（默认 `~/.grok`） |
+| OpenClaw | `openclaw` | `~/.openclaw/agents`，以及 `~/.moltbot`、`~/.moldbot`、`~/.clawdbot` 三种拼写 |
+| Droid | `droid` | `$FACTORY_DIR`（默认 `~/.factory`） |
+| Goose | `goose` | `$GOOSE_PATH_ROOT/…`，否则 `~/.local/share/goose/sessions`（Windows：`%APPDATA%\Block\goose\sessions`），SQLite |
+| Forge | `forge` | 默认 `~/.forge`，SQLite |
 
 VS Code 系扩展的 `…/globalStorage` 会按平台和编辑器解析 —— 编辑器：VS Code、VS Code Insiders、
 Cursor、Windsurf、VSCodium、Trae；平台：macOS 是 `~/Library/Application Support/<编辑器>/User/globalStorage`，
@@ -91,6 +104,17 @@ Linux 是 `~/.config/<编辑器>/User/globalStorage`（或 `$XDG_CONFIG_HOME/…
 | `MYTOKEN_CRUSH_DIRS` | 直接指定 Crush 目录（路径列表） |
 | `CLINE_DIR`、`CLINE_DATA_DIR`、`CLINE_SESSION_DATA_DIR` | Cline 数据目录 |
 | `MYTOKEN_CLINE_DIRS`、`MYTOKEN_ROO_DIRS`、`MYTOKEN_KILO_DIRS` | 直接指定 Cline / Roo / Kilo 目录（路径列表） |
+| `MYTOKEN_CLAUDEDESKTOP_DIRS` | 直接指定 Claude Desktop 会话目录（路径列表） |
+| `WORKBUDDY_HOME`、`CODEBUDDY_HOME` | 用该目录替代 `~/.workbuddy` / `~/.codebuddy` 作为 WorkBuddy / CodeBuddy 主目录 |
+| `HERMES_HOME` | 用该目录替代 `~/.hermes` 作为 Hermes 主目录 |
+| `QWEN_DATA_DIR`、`MYTOKEN_QWEN_DIRS` | Qwen Code 数据目录，或直接指定目录（路径列表） |
+| `KIMI_SHARE_DIR`、`MYTOKEN_KIMI_DIRS` | Kimi share 目录，或直接指定目录（路径列表） |
+| `CODEBURN_OPENCLAUDE_DIR`、`MYTOKEN_OPENCLAUDE_DIRS` | OpenClaude 数据目录，或直接指定目录（路径列表） |
+| `GROK_HOME`、`MYTOKEN_GROK_DIRS` | Grok 主目录，或直接指定目录（路径列表） |
+| `MYTOKEN_OPENCLAW_DIRS` | 直接指定 OpenClaw agent 目录（路径列表） |
+| `FACTORY_DIR`、`MYTOKEN_DROID_DIRS` | Droid 主目录，或直接指定目录（路径列表） |
+| `GOOSE_PATH_ROOT`、`MYTOKEN_GOOSE_DIRS` | Goose 数据根目录，或直接指定目录（路径列表） |
+| `MYTOKEN_FORGE_DIRS` | 直接指定 Forge 目录（路径列表） |
 
 ## 供应商归因
 
@@ -122,7 +146,8 @@ Linux 是 `~/.config/<编辑器>/User/globalStorage`（或 `$XDG_CONFIG_HOME/…
 ## 隐私
 
 - **纯本地。** 索引、价格缓存和设置都不会离开你的机器。没有遥测、没有统计、没有崩溃上报、没有账号、没有同步。
-- **只有一个网络请求。** 下载价格表（先 models.dev，再 LiteLLM），仅此而已。有缓存或内置快照时，应用一个请求都不发。
+- **默认只发一个请求（价格表）。** 价格表先取 models.dev，回退 LiteLLM；有缓存或内置快照时一个请求都不发。中转站对账默认全关，按站点、按层（倍率 / 余额 / 账单）逐个开启，没开启前不会联系任何站点。
+- **Key 不落盘、不外传。** 中转站的 Key 只在内存里读取，只发往它所属的站点本身；索引里只存 Key ID（SHA-256 的前 12 位十六进制）。Key 不会出现在日志、错误信息或 `--json` 输出里。
 - **只读读取器。** harness 日志只以只读方式打开；索引是独立的 SQLite 文件，随时可以删掉重来。
 - **不存对话内容。** 只存数字和元数据，唯一例外是会话标题：首条用户消息的前 60 个字符，只为让会话列表可读。
 
@@ -255,8 +280,11 @@ Windows 三个平台运行 `go vet` 和 `go test`，并额外做一次 `gofmt` �
 
 ## 致谢
 
-- **[tokscale](https://github.com/search?q=tokscale)** —— 多个 harness 的解析规则移植自 tokscale，
-  包括 Gemini CLI 的 token 折叠方式和它接受的各种字段名。
+- **[tokscale](https://github.com/junhoyeo/tokscale)** —— 多个 harness 的读取器参照了 tokscale 公开的解析规则
+  （比如 Gemini CLI 的 token 折叠方式和它接受的各种字段名），没有复制代码。
+- **[codeburn](https://github.com/getagentseal/codeburn)** —— qwen、kimi、openclaude、claude-desktop、
+  grok、openclaw、droid、goose、forge 九个读取器参照其 provider 读取器编写（见
+  [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)）。
 - **[MyGo](https://github.com/egoist/mygo)** —— 应用所用的原生 UI 工具包。由 MyGo 强力驱动！
 - **[models.dev](https://models.dev)** 与 **[LiteLLM](https://github.com/BerriAI/litellm)** —— 价格表来源。
 - **cc-switch** —— 价格导入格式，以及归因所使用的供应商请求日志。

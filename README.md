@@ -23,11 +23,13 @@
 already write to disk, attributes every request to a session, provider and model, prices it, and
 shows you the result in a native desktop app — or as JSON from the command line.
 
-Everything happens on your machine. No account, no telemetry, no uploads: the only network request
-the app ever makes is the price table download.
+Everything happens on your machine. No account, no telemetry, no uploads: by default the only
+network request the app ever makes is the price table download — relay-site reconciliation is opt-in
+per site, and a site is only ever contacted with the key you already gave that site.
 
-- **Ten harnesses in one window** — Claude Code, Codex CLI, DSH, Gemini CLI, opencode, Crush,
-  Cline, Roo Code, Kilo Code and pi.
+- **Twenty-two harnesses in one window** — Claude Code, Codex CLI, DSH, pi, Gemini CLI, opencode,
+  Crush, Cline, Roo Code, Kilo Code, Claude Desktop, WorkBuddy, CodeBuddy, Hermes, Qwen Code, Kimi,
+  OpenClaude, Grok, OpenClaw, Droid, Goose and Forge.
 - **Session × provider × model** — token classes kept apart (input, output, cache read, cache write,
   reasoning), with cache-hit rate, per-project and per-day breakdowns, and sub-agent trees.
 - **Attribution you can audit** — every provider is labelled with how it was determined: `log`,
@@ -73,6 +75,18 @@ first user message).
 | Cline | `cline` | `…/globalStorage/saoudrizwan.claude-dev/tasks`, plus `~/.cline/data/tasks` and `~/.cline/data/sessions` |
 | Roo Code | `roo` | `…/globalStorage/rooveterinaryinc.roo-cline/tasks` |
 | Kilo Code | `kilo` | `…/globalStorage/kilocode.kilo-code/tasks` |
+| Claude Desktop | `claude-desktop` | `…/Claude/local-agent-mode-sessions` and its `Claude-3p` sibling (macOS: `~/Library/Application Support`, Windows: `%APPDATA%`), plus the Cowork usage ledger |
+| WorkBuddy | `workbuddy` | `$WORKBUDDY_HOME/projects` (`~/.workbuddy/projects` by default) |
+| CodeBuddy | `codebuddy` | `$CODEBUDDY_HOME/projects` (`~/.codebuddy/projects` by default) |
+| Hermes | `hermes` | `$HERMES_HOME` (`~/.hermes` by default), SQLite |
+| Qwen Code | `qwen` | `$QWEN_DATA_DIR/projects` (`~/.qwen/projects` by default) |
+| Kimi | `kimi` | `$KIMI_SHARE_DIR/sessions` (`~/.kimi/sessions` by default) |
+| OpenClaude | `openclaude` | `$CODEBURN_OPENCLAUDE_DIR/projects`, else `~/.openclaude/projects` |
+| Grok | `grok` | `$GROK_HOME` (`~/.grok` by default) |
+| OpenClaw | `openclaw` | `~/.openclaw/agents`, plus the `~/.moltbot`, `~/.moldbot` and `~/.clawdbot` spellings |
+| Droid | `droid` | `$FACTORY_DIR` (`~/.factory` by default) |
+| Goose | `goose` | `$GOOSE_PATH_ROOT/…`, else `~/.local/share/goose/sessions` (Windows: `%APPDATA%\Block\goose\sessions`), SQLite |
+| Forge | `forge` | `~/.forge` by default, SQLite |
 
 For the VS Code family extensions, `…/globalStorage` is resolved per platform and per editor —
 editors: VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Trae; platforms:
@@ -98,6 +112,17 @@ archived logs:
 | `MYTOKEN_CRUSH_DIRS` | Explicit Crush dirs (path list) |
 | `CLINE_DIR`, `CLINE_DATA_DIR`, `CLINE_SESSION_DATA_DIR` | Cline data dirs |
 | `MYTOKEN_CLINE_DIRS`, `MYTOKEN_ROO_DIRS`, `MYTOKEN_KILO_DIRS` | Explicit Cline / Roo / Kilo dirs (path list) |
+| `MYTOKEN_CLAUDEDESKTOP_DIRS` | Explicit Claude Desktop session dirs (path list) |
+| `WORKBUDDY_HOME`, `CODEBUDDY_HOME` | WorkBuddy / CodeBuddy home dir instead of `~/.workbuddy` / `~/.codebuddy` |
+| `HERMES_HOME` | Hermes home dir instead of `~/.hermes` |
+| `QWEN_DATA_DIR`, `MYTOKEN_QWEN_DIRS` | Qwen Code data dir, or explicit dirs (path list) |
+| `KIMI_SHARE_DIR`, `MYTOKEN_KIMI_DIRS` | Kimi share dir, or explicit dirs (path list) |
+| `CODEBURN_OPENCLAUDE_DIR`, `MYTOKEN_OPENCLAUDE_DIRS` | OpenClaude data dir, or explicit dirs (path list) |
+| `GROK_HOME`, `MYTOKEN_GROK_DIRS` | Grok home dir, or explicit dirs (path list) |
+| `MYTOKEN_OPENCLAW_DIRS` | Explicit OpenClaw agent dirs (path list) |
+| `FACTORY_DIR`, `MYTOKEN_DROID_DIRS` | Droid home dir, or explicit dirs (path list) |
+| `GOOSE_PATH_ROOT`, `MYTOKEN_GOOSE_DIRS` | Goose data root, or explicit dirs (path list) |
+| `MYTOKEN_FORGE_DIRS` | Explicit Forge dirs (path list) |
 
 ## Provider attribution
 
@@ -134,8 +159,12 @@ priority chain, and the app tells you which step produced the answer:
 
 - **Local only.** The index, the price cache and the settings never leave your machine. There is no
   telemetry, no analytics, no crash reporting, no account and no sync.
-- **One network request.** The price table download (models.dev, then LiteLLM) — nothing else. With
-  a cached or bundled table the app makes no requests at all.
+- **One request by default — the price table.** models.dev, falling back to LiteLLM; with a cached or
+  bundled table the app makes no request at all. Relay reconciliation is off by default and enabled
+  per site and per layer (ratios, balance, bills), so nothing else is contacted until you ask.
+- **Keys are never stored or forwarded.** A relay key is read into memory, sent only to the site it
+  belongs to, and the index keeps just its key ID (the first 12 hex digits of a SHA-256). Keys never
+  appear in logs, error messages or `--json` output.
 - **Read-only readers.** Harness logs are opened for reading; the index is a separate SQLite file
   that you can delete at any time to start over.
 - **No conversation content.** Only numbers and metadata are stored. The single exception is the
@@ -276,8 +305,12 @@ Windows, plus a `gofmt` check, for every push and pull request.
 
 ## Credits
 
-- **[tokscale](https://github.com/search?q=tokscale)** — several harness readers are ports of
-  tokscale's parsing rules, including Gemini CLI's token folding and accepted field names.
+- **[tokscale](https://github.com/junhoyeo/tokscale)** — several harness readers follow tokscale's
+  documented parsing rules (for example Gemini CLI's token folding and accepted field names); no
+  code was copied.
+- **[codeburn](https://github.com/getagentseal/codeburn)** — the qwen, kimi, openclaude,
+  claude-desktop, grok, openclaw, droid, goose and forge readers were written from its provider
+  readers (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)).
 - **[MyGo](https://github.com/egoist/mygo)** — the native UI toolkit the app is built with. Powered by MyGo!
 - **[models.dev](https://models.dev)** and **[LiteLLM](https://github.com/BerriAI/litellm)** — the
   price tables.

@@ -33,6 +33,11 @@ const usage = `Usage: mytoken <command> [options]
   prices [list|import-ccswitch]
   prices set --provider NAME [--model NAME] [--multiplier N] [--input N]
              [--output N] [--cache-read N] [--cache-write N]
+  relay list [--format table|json|csv] [--json] [--offline]
+  relay enable <origin|provider> [--layers ratio,balance,bills] [--key-id ID]
+  relay disable <origin|provider> [--key-id ID]
+  relay sync [<origin|provider>] [--key-id ID]
+  reconcile [<origin|provider>] [--by category|model|day] [options]
 
 options for stats and sessions:
   --since DATE|DUR    range start (stats default 7d; sessions default all time)
@@ -49,6 +54,9 @@ DATE is YYYY-MM-DD, YYYYMMDD or RFC3339. DUR is Ns, Nh, Nd, Nw or Nm
 (Nm is a calendar month; minutes are written 90s).
 stats defaults: --since 7d --by session
 sessions defaults: --limit 50 (0 means all); most recently updated first.
+relay list and reconcile never use the network; relay enable and relay sync do,
+and refuse --offline. A relay site stays off until you enable it, and its key is
+never stored or printed - only its key ID (a truncated hash) appears.
 Exit status: 0 success, 1 operational error, 2 invalid arguments.
 `
 

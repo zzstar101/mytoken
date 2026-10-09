@@ -54,12 +54,117 @@ func addCommonFlags(fs *flag.FlagSet, cf *commonFlags, defaultSince string) {
 // parse parses args and remembers which flags were set, so resolve can tell an
 // explicit value from a default (needed for the --last/--since exclusion).
 func (cf *commonFlags) parse(fs *flag.FlagSet, args []string) error {
-	if e := fs.Parse(args); e != nil {
+	return cf.parseFlags(fs, args)
+}
+
+// parseFlags is parse for callers that already split flags from positional
+// arguments (see splitArgs).
+func (cf *commonFlags) parseFlags(fs *flag.FlagSet, flags []string) error {
+	if e := fs.Parse(flags); e != nil {
 		return e
 	}
 	cf.set = map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { cf.set[f.Name] = true })
 	return nil
+}
+
+// splitArgs separates flags from positional arguments so a command accepts its
+// target before or after the options: Go's flag package stops parsing at the
+// first positional argument, which would make `reconcile <origin> --by day` a
+// usage error. bools names the flags that take no value; any other flag written
+// as --name consumes the next argument as its value. A lone "--" ends flag
+// parsing, and everything after it is positional.
+func splitArgs(args []string, bools map[string]bool) (flags, positional []string, err error) {
+	terminated := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if terminated || arg == "-" || !strings.HasPrefix(arg, "-") {
+			positional = append(positional, arg)
+			continue
+		}
+		if arg == "--" {
+			terminated = true
+			continue
+		}
+		flags = append(flags, arg)
+		if strings.Contains(arg, "=") || bools[flagName(arg)] {
+			continue
+		}
+		if i+1 >= len(args) {
+			return nil, nil, fmt.Errorf("flag needs an argument: %s", arg)
+		}
+		i++
+		flags = append(flags, args[i])
+	}
+	return flags, positional, nil
+}
+
+// flagName strips the leading dashes and any =value from a flag argument.
+func flagName(arg string) string {
+	name := strings.TrimLeft(arg, "-")
+	if i := strings.IndexByte(name, '='); i >= 0 {
+		name = name[:i]
+	}
+	return name
+}
+
+// outputFlags are the output-only flags, for commands that take no time range
+// (relay list). Commands that must not omit cost reject --no-cost themselves.
+type outputFlags struct {
+	format string
+	json   bool
+
+	set map[string]bool // flags the user actually passed
+}
+
+// addOutputFlags registers the output flags on fs.
+func addOutputFlags(fs *flag.FlagSet, of *outputFlags) {
+	fs.StringVar(&of.format, "format", "table", "output format: table, json or csv")
+	fs.BoolVar(&of.json, "json", false, "alias for --format json")
+}
+
+// parse parses args and remembers which flags were set, so resolve can tell an
+// explicit --format from the default.
+func (of *outputFlags) parse(fs *flag.FlagSet, args []string) error {
+	return of.parseFlags(fs, args)
+}
+
+// parseFlags is parse for callers that already split flags from positional
+// arguments (see splitArgs).
+func (of *outputFlags) parseFlags(fs *flag.FlagSet, flags []string) error {
+	if e := fs.Parse(flags); e != nil {
+		return e
+	}
+	of.set = map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { of.set[f.Name] = true })
+	return nil
+}
+
+// resolve turns the output flags into one output format.
+func (of *outputFlags) resolve() (outputFormat, error) {
+	return resolveFormat(of.format, of.json, of.set["format"])
+}
+
+// resolveFormat merges --format and --json into a single format. --json is an
+// alias for --format json and is only rejected when it contradicts an explicit
+// --format.
+func resolveFormat(format string, jsonFlag, formatSet bool) (outputFormat, error) {
+	name := format
+	if name == "" {
+		name = string(formatTable)
+	}
+	if jsonFlag {
+		if formatSet && name != string(formatJSON) {
+			return "", fmt.Errorf("--json cannot be combined with --format %s", name)
+		}
+		name = string(formatJSON)
+	}
+	switch outputFormat(name) {
+	case formatTable, formatJSON, formatCSV:
+		return outputFormat(name), nil
+	default:
+		return "", fmt.Errorf("invalid --format %q (want table, json or csv)", name)
+	}
 }
 
 // options is the resolved form of commonFlags.
@@ -82,22 +187,11 @@ func (cf *commonFlags) resolve(now time.Time) (options, error) {
 		}
 		o.loc = loc
 	}
-	name := cf.format
-	if name == "" {
-		name = string(formatTable)
+	format, e := resolveFormat(cf.format, cf.json, cf.set["format"])
+	if e != nil {
+		return o, e
 	}
-	if cf.json {
-		if cf.set["format"] && name != string(formatJSON) {
-			return o, fmt.Errorf("--json cannot be combined with --format %s", name)
-		}
-		name = string(formatJSON)
-	}
-	switch outputFormat(name) {
-	case formatTable, formatJSON, formatCSV:
-		o.format = outputFormat(name)
-	default:
-		return o, fmt.Errorf("invalid --format %q (want table, json or csv)", name)
-	}
+	o.format = format
 	if cf.set["last"] && (cf.set["since"] || cf.set["until"]) {
 		other := "--since"
 		switch {

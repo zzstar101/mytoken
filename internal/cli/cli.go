@@ -45,6 +45,10 @@ func run(args []string, out, errout io.Writer) int {
 		return runPrices(ctx, args[1:], out, errout)
 	case "stats":
 		return runStats(ctx, args[1:], out, errout)
+	case "relay":
+		return runRelay(ctx, args[1:], out, errout)
+	case "reconcile":
+		return runReconcile(ctx, args[1:], out, errout)
 	default:
 		fmt.Fprintln(errout, "unknown command:", args[0])
 		return 2

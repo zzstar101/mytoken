@@ -18,7 +18,8 @@ Exit status: `0` success, `1` operational error, `2` invalid arguments.
 
 `stats` and `sessions` share the range, timezone, offline and output flags —
 including CSV export — described in [Range, time and output
-options](#range-time-and-output-options).
+options](#range-time-and-output-options). `relay list` and `reconcile` accept the
+output flags too, and `reconcile` accepts the range flags as well.
 
 ## scan
 
@@ -213,6 +214,97 @@ mytoken prices set --provider NAME [--model NAME] [--multiplier N]
 - `set` adds or replaces a user rule for a provider (optionally one model):
   either a `--multiplier` applied to catalog prices, or explicit prices in USD
   per million tokens. Existing events are repriced with the new rules.
+
+## relay
+
+```
+mytoken relay list    [--format table|json|csv] [--json] [--offline]
+mytoken relay enable  <origin|provider> [--layers ratio,balance,bills] [--key-id ID]
+mytoken relay disable <origin|provider> [--key-id ID]
+mytoken relay sync    [<origin|provider>] [--key-id ID]
+```
+
+Relay sites (中转站) are **off by default** — nothing is contacted until you
+enable one site, one key, one layer at a time. A layer maps to what the gateway
+publishes:
+
+| Layer | Flag name | What it reads |
+|-------|-----------|---------------|
+| L1 ratios | `ratio` | per-model price ratios, stored as dated price rules |
+| L2 balance | `balance` | the remaining/used quota of one key, snapshotted over time |
+| L3 bills | `bills` | per-request logs (new-api) or daily usage (sub2api) |
+
+- `list` shows every site this build knows about: sites you enabled and sites a
+  credential source (cc-switch, harness config) knows about but you never turned
+  on. It never uses the network; `--offline` is accepted and redundant.
+- `enable` identifies the site (one request to that origin) and starts syncing
+  the selected layers. `--layers` defaults to all three; `--key-id` picks one key
+  when several credentials match the origin.
+- `disable` stops syncing a site and keeps its row and history.
+- `sync` refreshes the enabled sites now. With no argument it syncs all of them.
+- A target may be an origin or a provider name (`claude-code`, `openai`, …).
+  Matching ignores case and a trailing slash on the origin. When a target names
+  several sites or several keys, `enable` and `disable` never guess: they list the
+  candidates and exit `1`, and you pick one with `--key-id`.
+
+**Privacy.** A key is read in memory, used for requests to its own origin only,
+and never stored, logged or printed: `relay list` shows the key *ID* (a truncated
+SHA-256, `keyId` in JSON) and nothing else. Every command except
+`enable`/`sync` stays entirely offline, and those two refuse `--offline` with
+exit status `2` rather than silently ignoring it.
+
+```sh
+mytoken relay list
+mytoken relay list --json | jq '.sites[] | select(.enabled) | {origin, layers}'
+mytoken relay enable https://api.example.com --layers ratio,balance
+mytoken relay sync
+mytoken relay disable https://api.example.com
+```
+
+`--format csv` writes the stable header
+`origin,key_id,has_key,kind,version,enabled,layers,providers,last_sync,last_error,remaining_usd,used_usd,unlimited`.
+
+## reconcile
+
+```
+mytoken reconcile [<origin|provider>] [--since DATE|DUR] [--until DATE|DUR] [--last WINDOW]
+                  [--timezone TZ] [--by category|model|day]
+                  [--format table|json|csv] [--json] [--key-id ID]
+```
+
+Compares what the local logs say you should have paid with what the relay site
+actually charged, and splits the difference into categories (`matched`,
+`price-diff`, `token-semantics`, `bill-only`, `event-only`, `refund`). It reads
+only the local index and the bills already synced, so it never uses the network.
+The default range is `--since 7d`; the range flags are the ones from
+[Range, time and output options](#range-time-and-output-options). `--no-cost` is
+refused (exit `2`) — the whole view is about money.
+
+The optional target is an origin or a provider name, matched the same way as in
+[`relay`](#relay). With no target every enabled site is reconciled, and JSON/CSV
+carry one report per site in a `reports` list. A target that matches no enabled
+site exits `1`; no enabled site at all is an empty view — the table prints a hint
+and exits `0`, and JSON/CSV write an empty list.
+
+`--by` selects the detail table:
+
+| `--by` | Detail rows |
+|--------|-------------|
+| `category` (default) | one row per difference category, with a note naming the model |
+| `model` | one row per model: local, formula and charged USD |
+| `day` | one row per local day, plus the multiplier and usage parts of the difference |
+
+The `day` CSV view also carries `multiplier_diff_usd`, `usage_diff_usd` and
+`unpriced`; the other views use
+`origin,key_id,category,count,local_usd,formula_usd,charged_usd,note` and
+`origin,key_id,model,count,local_usd,formula_usd,charged_usd`.
+
+```sh
+mytoken reconcile
+mytoken reconcile https://api.example.com --last month --by day
+mytoken reconcile --by category --format csv > differences.csv
+mytoken reconcile --last week --json | jq '.reports[0] | {localUsd, chargedUsd, impliedMultiplier}'
+```
 
 ## version / help
 
