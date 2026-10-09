@@ -8,8 +8,8 @@ to identify each tool.
 | File | Harness |
 |------|---------|
 | claudecode-color.svg | Claude Code |
-| codex-color.svg | Codex |
-| geminicli-color.svg | Gemini CLI |
+| openai.svg | Codex |
+| gemini-color.svg | Gemini CLI |
 | deepseek-color.svg | DeepSeek Harness |
 | opencode.svg | OpenCode |
 | cline.svg | Cline |

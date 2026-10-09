@@ -93,8 +93,8 @@ var harnessIcons = func() map[model.Harness]brandMark {
 	}
 	return map[model.Harness]brandMark{
 		model.ClaudeCode: {load("claudecode-color"), true, false},
-		model.Codex:      {load("codex-color"), true, true},
-		model.Gemini:     {load("geminicli-color"), true, true},
+		model.Codex:      {load("openai"), false, false},
+		model.Gemini:     {load("gemini-color"), true, false},
 		model.DSH:        {load("deepseek-color"), true, false},
 		model.OpenCode:   {load("opencode"), false, false},
 		model.Cline:      {load("cline"), false, false},
