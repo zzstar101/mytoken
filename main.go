@@ -145,8 +145,10 @@ func main() {
 			MinHeight:     640,
 			Hidden:        hidden,
 			TitleBarStyle: mygo.TitleBarHidden,
-			StateKey:      "main",
-			Content:       ui.View(func(c *ui.Context) { state.MainView(c) }),
+			// The traffic lights sit inside the sidebar card, not on its edge.
+			TrafficLightPosition: &mygo.Point{X: gui.TrafficLightX, Y: gui.TrafficLightY},
+			StateKey:             "main",
+			Content:              ui.View(func(c *ui.Context) { state.MainView(c) }),
 		})
 		// Closing the main window keeps the app in the tray. A quit (the tray
 		// menu, Cmd+Q, SIGTERM, logging out) closes every window first, so

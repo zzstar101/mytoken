@@ -13,11 +13,17 @@ import (
 func (s *State) MainView(c *ui.Context) {
 	pal := applyTheme(c)
 	c.Root().Background(ui.Transparent)
+	// Window buttons on the right (Windows, Linux) sit over the page's
+	// header, so the page starts below them.
+	pageTop := float32(0)
+	if bar := c.TitleBar(); bar.Right > 0 {
+		pageTop = max(bar.Height-SidebarInset, 0)
+	}
 	ui.Box(c).Fill().Draw(aurora(pal)).Children(func() {
-		ui.Row(c).Fill().Padding(10).Gap(14).Children(func() {
+		ui.Row(c).Fill().Padding(SidebarInset).Gap(14).Children(func() {
 			s.sidebar(c, pal)
 			// Keyed by page, so that every page rises in afresh.
-			ui.Column(c.Key("page-" + s.page)).Grow(1).Basis(0).Fill().
+			ui.Column(c.Key("page-"+s.page)).Grow(1).Basis(0).Fill().Padding(pageTop, 0, 0, 0).
 				Transition(ui.ElementTransition{Duration: 320 * time.Millisecond, Enter: &ui.Motion{Y: 10}}).
 				Children(func() {
 					switch s.page {
@@ -48,11 +54,24 @@ var navItems = []struct {
 	col ui.Color
 }{{"overview", icOverview, Tomori}, {"sessions", icSessions, Anon}, {"ranking", icRanking, Rana}, {"projects", icProjects, Soyo}, {"relays", icScale, relayColor}, {"settings", icSettings, Taki}}
 
+// SidebarInset is the window padding around the sidebar card. The main
+// window puts the close button TrafficLightX, TrafficLightY from its corner:
+// inside the card, about where the logo's left edge is.
+const (
+	SidebarInset  = 10
+	TrafficLightX = SidebarInset + 18
+	TrafficLightY = SidebarInset + 16
+)
+
 func (s *State) sidebar(c *ui.Context, pal palette) {
 	bar := c.TitleBar()
 	top := float32(20)
-	if bar.Height > 0 {
-		top = bar.Height + 10
+	if bar.Left > 0 && bar.Height > 0 {
+		// Traffic lights on the left: they are centred in the title bar, so
+		// the logo goes a little below their bottom edge, measured from the
+		// card's top.
+		const button = 14
+		top = bar.Height/2 + button/2 + 14 - SidebarInset
 	}
 	pane(c, pal).Width(214).FillHeight().Shrink(0).Padding(top, 12, 14, 12).Gap(6).Children(func() {
 		ui.Column(c).Padding(2, 8, 20, 8).Gap(5).DragWindow().Children(func() {

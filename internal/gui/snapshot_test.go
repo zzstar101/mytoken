@@ -96,7 +96,7 @@ func shot(t *testing.T, path string, view func(*ui.Context), w, h int, dark bool
 	}
 	tt.SetScale(scale)
 	if w > 600 {
-		tt.SetTitleBar(ui.TitleBar{Height: 28, Left: 78})
+		tt.SetTitleBar(ui.TitleBar{Height: 66, Left: 82})
 	}
 	// Skip entry animations: snapshots show the settled state.
 	tt.SetPreferences(ui.Preferences{ReduceMotion: true})

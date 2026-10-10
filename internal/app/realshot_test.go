@@ -39,7 +39,7 @@ func TestRealShots(t *testing.T) {
 func shot(t *testing.T, path string, view func(*ui.Context), w, h int, main bool) {
 	tt := ui.NewTester(view, w, h)
 	if main {
-		tt.SetTitleBar(ui.TitleBar{Height: 28, Left: 78})
+		tt.SetTitleBar(ui.TitleBar{Height: 66, Left: 82})
 	}
 	tt.SetPreferences(ui.Preferences{ReduceMotion: true})
 	for i := 0; i < 20; i++ {
