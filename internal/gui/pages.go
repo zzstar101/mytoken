@@ -168,6 +168,26 @@ func (s *State) projectsPage(c *ui.Context, pal palette) {
 	})
 }
 
+// updateRows are the daily update check and the button that checks now.
+func (s *State) updateRows(c *ui.Context, pal palette) {
+	sub := tr("autoUpdateSub")
+	if s.Hooks.CanUpdate != nil && !s.Hooks.CanUpdate() {
+		sub = tr("noSelfUpdate")
+	}
+	settingRow(c, pal, tr("autoUpdate"), sub, func() {
+		on := s.Hooks.AutoUpdates != nil && s.Hooks.AutoUpdates()
+		if ui.Switch(c, &on).Changed() && s.Hooks.SetAutoUpdates != nil {
+			s.Hooks.SetAutoUpdates(on)
+		}
+	})
+	ui.Divider(c)
+	settingRow(c, pal, tr("checkUpdates"), fmt.Sprintf(tr("currentVersion"), s.Hooks.Version), func() {
+		if ui.Button(c, tr("checkUpdates")).Clicked() {
+			s.Hooks.CheckUpdates()
+		}
+	})
+}
+
 // settingsPage holds the few preferences there are.
 func (s *State) settingsPage(c *ui.Context, pal palette) {
 	pageHeader(c, pal, "settings", "", nil)
@@ -181,6 +201,10 @@ func (s *State) settingsPage(c *ui.Context, pal palette) {
 							s.Hooks.SetOpenAtLogin(on)
 						}
 					})
+					if s.Hooks.CheckUpdates != nil {
+						ui.Divider(c)
+						s.updateRows(c, pal)
+					}
 					ui.Divider(c)
 					settingRow(c, pal, tr("rebuild"), tr("rebuildSub"), func() {
 						if ui.Button(c, tr("rebuild")).Clicked() && s.Hooks.Rebuild != nil {

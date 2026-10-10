@@ -6,6 +6,10 @@
   "icon": "resources/icon.png",
   "main": ".",
   "out": "build",
+  "updates": {
+    "publicKey": "my7Qm3yAQkDnUQe1FQ2t+eV6IGxct+WzjpsyA6s+OmI=",
+    "github": "zzstar101/mytoken"
+  },
   "macos": {
     "dmgTitle": "MyToken!!!!!",
     "infoPlist": {

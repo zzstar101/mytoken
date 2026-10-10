@@ -27,6 +27,7 @@ func TestSnapshots(t *testing.T) {
 		SetLang(lang)
 		for _, dark := range []bool{false, true} {
 			s := NewState(NewDemoService(now), Hooks{Settings: NewDemoSettings(), Relays: NewDemoRelays(now), Now: func() time.Time { return now }, DataDir: "~/Library/Application Support/MyToken",
+				Version: "0.2.1", CheckUpdates: func() {}, AutoUpdates: func() bool { return true },
 				Progress: func() (int, int) { return 10, 10 }}, nil)
 			s.Start()
 			rows := s.sessions.Rows

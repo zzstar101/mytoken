@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
+	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 
 	"github.com/zzstar101/mytoken/internal/app"
@@ -62,6 +64,11 @@ func main() {
 		return
 	}
 	mygo.App.OnSecondInstance(func([]string, string) { openMain() })
+
+	// Checks github.com for a new version once a day (Settings turns it
+	// off); builds that cannot replace themselves, such as development
+	// builds and the Debian package, never check.
+	mygo.Use(native.Plugin)
 
 	a, err := app.Open()
 	if err != nil {
@@ -119,6 +126,11 @@ func main() {
 		Relays:         a.Relays,
 		OpenMain:       func() { main.Update(openMain) },
 		Quit:           func() { mygo.App.Quit() },
+		Version:        cli.Version,
+		CanUpdate:      mygo.Updater.Enabled,
+		CheckUpdates:   updater.CheckForUpdates,
+		AutoUpdates:    updater.AutomaticChecks,
+		SetAutoUpdates: updater.SetAutomaticChecks,
 		Visible: func() bool {
 			return main != nil && main.IsVisible() || panel != nil && panel.IsVisible()
 		},

@@ -23,9 +23,10 @@
 already write to disk, attributes every request to a session, provider and model, prices it, and
 shows you the result in a native desktop app — or as JSON from the command line.
 
-Everything happens on your machine. No account, no telemetry, no uploads: by default the only
-network request the app ever makes is the price table download — relay-site reconciliation is opt-in
-per site, and a site is only ever contacted with the key you already gave that site.
+Everything happens on your machine. No account, no telemetry, no uploads: by default the app
+makes two kinds of request — the price table download, and a daily update check on github.com
+(Settings turns it off). Relay-site reconciliation is opt-in per site, and a site is only ever
+contacted with the key you already gave that site.
 
 - **Twenty-two harnesses in one window** — Claude Code, Codex CLI, DSH, pi, Gemini CLI, opencode,
   Crush, Cline, Roo Code, Kilo Code, Claude Desktop, WorkBuddy, CodeBuddy, Hermes, Qwen Code, Kimi,
@@ -159,9 +160,12 @@ priority chain, and the app tells you which step produced the answer:
 
 - **Local only.** The index, the price cache and the settings never leave your machine. There is no
   telemetry, no analytics, no crash reporting, no account and no sync.
-- **One request by default — the price table.** models.dev, falling back to LiteLLM; with a cached or
-  bundled table the app makes no request at all. Relay reconciliation is off by default and enabled
-  per site and per layer (ratios, balance, bills), so nothing else is contacted until you ask.
+- **Two requests by default — the price table and the update check.** The price table comes from
+  models.dev, falling back to LiteLLM; with a cached or bundled table no request is made. Once a day
+  the app asks github.com whether there is a new version, sending nothing but the request itself;
+  Settings turns this off, and builds that cannot update themselves (development builds, the Debian
+  package) never ask. The command line never checks. Relay reconciliation is off by default and
+  enabled per site and per layer (ratios, balance, bills), so nothing else is contacted until you ask.
 - **Keys are never stored or forwarded.** A relay key is read into memory, sent only to the site it
   belongs to, and the index keeps just its key ID (the first 12 hex digits of a SHA-256). Keys never
   appear in logs, error messages or `--json` output.

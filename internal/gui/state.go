@@ -17,6 +17,14 @@ type Hooks struct {
 	Progress func() (done, total int)
 	// Rebuild drops the index and rescans.
 	Rebuild func()
+	// Version is the app's version. CanUpdate reports whether this build
+	// can replace itself; CheckUpdates checks now, showing the update
+	// window; AutoUpdates and SetAutoUpdates read and set the daily check.
+	Version        string
+	CanUpdate      func() bool
+	CheckUpdates   func()
+	AutoUpdates    func() bool
+	SetAutoUpdates func(bool)
 	// OpenAtLogin reads and sets launch at login.
 	OpenAtLogin    func() bool
 	SetOpenAtLogin func(bool)

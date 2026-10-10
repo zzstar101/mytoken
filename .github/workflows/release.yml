@@ -3,13 +3,19 @@
 #
 # The draft is created before the builds start so that every matrix job
 # uploads into the same release, which is the layout MyGo's
-# docs/github-actions.md describes. This project has no `updates`
-# configuration (which would need an update-signing key), so `mygo build
-# -upload` has nowhere to upload to; the files are attached with `gh release
-# upload` instead, by one publish job once every build is done (parallel
-# uploads of same-named files race), which then publishes the release.
+# docs/github-actions.md describes. The files are attached with `gh release
+# upload` by one publish job once every build is done (parallel uploads of
+# same-named files race), which then publishes the release.
 #
-# Signing needs no secrets: macOS bundles are ad-hoc signed by default
+# Updates: with secrets.MYGO_UPDATER_PRIVATE_KEY (`gh secret set
+# MYGO_UPDATER_PRIVATE_KEY < mygo-update.key`; the public key is in
+# mygo.json) each build also signs an update: the app archive, deltas from
+# the versions before and update-<platform>.json. Their names are kept, as
+# the manifests point at them; installed apps read the manifests of the
+# latest release, so an update goes out when the release is published. The
+# notes come from the version's section in CHANGELOG.md.
+#
+# Code signing needs no secrets: macOS bundles are ad-hoc signed by default
 # (`macos.signingIdentity` is "-") and the Windows installer is unsigned.
 # To ship signed and notarized builds, add the secrets below, set
 # `macos.signingIdentity` and a `macos.notarize` block in mygo.json, and
@@ -65,12 +71,21 @@ jobs:
           - { name: Linux, os: ubuntu-latest, platform: "linux/amd64,linux/arm64" }
     env:
       CGO_ENABLED: "0"
+      MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+      # deltas look up the published updates
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+      - name: Check the update-signing key
+        run: |
+          if [ -z "$MYGO_UPDATER_PRIVATE_KEY" ]; then
+            echo "::error::secrets.MYGO_UPDATER_PRIVATE_KEY is not set; installed apps would get no update"
+            exit 1
+          fi
       - name: Take the version from the tag
         run: go run ./scripts/setversion "$GITHUB_REF_NAME"
       - name: Install NSIS, for the Windows installers
@@ -88,6 +103,8 @@ jobs:
             build/*/*.deb
             build/*/*Setup*.exe
             build/*/install.sh
+            build/*/*.delta
+            build/*/update-*.json
 
   publish:
     name: publish
