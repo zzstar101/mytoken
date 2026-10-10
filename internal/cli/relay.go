@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -232,7 +233,7 @@ func nonNilStrings(v []string) []string {
 
 // matchesTarget reports whether a site answers to the user's <origin|provider>
 // argument: the origin itself (case-insensitive, trailing slash ignored), or one
-// of the providers its credentials were found under. An empty target means
+// of the providers its credentials were found under, or the bare host. An empty target means
 // every site.
 func matchesTarget(st reconcile.SiteStatus, target string) bool {
 	if target == "" {
@@ -242,13 +243,18 @@ func matchesTarget(st reconcile.SiteStatus, target string) bool {
 	if strings.EqualFold(normalizeTarget(st.Site.Origin), t) {
 		return true
 	}
+	// A bare host ("api.example.com" or "api.example.com:3000") names its site.
+	if u, err := url.Parse(st.Site.Origin); err == nil && u.Host != "" && strings.EqualFold(u.Host, t) {
+		return true
+	}
 	for _, p := range st.Providers {
 		if strings.EqualFold(strings.TrimSpace(p), t) {
 			return true
 		}
 	}
 	for _, p := range st.Site.Providers {
-		if strings.EqualFold(strings.TrimSpace(p), t) {
+		_, name := relay.SplitProvider(p)
+		if strings.EqualFold(strings.TrimSpace(p), t) || strings.EqualFold(strings.TrimSpace(name), t) {
 			return true
 		}
 	}
@@ -563,14 +569,22 @@ func relaySyncRun(ctx context.Context, req relaySyncReq, env *relayEnv, out, err
 		fmt.Fprintf(errout, "no enabled relay site matches %q; run `mytoken relay list`\n", req.target)
 		return 1
 	}
+	// One site failing (a dead relay, a revoked key) must not keep the others
+	// from syncing: try all, report each, and fail at the end.
+	code := 0
 	for _, st := range sites {
-		if e := svc.Sync(ctx, st.Site.Origin, st.Site.KeyID); e != nil {
-			fmt.Fprintln(errout, e)
-			return 1
+		name := st.Site.Origin
+		if len(sites) > 1 {
+			name += " (" + st.Site.KeyID + ")"
 		}
-		fmt.Fprintf(out, "synced %s\n", st.Site.Origin)
+		if e := svc.Sync(ctx, st.Site.Origin, st.Site.KeyID); e != nil {
+			fmt.Fprintf(errout, "%s: %v\n", name, e)
+			code = 1
+			continue
+		}
+		fmt.Fprintf(out, "synced %s\n", name)
 	}
-	return 0
+	return code
 }
 
 // --- reconcile -------------------------------------------------------------

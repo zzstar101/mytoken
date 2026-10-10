@@ -238,6 +238,9 @@ func fmtInt(n int64) string {
 
 func fmtCost(usd float64) string {
 	switch {
+	case usd < 0:
+		// an overdrawn relay wallet
+		return "−" + fmtCost(-usd)
 	case usd == 0:
 		return "$0"
 	case usd < 0.01:

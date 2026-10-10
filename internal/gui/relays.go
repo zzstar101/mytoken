@@ -451,11 +451,23 @@ func balanceText(b *relay.Balance) string {
 	case b.Unlimited:
 		return tr("relayUnlimited")
 	case b.RemainingUSD != nil:
-		return fmtCost(*b.RemainingUSD)
+		return inCurrency(fmtCost(*b.RemainingUSD), b.Currency)
 	case b.UsedUSD != nil:
-		return trf("relayUsed", fmtCost(*b.UsedUSD))
+		return trf("relayUsed", inCurrency(fmtCost(*b.UsedUSD), b.Currency))
 	}
 	return "—"
+}
+
+// inCurrency swaps the dollar sign for the currency a balance is quoted in.
+// Amounts are not converted: DeepSeek's balance stays in yuan.
+func inCurrency(s, currency string) string {
+	switch currency {
+	case "", "USD":
+		return s
+	case "CNY":
+		return strings.Replace(s, "$", "¥", 1)
+	}
+	return strings.Replace(s, "$", "", 1) + " " + currency
 }
 
 func hostOf(origin string) string {
@@ -755,7 +767,7 @@ var relayStrs = map[string][2]string{
 	"relayBalance":           {"余额", "Balance"},
 	"relayUnlimited":         {"不限额", "Unlimited"},
 	"relayUsed":              {"已用 %s", "%s used"},
-	"relayCoverage":          {"账单截至 %s", "Bills up to %s"},
+	"relayCoverage":          {"只核对 %s 之后（站点保留的账单从这里开始）", "Checked from %s on (the oldest charge the site kept)"},
 	"relayWaterfall":         {"差额从哪来", "Where the difference comes from"},
 	"relayCategories":        {"对账分类", "Categories"},
 	"relayByModel":           {"按模型", "By model"},
@@ -776,6 +788,6 @@ var relayStrs = map[string][2]string{
 	"catsub-price-diff":      {"同一请求，站点的单价或倍率和本地不一样", "Same request, but the site's price or multiplier differs"},
 	"catsub-token-semantics": {"同一请求，缓存 token 的计法不同", "Same request, cache tokens counted differently"},
 	"catsub-bill-only":       {"站点扣了钱，本地没有对应的请求（可能是别的设备或工具用了同一个 Key）", "Charged, but no local request matches (another device or tool on the same key?)"},
-	"catsub-event-only":      {"本地有请求，站点没有扣费记录（失败、免费或账单还没同步）", "A local request with no charge (failed, free, or not synced yet)"},
+	"catsub-event-only":      {"本地有请求，站点没有扣费记录（失败、免费、用的是别的 Key，或账单还没同步）", "A local request with no charge (failed, free, another key, or not synced yet)"},
 	"catsub-refund":          {"站点退回的额度", "Quota the site gave back"},
 }

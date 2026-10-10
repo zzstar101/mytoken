@@ -8,7 +8,6 @@ import (
 	"github.com/zzstar101/mytoken/internal/query"
 	"io"
 	"strconv"
-	"text/tabwriter"
 )
 
 func runPrices(ctx context.Context, args []string, out, errout io.Writer) int {
@@ -87,7 +86,7 @@ func runPrices(ctx context.Context, args []string, out, errout io.Writer) int {
 			fmt.Fprintln(errout, err)
 			return 1
 		}
-		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+		w := newTable(out)
 		fmt.Fprintln(w, "PROVIDER\tMODEL\tMULTIPLIER\tINPUT\tOUTPUT\tCACHE READ\tCACHE WRITE\tSOURCE")
 		rate := func(v *float64) string {
 			if v == nil {

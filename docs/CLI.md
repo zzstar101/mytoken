@@ -262,7 +262,7 @@ mytoken relay disable https://api.example.com
 ```
 
 `--format csv` writes the stable header
-`origin,key_id,has_key,kind,version,enabled,layers,providers,last_sync,last_error,remaining_usd,used_usd,unlimited`.
+`origin,key_id,has_key,kind,version,enabled,layers,providers,last_sync,last_error,remaining_usd,used_usd,unlimited,currency`. `currency` is the ISO code the balance is quoted in (`USD`, or `CNY` for DeepSeek); amounts are never converted, so `remaining_usd`/`used_usd` hold that currency.
 
 ## reconcile
 

@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/zzstar101/mytoken/internal/reconcile"
@@ -48,7 +47,9 @@ type reconcileLine struct {
 	LocalUSD   float64 `json:"localUsd"`
 	FormulaUSD float64 `json:"formulaUsd"`
 	ChargedUSD float64 `json:"chargedUsd"`
-	Note       string  `json:"note,omitempty"`
+	// FormulaMissing counts charges with no computable list cost.
+	FormulaMissing int64  `json:"formulaMissing,omitempty"`
+	Note           string `json:"note,omitempty"`
 }
 
 // reconcileModelLine mirrors reconcile.ModelLine.
@@ -83,6 +84,7 @@ type reconcileReport struct {
 	Coverage          *time.Time           `json:"coverage,omitempty"`
 	LocalUSD          float64              `json:"localUsd"`
 	FormulaUSD        float64              `json:"formulaUsd"`
+	FormulaMissing    int64                `json:"formulaMissing,omitempty"`
 	ChargedUSD        float64              `json:"chargedUsd"`
 	ImpliedMultiplier *float64             `json:"impliedMultiplier,omitempty"`
 	Lines             []reconcileLine      `json:"lines"`
@@ -100,7 +102,7 @@ type reconcileJSON struct {
 func siteRowFrom(st reconcile.SiteStatus) relaySiteRow {
 	providers := st.Providers
 	if len(providers) == 0 {
-		providers = st.Site.Providers
+		providers = relay.ProviderNames(st.Site.Providers)
 	}
 	row := relaySiteRow{
 		Origin:    st.Site.Origin,
@@ -151,9 +153,10 @@ func reportFrom(r reconcile.Report, from, to time.Time) reconcileReport {
 	}
 	for _, l := range r.Lines {
 		out.FormulaUSD += l.FormulaUSD
+		out.FormulaMissing += l.FormulaMissing
 		out.Lines = append(out.Lines, reconcileLine{
 			Category: string(l.Category), Count: l.Count, LocalUSD: l.LocalUSD,
-			FormulaUSD: l.FormulaUSD, ChargedUSD: l.ChargedUSD, Note: l.Note,
+			FormulaUSD: l.FormulaUSD, ChargedUSD: l.ChargedUSD, FormulaMissing: l.FormulaMissing, Note: l.Note,
 		})
 	}
 	for _, l := range r.ByModel {
@@ -175,7 +178,7 @@ func reportFrom(r reconcile.Report, from, to time.Time) reconcileReport {
 // CSV headers are stable: new columns append to the end, and numbers are plain
 // (no thousands separators, no currency symbol).
 var (
-	relayListCSVHeader         = []string{"origin", "key_id", "has_key", "kind", "version", "enabled", "layers", "providers", "last_sync", "last_error", "remaining_usd", "used_usd", "unlimited"}
+	relayListCSVHeader         = []string{"origin", "key_id", "has_key", "kind", "version", "enabled", "layers", "providers", "last_sync", "last_error", "remaining_usd", "used_usd", "unlimited", "currency"}
 	reconcileCategoryCSVHeader = []string{"origin", "key_id", "category", "count", "local_usd", "formula_usd", "charged_usd", "note"}
 	reconcileModelCSVHeader    = []string{"origin", "key_id", "model", "count", "local_usd", "formula_usd", "charged_usd"}
 	reconcileDayCSVHeader      = []string{"origin", "key_id", "day", "count", "local_usd", "formula_usd", "charged_usd", "multiplier_diff_usd", "usage_diff_usd", "unpriced"}
@@ -196,12 +199,12 @@ func writeRelayList(out io.Writer, format outputFormat, rows []relaySiteRow) err
 		}
 		return writeCSV(out, relayListCSVHeader, recs)
 	}
-	w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "ORIGIN\tKIND\tKEY\tLAYERS\tPROVIDERS\tLAST SYNC\tREMAINING")
+	w := newTable(out)
+	fmt.Fprintln(w, "ORIGIN\tKIND\tKEY\tLAYERS\tPROVIDERS\tLAST SYNC\tREMAINING\tERROR")
 	for _, r := range rows {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			r.Origin, dash(r.Kind), dash(r.KeyID), layersText(r.Layers),
-			dash(strings.Join(r.Providers, ",")), syncText(r.LastSync), balanceText(r.Balance))
+			dash(strings.Join(r.Providers, ",")), syncText(r.LastSync), balanceText(r.Balance), r.LastError)
 	}
 	return w.Flush()
 }
@@ -212,9 +215,10 @@ func relaySiteCSVRow(r relaySiteRow) []string {
 	if r.LastSync != nil {
 		row[8] = r.LastSync.Format(time.RFC3339)
 	}
-	remaining, used, unlimited := "", "", ""
+	remaining, used, unlimited, currency := "", "", "", ""
 	if r.Balance != nil {
 		unlimited = strconv.FormatBool(r.Balance.Unlimited)
+		currency = balanceCurrency(r.Balance)
 		if r.Balance.RemainingUSD != nil {
 			remaining = cost(*r.Balance.RemainingUSD)
 		}
@@ -222,7 +226,16 @@ func relaySiteCSVRow(r relaySiteRow) []string {
 			used = cost(*r.Balance.UsedUSD)
 		}
 	}
-	return append(row, remaining, used, unlimited)
+	return append(row, remaining, used, unlimited, currency)
+}
+
+// balanceCurrency is the ISO code a balance is quoted in; MyToken does not
+// convert (DeepSeek quotes CNY).
+func balanceCurrency(b *relay.Balance) string {
+	if b.Currency == "" {
+		return "USD"
+	}
+	return b.Currency
 }
 
 // writeReconcile renders the reports in the requested format. by selects the
@@ -252,12 +265,19 @@ func writeReconcileTable(out io.Writer, by string, reports []reconcileReport) er
 		if r.ImpliedMultiplier != nil {
 			multiplier = fmt.Sprintf("  implied x%.4f", *r.ImpliedMultiplier)
 		}
-		fmt.Fprintf(out, "local $%.6f  formula $%.6f  charged $%.6f%s\n",
-			r.LocalUSD, r.FormulaUSD, r.ChargedUSD, multiplier)
-		if r.Balance != nil {
-			fmt.Fprintf(out, "balance remaining %s  used %s\n", money(r.Balance.RemainingUSD), money(r.Balance.UsedUSD))
+		// Only charges have a formula; local requests without one do not.
+		var count int64
+		for _, l := range r.Lines {
+			if l.Category != string(reconcile.EventOnly) {
+				count += l.Count
+			}
 		}
-		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+		fmt.Fprintf(out, "local $%.6f  formula %s  charged $%.6f%s\n",
+			r.LocalUSD, formulaText(r.FormulaUSD, r.FormulaMissing, count, "$"), r.ChargedUSD, multiplier)
+		if r.Balance != nil {
+			fmt.Fprintf(out, "balance remaining %s  used %s\n", balanceMoney(r.Balance, r.Balance.RemainingUSD), balanceMoney(r.Balance, r.Balance.UsedUSD))
+		}
+		w := newTable(out)
 		switch by {
 		case "model":
 			fmt.Fprintln(w, "MODEL\tCOUNT\tLOCAL USD\tFORMULA USD\tCHARGED USD")
@@ -271,13 +291,25 @@ func writeReconcileTable(out io.Writer, by string, reports []reconcileReport) er
 					l.Day.Format("2006-01-02"), l.Count, l.LocalUSD, l.FormulaUSD, l.ChargedUSD, l.Unpriced)
 			}
 		default:
+			if len(r.Lines) == 0 {
+				fmt.Fprintln(out, "no charges and no local requests in range")
+				continue
+			}
 			fmt.Fprintln(w, "CATEGORY\tCOUNT\tLOCAL USD\tFORMULA USD\tCHARGED USD\tNOTE")
 			for _, l := range r.Lines {
-				fmt.Fprintf(w, "%s\t%d\t%.6f\t%.6f\t%.6f\t%s\n", l.Category, l.Count, l.LocalUSD, l.FormulaUSD, l.ChargedUSD, l.Note)
+				formula := formulaText(l.FormulaUSD, l.FormulaMissing, l.Count, "")
+				if l.Category == string(reconcile.EventOnly) {
+					formula = ""
+				}
+				fmt.Fprintf(w, "%s\t%d\t%.6f\t%s\t%.6f\t%s\n", l.Category, l.Count, l.LocalUSD, formula, l.ChargedUSD, l.Note)
 			}
+
 		}
 		if e := w.Flush(); e != nil {
 			return e
+		}
+		if r.FormulaMissing > 0 && by != "model" && by != "day" {
+			fmt.Fprintf(out, "formula: %d charges have no computable list cost (- none, * some)\n", r.FormulaMissing)
 		}
 	}
 	return nil
@@ -348,7 +380,18 @@ func balanceText(b *relay.Balance) string {
 	if b.RemainingUSD == nil {
 		return "-"
 	}
+	if c := balanceCurrency(b); c != "USD" {
+		return fmt.Sprintf("%.4f %s", *b.RemainingUSD, c)
+	}
 	return fmt.Sprintf("%.4f", *b.RemainingUSD)
+}
+
+// balanceMoney writes a balance amount with its own currency.
+func balanceMoney(b *relay.Balance, v *float64) string {
+	if c := balanceCurrency(b); c != "USD" && v != nil {
+		return fmt.Sprintf("%.4f %s", *v, c)
+	}
+	return money(v)
 }
 
 func money(v *float64) string {
@@ -363,4 +406,16 @@ func optCost(v *float64) string {
 		return ""
 	}
 	return cost(*v)
+}
+
+// formulaText prints a formula total; "-" when no charge had a computable
+// list cost, a trailing "*" when only some did.
+func formulaText(v float64, missing, count int64, unit string) string {
+	switch {
+	case missing > 0 && missing >= count:
+		return "-"
+	case missing > 0:
+		return fmt.Sprintf("%s%.6f*", unit, v)
+	}
+	return fmt.Sprintf("%s%.6f", unit, v)
 }

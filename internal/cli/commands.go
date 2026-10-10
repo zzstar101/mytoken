@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
-	"text/tabwriter"
 	"time"
 
 	"github.com/zzstar101/mytoken/internal/app"
@@ -238,7 +237,7 @@ func runDoctor(ctx context.Context, args []string, out, errout io.Writer) int {
 			fmt.Fprint(out, " (age unknown)")
 		}
 		fmt.Fprintln(out)
-		w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+		w := newTable(out)
 		fmt.Fprintln(w, "HARNESS\tSOURCES\tEVENTS\tROOT\tEXISTS")
 		for _, h := range report.Harnesses {
 			for _, r := range h.Roots {

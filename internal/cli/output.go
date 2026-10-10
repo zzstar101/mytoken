@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"text/tabwriter"
 	"time"
 
 	"github.com/zzstar101/mytoken/internal/model"
@@ -141,7 +140,7 @@ func writeStatsTable(out io.Writer, total query.Totals, rows any, noCost bool) e
 	if _, e := io.WriteString(out, summary); e != nil {
 		return e
 	}
-	w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+	w := newTable(out)
 	switch values := rows.(type) {
 	case []query.Bucket:
 		if noCost {
@@ -214,7 +213,7 @@ func writeStatsCSV(out io.Writer, rows any, noCost bool) error {
 
 // writeSessionsTable prints the sessions table.
 func writeSessionsTable(out io.Writer, rows []query.SessionRow, noCost bool) error {
-	w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+	w := newTable(out)
 	if noCost {
 		fmt.Fprintln(w, "HARNESS\tSESSION\tUPDATED\tREQUESTS\tTOKENS\tTITLE")
 	} else {
