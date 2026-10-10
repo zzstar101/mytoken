@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -35,7 +36,22 @@ type Scanner struct {
 	// agents append to their logs all the time, and each scan stats every
 	// source, so back-to-back scans would keep a core busy.
 	minGap time.Duration
+	// dirs holds the directories of the sources the last scan found, which
+	// Run watches with the directories between them and their roots.
+	dirs map[string]bool
+	// watching counts the directories Run watches, for tests.
+	watching int
 }
+
+// maxWatchDirs bounds the directories Run watches. On macOS each watched
+// directory costs a descriptor for it and each file in it, and a harness
+// home can hold a whole program (~/.hermes/hermes-agent: 150K files): the
+// periodic scan covers whatever is past the bound.
+const maxWatchDirs = 2048
+
+// newDirBudget bounds how deep Run follows a directory created under a
+// watched one, such as a new session folder, before the next scan.
+const newDirBudget = 32
 
 func New(st *store.Store, resolver *attrib.Resolver, pricer *pricing.Pricer, parsers ...harness.Parser) *Scanner {
 	if len(parsers) == 0 {
@@ -84,6 +100,7 @@ func (s *Scanner) Scan(ctx context.Context) (err error) {
 	defer func() { err = errors.Join(err, restoreIndexes()) }()
 	var work []source
 	var errs []error
+	dirs := map[string]bool{}
 	for _, p := range s.parsers {
 		srcs, e := p.Discover(ctx)
 		if e != nil {
@@ -102,6 +119,11 @@ func (s *Scanner) Scan(ctx context.Context) (err error) {
 			var size int64
 			if info, err := os.Stat(src.Path); err == nil {
 				size = info.Size()
+				if info.IsDir() {
+					dirs[src.Path] = true
+				} else {
+					dirs[filepath.Dir(src.Path)] = true
+				}
 			}
 			work = append(work, source{p, src, cur, size})
 		}
@@ -111,6 +133,7 @@ func (s *Scanner) Scan(ctx context.Context) (err error) {
 	s.mu.Lock()
 	s.done = 0
 	s.total = len(work)
+	s.dirs = dirs
 	s.mu.Unlock()
 	ch := make(chan source)
 	type result struct {
@@ -241,52 +264,79 @@ func (s *Scanner) Run(ctx context.Context) error {
 	}
 	defer watcher.Close()
 	watched := map[string]bool{}
-	var addRecursive func(string)
-	addRecursive = func(path string) {
+	watch := func(path string) bool {
 		if watched[path] {
-			return
+			return true
 		}
-		fi, e := os.Stat(path)
-		if e != nil || !fi.IsDir() {
-			return
+		if len(watched) >= maxWatchDirs {
+			return false
 		}
-		if e = watcher.Add(path); e != nil {
-			return
+		if fi, e := os.Stat(path); e != nil || !fi.IsDir() {
+			return false
+		}
+		if watcher.Add(path) != nil {
+			return false
 		}
 		watched[path] = true
-		entries, e := os.ReadDir(path)
-		if e != nil {
-			return
-		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				addRecursive(filepath.Join(path, entry.Name()))
-			}
-		}
+		return true
 	}
-	watchRoots := func() {
-		for _, p := range s.parsers {
-			for _, root := range p.Roots() {
-				addRecursive(root)
+	// watchNew follows a directory created under a watched one a few
+	// levels down: a new session folder, not a program being installed.
+	watchNew := func(path string) {
+		budget := newDirBudget
+		var walk func(string)
+		walk = func(dir string) {
+			if budget <= 0 || !watch(dir) {
+				return
+			}
+			budget--
+			entries, e := os.ReadDir(dir)
+			if e != nil {
+				return
+			}
+			for _, entry := range entries {
+				if entry.IsDir() {
+					walk(filepath.Join(dir, entry.Name()))
+				}
 			}
 		}
+		walk(path)
+	}
+	// watchRoots watches each root, and the directories from it down to
+	// each source found: never a whole root, which may hold anything.
+	watchRoots := func() {
+		var roots []string
+		for _, p := range s.parsers {
+			roots = append(roots, p.Roots()...)
+		}
+		s.mu.Lock()
+		dirs := make([]string, 0, len(s.dirs))
+		for dir := range s.dirs {
+			dirs = append(dirs, dir)
+		}
+		s.mu.Unlock()
+		for _, dir := range watchDirs(roots, dirs) {
+			watch(dir)
+		}
+		defer func() {
+			s.mu.Lock()
+			s.watching = len(watched)
+			s.mu.Unlock()
+		}()
 		if s.resolver != nil {
 			if home, e := os.UserHomeDir(); e == nil {
 				for _, name := range []string{".claude", ".codex"} {
-					path := filepath.Join(home, name)
-					if !watched[path] {
-						if e := watcher.Add(path); e == nil {
-							watched[path] = true
-						}
-					}
+					watch(filepath.Join(home, name))
 				}
 			}
 		}
 	}
 	watchRoots()
-	if e = s.Scan(ctx); e != nil {
-		return e
+	// A source that fails to parse must not stop watching the others.
+	if s.Scan(ctx) != nil && ctx.Err() != nil {
+		return ctx.Err()
 	}
+	watchRoots()
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 	last := time.Now()
@@ -306,7 +356,7 @@ func (s *Scanner) Run(ctx context.Context) error {
 				return nil
 			}
 			if ev.Has(fsnotify.Create) {
-				addRecursive(ev.Name)
+				watchNew(ev.Name)
 			}
 			// The first change arms the timer and later ones ride on it:
 			// re-arming on each would never scan while an agent writes on.
@@ -328,9 +378,50 @@ func (s *Scanner) Run(ctx context.Context) error {
 			_ = s.Scan(ctx)
 			last = time.Now()
 		case <-ticker.C:
-			watchRoots()
 			_ = s.Scan(ctx)
+			watchRoots()
 			last = time.Now()
 		}
 	}
+}
+
+// watchDirs returns the directories to watch, roots first: each root, and
+// for each source directory the directories from it up to its root.
+func watchDirs(roots, dirs []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(dir string) {
+		if !seen[dir] {
+			seen[dir] = true
+			out = append(out, dir)
+		}
+	}
+	clean := make([]string, 0, len(roots))
+	for _, root := range roots {
+		if root != "" {
+			root = filepath.Clean(root)
+			clean = append(clean, root)
+			add(root)
+		}
+	}
+	dirs = append([]string(nil), dirs...)
+	sort.Strings(dirs)
+	for _, dir := range dirs {
+		dir = filepath.Clean(dir)
+		var chain []string
+		for _, root := range clean {
+			rel, e := filepath.Rel(root, dir)
+			if e != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue
+			}
+			for d := filepath.Dir(dir); len(d) > len(root); d = filepath.Dir(d) {
+				chain = append(chain, d)
+			}
+		}
+		for i := len(chain) - 1; i >= 0; i-- {
+			add(chain[i])
+		}
+		add(dir)
+	}
+	return out
 }
