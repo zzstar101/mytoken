@@ -3,7 +3,7 @@
 The section of each version is also what the app's update window shows, so
 every release needs one here (`## 0.2.1`), written for the people updating.
 
-## Unreleased
+## 0.2.2
 
 - **Fixed: no data and failing update checks on a fresh install.** MyToken
   watched every folder under each tool's home for changes, including whole
