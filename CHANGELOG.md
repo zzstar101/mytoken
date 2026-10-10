@@ -3,7 +3,7 @@
 The section of each version is also what the app's update window shows, so
 every release needs one here (`## 0.2.1`), written for the people updating.
 
-## Unreleased
+## 0.2.1
 
 - **Automatic updates.** MyToken checks github.com once a day and offers new
   versions with their notes; install, skip or be reminded later. Settings
