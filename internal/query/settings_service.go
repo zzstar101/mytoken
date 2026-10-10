@@ -85,6 +85,13 @@ func LoadPricingSettings(ctx context.Context, st *store.Store, p *pricing.Pricer
 	p.SetAliases(aliasMap(aliases))
 	return nil
 }
+func mustJSON(v any) string {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
 func validRate(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
 
 // relayRulePrefix marks rules that came from a gateway's own ratios
@@ -117,10 +124,14 @@ func (s *settingsService) AppendRelayRules(ctx context.Context, rules []pricing.
 	if err != nil {
 		return err
 	}
-	merged := relay.MergeRelayRules(pricingRules(old), rules)
+	merged := fromPricingRules(relay.MergeRelayRules(pricingRules(old), rules))
 	// The merge only rewrites rules a gateway reported; anything else keeps
-	// exactly what the user or cc-switch import stored.
-	return s.setPriceRules(ctx, fromPricingRules(merged))
+	// exactly what the user or cc-switch import stored. A sync that changes
+	// nothing must not re-price the history.
+	if a, b := mustJSON(old), mustJSON(merged); a != "" && a == b {
+		return nil
+	}
+	return s.setPriceRules(ctx, merged)
 }
 
 func (s *settingsService) SetPriceRules(ctx context.Context, rules []PriceRule) error {

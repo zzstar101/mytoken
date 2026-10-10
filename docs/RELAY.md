@@ -67,7 +67,8 @@
 - 输入单价 = `2 × model_ratio × group_ratio` $/M；
 - 输出单价 = 输入单价 × `completion_ratio`；
 - 缓存读单价 = 输入单价 × `cache_ratio`；
-- 缓存写单价 = 输入单价 × `cache_creation_ratio`。
+- 缓存写单价 = 输入单价 × `cache_creation_ratio`；
+- 1 小时缓存写：日志另给 `cache_creation_tokens_1h` / `cache_creation_ratio_1h`（Claude 的 1h TTL 写入）。适配器记成 `Bill.CacheWrite1h`（是 `CacheWrite` 的一部分），算公式价时按 1h 单价计；分档表达式里对应 `cc1h` 项（`cc` 是 5 分钟写入）。本地事件还分不出 1h 写入，所以大量用 1h 缓存的 Key 会稳定落在 `price-diff`，差额就是 1h 与 5m 的单价差。
 
 **token 口径要归一化**：不同上游下，`prompt_tokens` 有时已经扣掉缓存、有时没扣。适配器必须按 `other` 里的 `cache_tokens` / `cache_creation_tokens` 换算成 MyToken 的口径：`Input` 不含缓存。实现时对照 `/tmp/na` 源码，并用测试覆盖。
 
@@ -86,6 +87,8 @@ sub2api 不提供逐条日志，所以只做按天、按模型的对账：
 - 实际倍率 = `actual_cost / cost`，可以和 billing 接口给的倍率互相印证。
 
 时区：请求时传用户本地的 IANA 时区，保证「天」的划分和本地一致。
+
+实测补充（sub2api 源码 `handler/usage_handler.go`）：每日用量的窗口固定是「截至今天的最近 `days` 天」（1–90），`start_date` / `end_date` 只影响 `model_stats`；站点只列出有用量的天。`model_stats` 是整段区间的合计，拆不到天，所以**不用于按天对账**。同步时拉最近 30 天，补零后整段替换 `relay_daily`（`ReplaceRelayDaily`），没用量的天和旧数据都会被清掉。每天按请求数拆分：站点请求数明显多于本地（>110%+1）时，多出来的部分按比例记 `bill-only`；本地明显多于站点时，多出来的部分按比例记 `event-only`。
 
 ### 4.3 官方 API（只有 L2 余额）
 
@@ -310,6 +313,9 @@ func Reconcile(ctx context.Context, st *store.Store, site relay.Site, from, to t
 - 中转站规则的优先级：用户规则 > 中转站规则 > cc-switch 导入规则 > 目录价。时间上，仍按 `From` 取不晚于事件时间的最新一条。
 - L1 打开后，新的倍率快照或从账单反推出的倍率，会生成一组带 `From` 的规则，写进设置。`Fingerprint` 随之变化，触发重算，所以本地估算会自动靠近实扣。
 - **反推得到的规则只在倍率真的变了时才新增**（变化超过 1%），避免规则表无限增长。
+- 规则来源按 Key 区分：`Source = "relay:<origin>#<keyID>"`（同一站点的不同 Key 可能在不同分组，倍率不同）。一次同步产出的规则定义了这个 Key 当前给哪些服务商定价，同一来源下其它服务商的旧规则会被删掉；旧版本留下的 `relay:<origin>`（没有 `#keyID`）规则也一并清理。规则内容没变时不写设置、不触发重算。
+- 服务商写成带 harness 的形式（`pi/kami`，见 `pricing.Scoped`），这样同一个服务商名在不同工具里指向不同站点、不同 Key 时互不干扰。查找顺序：`{harness/服务商, 模型}` → `{服务商, 模型}` → `{"", 模型}` → `{harness/服务商, ""}` → `{服务商, ""}`。注意：带 harness 的中转站规则比用户写的「整个服务商」规则更具体，所以会优先生效；要覆盖它，给同一个模型写用户规则。重新计价时会带上事件的 harness（`fingerprintVersion = 2` 让旧库重算一次）。
+- 同一站点有多个 Key 时，只有能证明属于这个 Key 的服务商才拿到它的规则：配置里用的就是这个 Key，或者已有账单配上过这个服务商的事件。
 - 接口：`query.Settings` 新增 `RelayRules(ctx) ([]pricing.Rule, error)` 和 `AppendRelayRules(ctx, origin string, rules []pricing.Rule) error`。后者负责去重（上一条），并把规则装进 Pricer；规则单独存一个设置键 `relay-rules`，不和用户规则混在一起。`Syncer` 只调用这个接口。
 
 ### 5.6 同步调度（astra-perf 实现 `reconcile.Syncer`，lead 接入 app）
@@ -319,7 +325,9 @@ func Reconcile(ctx context.Context, st *store.Store, site relay.Site, from, to t
 `Syncer.Sync(ctx, site)`：调用 `relay.Client` 按开启的层拉 L1 / L2 / L3，写库，再把倍率换成规则交给设置服务，最后对新账单做增量匹配（`ReconcilePending`）。
 - `Run`：只遍历库里 `Layers != 0` 的站点，没有开启的站点就不发任何请求；按各站 `LastSync` 和下一次到期时间串行同步，启动时不会对所有站点并发请求；`ctx` 取消后立刻返回（`App.Close` 会等它）。
 - 后台：每 5 分钟同步一次所有已开启的站点；new-api 日志只有 1000 条的窗口，所以不能更慢。
-- 失败：退避到 30 分钟，并把错误记到 `relay_cursors.last_error`，错误信息不含 Key。
+- 失败：退避到 30 分钟，并把错误记到 `relay_cursors.last_error`，错误信息不含 Key。价格表（L1）和余额（L2）失败只算警告：同步继续拉账单、对账，最后把警告记进 `last_error` 并返回。
+- 限流：站点返回 HTTP 429 时，按 `Retry-After`（没有则 2 秒，超过 20 秒不等）等一次再重试；仍失败就提示「被限流，稍后再试」。
+- 没有账单也没有每日数据的 Key（例如 Key 被拒、还没同步过），报表不计本地事件，避免把整段本地用量都当成 `event-only`。
 - 用 `mytoken relay sync` 立即同步。
 
 ## 6. CLI（flash-cli）

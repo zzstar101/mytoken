@@ -25,7 +25,7 @@ func TestRelayPersistenceAndRebuild(t *testing.T) {
 	if err = st.PutRelaySite(ctx, site); err != nil {
 		t.Fatal(err)
 	}
-	bill := relay.Bill{Origin: site.Origin, KeyID: site.KeyID, ID: 7, At: time.Unix(120, 0).UTC(), Type: "consume", Model: "model", Tokens: model.Tokens{Input: 10, Output: 20, CacheRead: 30, CacheWrite: 40, Reasoning: 5}, RequestID: "req-test", UpstreamRequestID: "resp-test", ChargedUSD: .25, Ratios: relay.Ratios{Model: 2, Group: .5}, Stream: true, LatencyMS: 19}
+	bill := relay.Bill{Origin: site.Origin, KeyID: site.KeyID, ID: 7, At: time.Unix(120, 0).UTC(), Type: "consume", Model: "model", Tokens: model.Tokens{Input: 10, Output: 20, CacheRead: 30, CacheWrite: 40, Reasoning: 5}, CacheWrite1h: 25, RequestID: "req-test", UpstreamRequestID: "resp-test", ChargedUSD: .25, Ratios: relay.Ratios{Model: 2, Group: .5, CacheCreate1h: 2}, Stream: true, LatencyMS: 19}
 	if err = st.PutRelayBills(ctx, []relay.Bill{bill, bill}); err != nil {
 		t.Fatal(err)
 	}
@@ -152,5 +152,54 @@ func TestRelayBillFootprint(t *testing.T) {
 	t.Logf("%d populated bills including both request IDs, matches, dictionaries and indexes: %d bytes, %.2f B/bill", n, delta, bpe)
 	if bpe > 200 {
 		t.Fatalf("bill footprint %.2f B exceeds 200B", bpe)
+	}
+}
+
+// TestRelayBillCacheWrite1hMigration upgrades a bill table from before 1-hour
+// cache writes were stored: the column is added and the bill cursors are reset
+// so the next sync fetches the bills again with their 1-hour counts.
+func TestRelayBillCacheWrite1hMigration(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "index.db")
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := relay.Site{Origin: "https://relay.example", KeyID: "deadbeef0123", Kind: relay.KindNewAPI, Layers: relay.LayerBills}
+	bill := relay.Bill{Origin: site.Origin, KeyID: site.KeyID, ID: 3, At: time.Unix(120, 0).UTC(), Type: "consume", Model: "m", Tokens: model.Tokens{Input: 1, CacheWrite: 9}, ChargedUSD: .1}
+	if err = st.PutRelaySite(ctx, site); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.PutRelayBills(ctx, []relay.Bill{bill}); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.PutRelayCursor(ctx, RelayCursor{Origin: site.Origin, KeyID: site.KeyID, LastBillID: 3, LastSync: bill.At}); err != nil {
+		t.Fatal(err)
+	}
+	// Turn the database back into the previous layout.
+	if err = st.Exec(ctx, `DROP VIEW relay_bills; ALTER TABLE relay_bill_data DROP COLUMN cache_write_1h;`); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if st, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	bills, err := st.RelayBills(ctx, site.Origin, site.KeyID, time.Time{}, time.Time{})
+	if err != nil || len(bills) != 1 || !reflect.DeepEqual(bills[0], bill) {
+		t.Fatalf("bills=%+v err=%v", bills, err)
+	}
+	cur, err := st.RelayCursor(ctx, site.Origin, site.KeyID)
+	if err != nil || cur.LastBillID != 0 {
+		t.Fatalf("cursor after upgrade = %+v, %v; want bills refetched", cur, err)
+	}
+	bill.CacheWrite1h = 6
+	if err = st.PutRelayBills(ctx, []relay.Bill{bill}); err != nil {
+		t.Fatal(err)
+	}
+	if bills, err = st.RelayBills(ctx, site.Origin, site.KeyID, time.Time{}, time.Time{}); err != nil || len(bills) != 1 || bills[0].CacheWrite1h != 6 {
+		t.Fatalf("refetched bills=%+v err=%v", bills, err)
 	}
 }

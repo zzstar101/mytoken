@@ -141,7 +141,7 @@ func (h *HarnessConfig) Credentials(ctx context.Context) ([]Credential, error) {
 			out = append(out, Credential{
 				Origin:   origin,
 				KeyID:    KeyID(h.claudeKey()),
-				Provider: providerName(v),
+				Provider: hostName(origin),
 				Harness:  v.Harness,
 				Source:   "harness-config",
 				Secret:   NewSecret(h.claudeKey()),
@@ -161,6 +161,7 @@ func (h *HarnessConfig) Credentials(ctx context.Context) ([]Credential, error) {
 			})
 		}
 	}
+	out = append(out, h.configRoutes()...)
 	return out, nil
 }
 

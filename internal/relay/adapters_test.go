@@ -227,6 +227,7 @@ func TestNewAPIBillsTokenSemantics(t *testing.T) {
 					"request_id": "req-1", "upstream_request_id": "up-1",
 					"other": `{"model_ratio":2,"group_ratio":0.3,"completion_ratio":5,"cache_ratio":0.1,
 						"cache_creation_ratio":1.25,"cache_tokens":300,"cache_write_tokens":400,
+						"cache_creation_tokens_1h":250,"cache_creation_ratio_1h":2,
 						"usage_semantic":"anthropic"}`,
 				},
 				{
@@ -253,6 +254,10 @@ func TestNewAPIBillsTokenSemantics(t *testing.T) {
 	if got := bills[0].Tokens; got.Input != 1000 || got.CacheRead != 300 || got.CacheWrite != 400 {
 		t.Fatalf("anthropic tokens = %+v", got)
 	}
+	// 1-hour writes are a part of the writes, with their own ratio.
+	if bills[0].CacheWrite1h != 250 || bills[0].Ratios.CacheCreate1h != 2 || bills[1].CacheWrite1h != 0 {
+		t.Fatalf("1h writes = %d (ratio %v) / %d", bills[0].CacheWrite1h, bills[0].Ratios.CacheCreate1h, bills[1].CacheWrite1h)
+	}
 	// OpenAI-style: prompt_tokens includes cache, so it is subtracted.
 	if got := bills[1].Tokens; got.Input != 300 || got.CacheRead != 300 || got.CacheWrite != 400 {
 		t.Fatalf("openai tokens = %+v, want Input 300", got)
@@ -271,10 +276,83 @@ func TestNewAPIBillsTokenSemantics(t *testing.T) {
 	if bills[0].RequestID != "req-1" || bills[0].UpstreamRequestID != "up-1" {
 		t.Fatalf("ids = %q/%q", bills[0].RequestID, bills[0].UpstreamRequestID)
 	}
-	// afterID skips rows the caller already has.
-	bills, err = c.Bills(ctx, 11)
-	if err != nil || len(bills) != 1 || bills[0].ID != 12 {
-		t.Fatalf("bills after id 11 = %+v (%v)", bills, err)
+	// new-api's "id" is a display position, so bill ids come from the rows
+	// themselves: positive, distinct, and the same on the next poll.
+	again, err := c.Bills(ctx, 11)
+	if err != nil || len(again) != 2 {
+		t.Fatalf("second poll = %d bills (%v)", len(again), err)
+	}
+	if bills[0].ID <= 0 || bills[0].ID == bills[1].ID || again[0].ID != bills[0].ID || again[1].ID != bills[1].ID {
+		t.Fatalf("ids %d,%d then %d,%d", bills[0].ID, bills[1].ID, again[0].ID, again[1].ID)
+	}
+}
+
+// TestNewAPIBillsBareArray covers released new-api: data is the array itself,
+// row ids are positions (1 = newest) that shift as new requests arrive, and
+// two keys on one site never share a bill id.
+func TestNewAPIBillsBareArray(t *testing.T) {
+	ctx := context.Background()
+	row := func(pos int, at int64, req string) map[string]any {
+		return map[string]any{"id": pos, "created_at": at, "type": 2, "model_name": "glm-5.2",
+			"quota": 5000, "prompt_tokens": 100, "completion_tokens": 10, "request_id": req,
+			"other": `{"model_ratio":1,"group_ratio":1}`}
+	}
+	polls := [][]map[string]any{
+		{row(1, 200, "b"), row(2, 100, "a")},
+		{row(1, 300, "c"), row(2, 200, "b"), row(3, 100, "a")},
+		// two indistinguishable rows without a request id
+		{row(1, 400, ""), row(2, 400, "")},
+	}
+	n := 0
+	origin, h := newAPISite(t, func(g *gateway) {
+		g.handle("/api/log/token", func(w http.ResponseWriter, r *http.Request) {
+			jsonBody(w, 200, map[string]any{"success": true, "message": "", "data": polls[n]})
+			n++
+		})
+	})
+	site, _ := Detect(ctx, h, origin, cred(origin))
+	c, _ := New(h, site, cred(origin))
+	first, err := c.Bills(ctx, 0)
+	if err != nil || len(first) != 2 {
+		t.Fatalf("first = %+v (%v)", first, err)
+	}
+	second, err := c.Bills(ctx, 0)
+	if err != nil || len(second) != 3 {
+		t.Fatalf("second = %+v (%v)", second, err)
+	}
+	if second[1].ID != first[0].ID || second[2].ID != first[1].ID {
+		t.Fatalf("ids moved with the display position: %d,%d vs %d,%d", first[0].ID, first[1].ID, second[1].ID, second[2].ID)
+	}
+	dup, err := c.Bills(ctx, 0)
+	if err != nil || len(dup) != 2 || dup[0].ID == dup[1].ID {
+		t.Fatalf("identical rows = %+v (%v)", dup, err)
+	}
+	other := cred(origin)
+	other.KeyID = "000000000000"
+	site2 := site
+	site2.KeyID = other.KeyID
+	c2, _ := New(h, site2, other)
+	n = 0
+	theirs, err := c2.Bills(ctx, 0)
+	if err != nil || theirs[0].ID == first[0].ID {
+		t.Fatalf("two keys share bill id %d (%v)", first[0].ID, err)
+	}
+}
+
+// TestNewAPIBillsRefused treats {"success": false} as an error, not as an
+// empty window.
+func TestNewAPIBillsRefused(t *testing.T) {
+	ctx := context.Background()
+	origin, h := newAPISite(t, func(g *gateway) {
+		g.handle("/api/log/token", func(w http.ResponseWriter, r *http.Request) {
+			jsonBody(w, 200, map[string]any{"success": false, "message": "无权进行此操作"})
+		})
+	})
+	site, _ := Detect(ctx, h, origin, cred(origin))
+	c, _ := New(h, site, cred(origin))
+	_, err := c.Bills(ctx, 0)
+	if err == nil || Reason(err) != "site refused the request" {
+		t.Fatalf("err = %v (%q)", err, Reason(err))
 	}
 }
 
@@ -327,9 +405,8 @@ func TestNewAPIBillsFixedPriceModel(t *testing.T) {
 	if bills[0].Ratios.FixedPrice != 2.5 {
 		t.Fatalf("fixed price = %v, want 2.5", bills[0].Ratios.FixedPrice)
 	}
-	in, out, cr, cw := unitPrices(bills[0].Ratios)
-	if in != 0 || out != 0 || cr != 0 || cw != 0 {
-		t.Fatalf("unit prices = %v/%v/%v/%v, want all zero for a per-call model", in, out, cr, cw)
+	if p, ok := unitPrices(bills[0].Ratios); ok {
+		t.Fatalf("unit prices = %+v, want none for a per-call model", p)
 	}
 	// The money is still the site's own figure.
 	if bills[0].ChargedUSD != 5 {
@@ -414,52 +491,68 @@ func TestSub2APIBalanceAndSnapshot(t *testing.T) {
 
 func TestSub2APIDaily(t *testing.T) {
 	ctx := context.Background()
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Skip("no tzdata")
+	}
+	now := time.Now().In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	used := today.AddDate(0, 0, -1).Format("2006-01-02")
 	g := newGateway()
 	g.handle("/v1/sub2api/billing", func(w http.ResponseWriter, r *http.Request) {
 		jsonBody(w, 200, map[string]any{"effective_rate_multiplier": 0.5})
 	})
 	g.handle("/v1/usage", func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("start_date"); got != "2026-01-01" {
-			t.Errorf("start_date = %q", got)
+		// the daily window is "the last n days ending today" in this zone
+		if got := r.URL.Query().Get("days"); got != "4" {
+			t.Errorf("days = %q, want 4", got)
 		}
-		if got := r.URL.Query().Get("end_date"); got != "2026-01-03" {
-			t.Errorf("end_date = %q, want the day before 'to'", got)
-		}
-		if got := r.URL.Query().Get("timezone"); got == "" {
-			t.Error("timezone missing")
+		if got := r.URL.Query().Get("timezone"); got != "Asia/Shanghai" {
+			t.Errorf("timezone = %q", got)
 		}
 		jsonBody(w, 200, map[string]any{
 			"daily_usage": []map[string]any{
-				{"date": "2026-01-02", "requests": 9, "input_tokens": 1000, "output_tokens": 200,
+				{"date": used, "requests": 9, "input_tokens": 1000, "output_tokens": 200,
 					"cache_read_tokens": 50, "cache_write_tokens": 60, "cost": 4, "actual_cost": 2},
 			},
+			// range-wide, in the server's zone: must not become a day row
 			"model_stats": []map[string]any{
-				{"model": "claude-sonnet-4-5", "requests": 5, "input_tokens": 600, "output_tokens": 100,
-					"cache_creation_tokens": 60, "cache_read_tokens": 50, "cost": 3, "actual_cost": 1.5},
+				{"model": "claude-sonnet-4-5", "requests": 5, "cost": 3, "actual_cost": 1.5},
 			},
 		})
 	})
 	origin, h := g.site(t)
 	site, _ := Detect(ctx, h, origin, cred(origin))
 	c, _ := New(h, site, cred(origin))
+	rows, err := c.Daily(ctx, today.AddDate(0, 0, -3), today.AddDate(0, 0, 1), loc)
+	if err != nil {
+		t.Fatalf("daily: %v", err)
+	}
+	if len(rows) != 4 {
+		t.Fatalf("rows = %+v, want one per day of the range", rows)
+	}
+	var charged float64
+	for i, r := range rows {
+		if want := today.AddDate(0, 0, i-3).Format("2006-01-02"); r.Day != want || r.Model != "" {
+			t.Fatalf("row %d = %+v, want day %s", i, r, want)
+		}
+		charged += r.ChargedUSD
+	}
+	if rows[2].Day != used || rows[2].ListUSD != 4 || rows[2].ChargedUSD != 2 || rows[2].Tokens.CacheWrite != 60 || charged != 2 {
+		t.Fatalf("rows = %+v", rows)
+	}
+}
+
+func TestZoneName(t *testing.T) {
 	loc, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
 		t.Skip("no tzdata")
 	}
-	from := time.Date(2026, 1, 1, 0, 0, 0, 0, loc)
-	to := time.Date(2026, 1, 4, 0, 0, 0, 0, loc)
-	rows, err := c.Daily(ctx, from, to, loc)
-	if err != nil {
-		t.Fatalf("daily: %v", err)
+	if got := zoneName(loc); got != "Asia/Shanghai" {
+		t.Fatalf("zoneName = %q", got)
 	}
-	if len(rows) != 2 {
-		t.Fatalf("rows = %d, want 1 day + 1 model", len(rows))
-	}
-	if rows[0].Day != "2026-01-02" || rows[0].ListUSD != 4 || rows[0].ChargedUSD != 2 {
-		t.Fatalf("day row = %+v", rows[0])
-	}
-	if rows[1].Model != "claude-sonnet-4-5" || rows[1].Tokens.CacheWrite != 60 || rows[1].ChargedUSD != 1.5 {
-		t.Fatalf("model row = %+v", rows[1])
+	if got := zoneName(time.Local); got == "Local" {
+		t.Fatal("time.Local must resolve to a name a server understands")
 	}
 }
 

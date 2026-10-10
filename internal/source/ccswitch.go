@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	toml "github.com/pelletier/go-toml/v2"
+
 	"github.com/zzstar101/mytoken/internal/model"
 	"github.com/zzstar101/mytoken/internal/pricing"
 	"github.com/zzstar101/mytoken/internal/sqlitedsn"
@@ -243,16 +245,19 @@ func providerInfo(sourceName, app, name, base, key string) ProviderInfo {
 // visible to the next reconciliation without a restart. The key is only kept
 // inside the returned Secret and never written to disk by this package.
 func (c *CCSwitch) Credentials(ctx context.Context) ([]Credential, error) {
-	_ = ctx
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	if _, err := os.Stat(c.path); err != nil {
 		return nil, nil
 	}
-	if c.db == nil {
-		return nil, nil
+	// A short-lived read-only handle: callers (the relay facade) never Load
+	// this source, and the resolver's handle may be closed at any time.
+	q := url.Values{"mode": {"ro"}, "_pragma": {"busy_timeout(1500)"}}
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(c.path)+"?"+q.Encode())
+	if err != nil {
+		return nil, err
 	}
-	rows, err := c.db.Query(`SELECT app_type,name,COALESCE(settings_config,''),COALESCE(meta,'') FROM providers ORDER BY app_type,name`)
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	rows, err := db.QueryContext(ctx, `SELECT app_type,name,COALESCE(settings_config,''),COALESCE(meta,'') FROM providers ORDER BY app_type,name`)
 	if err != nil {
 		return nil, err
 	}
@@ -322,12 +327,43 @@ func appType(h model.Harness) string {
 
 // ccBaseURL extracts the endpoint from a provider's stored settings.
 func ccBaseURL(cfg, meta string) string {
-	for _, key := range []string{"ANTHROPIC_BASE_URL", "base_url", "baseURL", "OPENAI_BASE_URL"} {
+	for _, key := range []string{"ANTHROPIC_BASE_URL", "base_url", "baseURL", "baseUrl", "OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL"} {
 		if v := jsonString(cfg, key); v != "" {
 			return v
 		}
 	}
+	// Codex providers keep config.toml verbatim under "config".
+	if v := codexTOMLBaseURL(jsonString(cfg, "config")); v != "" {
+		return v
+	}
 	return jsonString(meta, "base_url")
+}
+
+// codexTOMLBaseURL returns the base URL of the selected model provider in a
+// Codex config.toml, or of its only provider when none is selected.
+func codexTOMLBaseURL(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	var c struct {
+		ModelProvider  string `toml:"model_provider"`
+		OpenAIBaseURL  string `toml:"openai_base_url"`
+		ModelProviders map[string]struct {
+			BaseURL string `toml:"base_url"`
+		} `toml:"model_providers"`
+	}
+	if toml.Unmarshal([]byte(raw), &c) != nil {
+		return ""
+	}
+	if p, ok := c.ModelProviders[c.ModelProvider]; ok && p.BaseURL != "" {
+		return p.BaseURL
+	}
+	if c.ModelProvider == "" && len(c.ModelProviders) == 1 {
+		for _, p := range c.ModelProviders {
+			return p.BaseURL
+		}
+	}
+	return c.OpenAIBaseURL
 }
 
 // ccKey returns the credential configured for a provider, or "". Callers must

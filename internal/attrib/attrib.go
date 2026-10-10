@@ -66,7 +66,76 @@ func NewWithSources(st *store.Store, sources ...source.Source) (*Resolver, error
 		r.Close()
 		return nil, err
 	}
+	if err := r.migrateBareGeneric(context.Background()); err != nil {
+		r.Close()
+		return nil, err
+	}
 	return r, nil
+}
+
+// migrateBareGeneric re-resolves events an older version attributed to a
+// generic log name ("custom") that had no base URL to name it by, and events
+// attributed to cc-switch's local proxy: Resolve now looks past both. Costs
+// depend on the provider, so the price checkpoint is cleared.
+func (r *Resolver) migrateBareGeneric(ctx context.Context) error {
+	const key = "attribution.bare-generic.v1"
+	done, err := r.st.Setting(ctx, key)
+	if err != nil || done == "1" {
+		return err
+	}
+	rows, err := r.st.DB().QueryContext(ctx, `SELECT rowid,harness,timestamp,model,provider,base_url,input,output,cache_read,cache_write,reasoning,resolved_provider,attrib FROM events
+		WHERE attrib!=? AND ((attrib=? AND lower(trim(resolved_provider)) IN ('','custom','openai-compatible','default','proxy')) OR (attrib=? AND resolved_provider IN ('127.0.0.1','localhost')))`,
+		model.AttribUserRule, model.AttribLog, model.AttribConfig)
+	if err != nil {
+		return err
+	}
+	type change struct {
+		id               int64
+		provider, attrib string
+	}
+	var changes []change
+	for rows.Next() {
+		var id, at int64
+		var e model.UsageEvent
+		var old, oldAttrib string
+		if err = rows.Scan(&id, &e.Harness, &at, &e.Model, &e.Provider, &e.BaseURL, &e.Tokens.Input, &e.Tokens.Output, &e.Tokens.CacheRead, &e.Tokens.CacheWrite, &e.Tokens.Reasoning, &old, &oldAttrib); err != nil {
+			rows.Close()
+			return err
+		}
+		e.Timestamp = time.Unix(0, at).UTC()
+		if p, a := r.Resolve(ctx, e); p != old || string(a) != oldAttrib {
+			changes = append(changes, change{id, p, string(a)})
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	tx, err := r.st.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if len(changes) > 0 {
+		stmt, err := tx.PrepareContext(ctx, "UPDATE events SET resolved_provider=?, attrib=? WHERE rowid=?")
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+		for _, c := range changes {
+			if _, err = stmt.ExecContext(ctx, c.provider, c.attrib, c.id); err != nil {
+				return err
+			}
+		}
+		if _, err = tx.ExecContext(ctx, "INSERT INTO settings VALUES('pricing_fingerprint','') ON CONFLICT(key) DO UPDATE SET value=excluded.value"); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO settings VALUES(?,'1') ON CONFLICT(key) DO UPDATE SET value=excluded.value", key); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 func (r *Resolver) migrateGenericProviders(ctx context.Context) error {
 	done, err := r.st.Setting(ctx, "attribution.generic-host.v1")
@@ -128,7 +197,8 @@ func (r *Resolver) Resolve(_ context.Context, e model.UsageEvent) (string, model
 			return v.Provider, model.AttribUserRule
 		}
 	}
-	if provider := displayProvider(e.Provider, e.BaseURL); provider != "" {
+	// A generic name ("custom") without a base URL says nothing: look further.
+	if provider := displayProvider(e.Provider, e.BaseURL); provider != "" && !generic(provider) {
 		return provider, model.AttribLog
 	}
 	// Request-level sources (cc-switch's proxy log) come next, in priority order.
@@ -144,17 +214,27 @@ func (r *Resolver) Resolve(_ context.Context, e model.UsageEvent) (string, model
 	configs := r.configs[e.Harness]
 	at := e.Timestamp.UnixNano()
 	for i := len(configs) - 1; i >= 0; i-- {
-		if configs[i].from <= at && configs[i].provider != "" {
+		// While a harness pointed at cc-switch's proxy, the provider behind it
+		// is the one cc-switch had selected, recorded before the switch.
+		if configs[i].from <= at && configs[i].provider != "" && !source.IsLocalProxy(configs[i].base) {
 			return displayProvider(configs[i].provider, e.BaseURL), model.AttribConfig
 		}
 	}
 	return Infer(e.Model), model.AttribInferred
 }
 
-// displayProvider preserves named providers and identifies generic relays by host.
-func displayProvider(provider, base string) string {
+// generic reports whether a provider name only says "some gateway".
+func generic(provider string) bool {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "", "custom", "openai-compatible", "default", "proxy":
+		return true
+	}
+	return false
+}
+
+// displayProvider preserves named providers and identifies generic relays by host.
+func displayProvider(provider, base string) string {
+	if generic(provider) && !source.IsLocalProxy(base) {
 		u, err := url.Parse(base)
 		if err == nil && u.Hostname() != "" && (u.Scheme == "https" || u.Scheme == "http") {
 			host := strings.ToLower(u.Hostname())

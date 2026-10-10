@@ -119,12 +119,29 @@ func (p *Pricer) ruleAt(key [2]string, t time.Time) (Rule, bool) {
 	return Rule{}, false
 }
 
+// Scoped joins a harness and a provider name into the provider a rule can
+// name to apply to that tool only ("pi/kami"): the same name can stand for a
+// different gateway in another tool's config.
+func Scoped(harness, provider string) string {
+	if harness == "" || provider == "" {
+		return provider
+	}
+	return harness + "/" + provider
+}
+
 // priceSources lists the rules that may supply unit prices for a model, most
-// specific first: provider+model, model-only, then provider-wide. A nil entry
-// means no rule of that shape is effective at t.
-func (p *Pricer) priceSources(provider, name string, t time.Time) [3]*Rule {
-	var out [3]*Rule
-	for i, key := range [][2]string{{provider, name}, {"", name}, {provider, ""}} {
+// specific first: harness-scoped provider+model, provider+model, model-only,
+// then the scoped and plain provider-wide rules. A nil entry means no rule of
+// that shape is effective at t.
+func (p *Pricer) priceSources(scoped, provider, name string, t time.Time) [5]*Rule {
+	var out [5]*Rule
+	keys := [5][2]string{{scoped, name}, {provider, name}, {"", name}, {scoped, ""}, {provider, ""}}
+	for i, key := range keys {
+		if i == 0 || i == 3 {
+			if scoped == provider {
+				continue
+			}
+		}
 		if r, ok := p.ruleAt(key, t); ok {
 			rule := r
 			out[i] = &rule
@@ -136,7 +153,7 @@ func (p *Pricer) priceSources(provider, name string, t time.Time) [3]*Rule {
 // classPrice returns the first rate set for a token class, walking the price
 // sources from most to least specific, so a narrower rule can override one
 // class while a wider one fills the rest.
-func classPrice(src [3]*Rule, class func(Rule) *float64) (*float64, bool) {
+func classPrice(src [5]*Rule, class func(Rule) *float64) (*float64, bool) {
 	for _, r := range src {
 		if r == nil {
 			continue
@@ -158,8 +175,11 @@ func ruleCacheWrite(r Rule) *float64 { return r.CacheWrite }
 // model-wide multiplier is the last fallback before the default 1. A rule's
 // zero Multiplier means unset and is skipped, so an imported model rule never
 // cancels a provider's multiplier.
-func (p *Pricer) multiplierFor(provider, name string, t time.Time) float64 {
-	for _, key := range [][2]string{{provider, name}, {provider, ""}} {
+func (p *Pricer) multiplierFor(scoped, provider, name string, t time.Time) float64 {
+	for _, key := range [][2]string{{scoped, name}, {provider, name}, {scoped, ""}, {provider, ""}} {
+		if key[0] == "" {
+			continue
+		}
 		if r, ok := p.ruleAt(key, t); ok && r.Multiplier != 0 {
 			return r.Multiplier
 		}
@@ -183,7 +203,8 @@ func ruleMoment(e model.UsageEvent) time.Time {
 	return e.Timestamp
 }
 
-func (p *Pricer) effective(provider, name string, at time.Time) (Price, bool, float64) {
+func (p *Pricer) effective(harness, provider, name string, at time.Time) (Price, bool, float64) {
+	scoped := Scoped(harness, provider)
 	name = p.canonical(provider, name)
 	price, known := p.lookup(name)
 	n := Normalize(name)
@@ -191,10 +212,10 @@ func (p *Pricer) effective(provider, name string, at time.Time) (Price, bool, fl
 		price = v
 		known = true
 	}
-	multiplier := p.multiplierFor(provider, n, at)
+	multiplier := p.multiplierFor(scoped, provider, n, at)
 	// Unit prices fall back class by class, from the most specific rule to the
 	// widest one; a class no rule sets keeps the catalog or override rate.
-	src := p.priceSources(provider, n, at)
+	src := p.priceSources(scoped, provider, n, at)
 	in, inSet := classPrice(src, ruleInput)
 	out, outSet := classPrice(src, ruleOutput)
 	cr, crSet := classPrice(src, ruleCacheRead)
@@ -222,12 +243,12 @@ func (p *Pricer) Evaluate(e model.UsageEvent) (float64, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	at := ruleMoment(e)
-	price, known, multiplier := p.effective(e.Provider, e.Model, at)
+	price, known, multiplier := p.effective(string(e.Harness), e.Provider, e.Model, at)
 	// Partial custom rules can price an unknown model if no missing class is
 	// used; the classes fall back across the same chain as the price itself.
 	if !known {
 		n := Normalize(p.canonical(e.Provider, e.Model))
-		src := p.priceSources(e.Provider, n, at)
+		src := p.priceSources(Scoped(string(e.Harness), e.Provider), e.Provider, n, at)
 		_, inSet := classPrice(src, ruleInput)
 		_, outSet := classPrice(src, ruleOutput)
 		_, crSet := classPrice(src, ruleCacheRead)

@@ -66,6 +66,14 @@ func KeyID(key string) string {
 // Origin normalizes a base URL to scheme://host[:port], lowercased and without
 // a path. It reports false for anything unusable (no scheme, no host, or a
 // scheme that is not http/https).
+// IsLocalProxy reports whether base points at cc-switch's local proxy, which
+// forwards to whichever provider is selected in cc-switch: it says nothing
+// about the gateway a request reached.
+func IsLocalProxy(base string) bool {
+	origin, ok := Origin(base)
+	return ok && (origin == LocalProxyOrigin || origin == "http://localhost:15721")
+}
+
 func Origin(rawURL string) (string, bool) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {

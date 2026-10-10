@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS relay_daily(origin TEXT NOT NULL,key_id TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS relay_cursors(origin TEXT NOT NULL,key_id TEXT NOT NULL,last_bill_id INTEGER NOT NULL,last_sync INTEGER NOT NULL,last_error TEXT NOT NULL,PRIMARY KEY(origin,key_id)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS relay_origins(id INTEGER PRIMARY KEY,origin TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS relay_bill_dimensions(id INTEGER PRIMARY KEY,origin_id INTEGER NOT NULL,key_id TEXT NOT NULL,type TEXT NOT NULL,model TEXT NOT NULL,grp TEXT NOT NULL,ratios_json TEXT NOT NULL,UNIQUE(origin_id,key_id,type,model,grp,ratios_json));
-CREATE TABLE IF NOT EXISTS relay_bill_data(origin_id INTEGER NOT NULL,id INTEGER NOT NULL,dimension_id INTEGER NOT NULL,at INTEGER NOT NULL,request_id TEXT NOT NULL,upstream_request_id TEXT NOT NULL,input INTEGER NOT NULL,output INTEGER NOT NULL,cache_read INTEGER NOT NULL,cache_write INTEGER NOT NULL,reasoning INTEGER NOT NULL,charged_usd REAL NOT NULL,stream INTEGER NOT NULL,latency_ms INTEGER NOT NULL,match_harness TEXT NOT NULL DEFAULT '',match_dedup_key TEXT NOT NULL DEFAULT '',match_kind TEXT NOT NULL DEFAULT '',PRIMARY KEY(origin_id,id)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS relay_bill_data(origin_id INTEGER NOT NULL,id INTEGER NOT NULL,dimension_id INTEGER NOT NULL,at INTEGER NOT NULL,request_id TEXT NOT NULL,upstream_request_id TEXT NOT NULL,input INTEGER NOT NULL,output INTEGER NOT NULL,cache_read INTEGER NOT NULL,cache_write INTEGER NOT NULL,reasoning INTEGER NOT NULL,charged_usd REAL NOT NULL,stream INTEGER NOT NULL,latency_ms INTEGER NOT NULL,match_harness TEXT NOT NULL DEFAULT '',match_dedup_key TEXT NOT NULL DEFAULT '',match_kind TEXT NOT NULL DEFAULT '',cache_write_1h INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(origin_id,id)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS relay_bill_dimension_time ON relay_bill_data(dimension_id,at);
-CREATE VIEW IF NOT EXISTS relay_bills AS SELECT o.origin,d.key_id,b.id,b.at,d.type,d.model,d.grp,b.request_id,b.upstream_request_id,b.input,b.output,b.cache_read,b.cache_write,b.reasoning,b.charged_usd,d.ratios_json,b.stream,b.latency_ms,b.match_harness,b.match_dedup_key,b.match_kind FROM relay_bill_data b JOIN relay_origins o ON o.id=b.origin_id JOIN relay_bill_dimensions d ON d.id=b.dimension_id;
+CREATE VIEW IF NOT EXISTS relay_bills AS SELECT o.origin,d.key_id,b.id,b.at,d.type,d.model,d.grp,b.request_id,b.upstream_request_id,b.input,b.output,b.cache_read,b.cache_write,b.reasoning,b.charged_usd,d.ratios_json,b.stream,b.latency_ms,b.match_harness,b.match_dedup_key,b.match_kind,b.cache_write_1h FROM relay_bill_data b JOIN relay_origins o ON o.id=b.origin_id JOIN relay_bill_dimensions d ON d.id=b.dimension_id;
 CREATE TRIGGER IF NOT EXISTS relay_bills_match_update INSTEAD OF UPDATE OF match_harness,match_dedup_key,match_kind ON relay_bills BEGIN UPDATE relay_bill_data SET match_harness=NEW.match_harness,match_dedup_key=NEW.match_dedup_key,match_kind=NEW.match_kind WHERE origin_id=(SELECT id FROM relay_origins WHERE origin=OLD.origin) AND id=OLD.id; END;
 `
 
@@ -116,7 +116,7 @@ func (s *Store) RelayCursor(ctx context.Context, origin, keyID string) (RelayCur
 	return c, err
 }
 func (s *Store) PutRelayBalance(ctx context.Context, b relay.Balance) error {
-	return s.Exec(ctx, `INSERT INTO relay_balances VALUES(?,?,?,?,?,?) ON CONFLICT(origin,key_id,at) DO UPDATE SET remaining_usd=excluded.remaining_usd,used_usd=excluded.used_usd,unlimited=excluded.unlimited`, b.Origin, b.KeyID, stamp(b.At), b.RemainingUSD, b.UsedUSD, b.Unlimited)
+	return s.Exec(ctx, `INSERT INTO relay_balances(origin,key_id,at,remaining_usd,used_usd,unlimited,currency) VALUES(?,?,?,?,?,?,?) ON CONFLICT(origin,key_id,at) DO UPDATE SET remaining_usd=excluded.remaining_usd,used_usd=excluded.used_usd,unlimited=excluded.unlimited,currency=excluded.currency`, b.Origin, b.KeyID, stamp(b.At), b.RemainingUSD, b.UsedUSD, b.Unlimited, b.Currency)
 }
 func (s *Store) LatestRelayBalance(ctx context.Context, origin, keyID string) (*relay.Balance, error) {
 	return latestRelayBalance(ctx, s.db, origin, keyID)
@@ -130,7 +130,7 @@ func latestRelayBalance(ctx context.Context, q relayQuerier, origin, keyID strin
 	b := &relay.Balance{Origin: origin, KeyID: keyID}
 	var at int64
 	var remaining, used sql.NullFloat64
-	err := q.QueryRowContext(ctx, `SELECT at,remaining_usd,used_usd,unlimited FROM relay_balances WHERE origin=? AND key_id=? ORDER BY at DESC LIMIT 1`, origin, keyID).Scan(&at, &remaining, &used, &b.Unlimited)
+	err := q.QueryRowContext(ctx, `SELECT at,remaining_usd,used_usd,unlimited,currency FROM relay_balances WHERE origin=? AND key_id=? ORDER BY at DESC LIMIT 1`, origin, keyID).Scan(&at, &remaining, &used, &b.Unlimited, &b.Currency)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -158,7 +158,7 @@ func (s *Store) PutRelayBills(ctx context.Context, bills []relay.Bill) error {
 			return err
 		}
 		defer dim.Close()
-		stmt, err := tx.PrepareContext(ctx, `INSERT INTO relay_bill_data(origin_id,id,dimension_id,at,request_id,upstream_request_id,input,output,cache_read,cache_write,reasoning,charged_usd,stream,latency_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(origin_id,id) DO UPDATE SET dimension_id=excluded.dimension_id,at=excluded.at,request_id=excluded.request_id,upstream_request_id=excluded.upstream_request_id,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,charged_usd=excluded.charged_usd,stream=excluded.stream,latency_ms=excluded.latency_ms,match_harness='',match_dedup_key='',match_kind='' WHERE (dimension_id,at,request_id,upstream_request_id,input,output,cache_read,cache_write,reasoning,charged_usd,stream,latency_ms) IS NOT (excluded.dimension_id,excluded.at,excluded.request_id,excluded.upstream_request_id,excluded.input,excluded.output,excluded.cache_read,excluded.cache_write,excluded.reasoning,excluded.charged_usd,excluded.stream,excluded.latency_ms)`)
+		stmt, err := tx.PrepareContext(ctx, `INSERT INTO relay_bill_data(origin_id,id,dimension_id,at,request_id,upstream_request_id,input,output,cache_read,cache_write,reasoning,charged_usd,stream,latency_ms,cache_write_1h) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(origin_id,id) DO UPDATE SET dimension_id=excluded.dimension_id,at=excluded.at,request_id=excluded.request_id,upstream_request_id=excluded.upstream_request_id,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,charged_usd=excluded.charged_usd,stream=excluded.stream,latency_ms=excluded.latency_ms,cache_write_1h=excluded.cache_write_1h,match_harness='',match_dedup_key='',match_kind='' WHERE (dimension_id,at,request_id,upstream_request_id,input,output,cache_read,cache_write,reasoning,charged_usd,stream,latency_ms,cache_write_1h) IS NOT (excluded.dimension_id,excluded.at,excluded.request_id,excluded.upstream_request_id,excluded.input,excluded.output,excluded.cache_read,excluded.cache_write,excluded.reasoning,excluded.charged_usd,excluded.stream,excluded.latency_ms,excluded.cache_write_1h)`)
 		if err != nil {
 			return err
 		}
@@ -184,7 +184,7 @@ func (s *Store) PutRelayBills(ctx context.Context, bills []relay.Bill) error {
 				}
 				dimensions[key] = did
 			}
-			if _, err = stmt.ExecContext(ctx, oid, b.ID, did, stamp(b.At), b.RequestID, b.UpstreamRequestID, b.Tokens.Input, b.Tokens.Output, b.Tokens.CacheRead, b.Tokens.CacheWrite, b.Tokens.Reasoning, b.ChargedUSD, b.Stream, b.LatencyMS); err != nil {
+			if _, err = stmt.ExecContext(ctx, oid, b.ID, did, stamp(b.At), b.RequestID, b.UpstreamRequestID, b.Tokens.Input, b.Tokens.Output, b.Tokens.CacheRead, b.Tokens.CacheWrite, b.Tokens.Reasoning, b.ChargedUSD, b.Stream, b.LatencyMS, b.CacheWrite1h); err != nil {
 				return err
 			}
 		}
@@ -192,7 +192,7 @@ func (s *Store) PutRelayBills(ctx context.Context, bills []relay.Bill) error {
 	})
 }
 
-const relayBillSelect = `SELECT origin,key_id,id,at,type,model,grp,request_id,upstream_request_id,input,output,cache_read,cache_write,reasoning,charged_usd,ratios_json,stream,latency_ms FROM relay_bills WHERE origin=? AND key_id=?`
+const relayBillSelect = `SELECT origin,key_id,id,at,type,model,grp,request_id,upstream_request_id,input,output,cache_read,cache_write,reasoning,charged_usd,ratios_json,stream,latency_ms,cache_write_1h FROM relay_bills WHERE origin=? AND key_id=?`
 
 func (s *Store) RelayBills(ctx context.Context, origin, keyID string, from, to time.Time) ([]relay.Bill, error) {
 	return s.relayBills(ctx, origin, keyID, from, to, false)
@@ -229,7 +229,7 @@ func (s *Store) relayBills(ctx context.Context, origin, keyID string, from, to t
 		var b relay.Bill
 		var at int64
 		var raw string
-		if err = rows.Scan(&b.Origin, &b.KeyID, &b.ID, &at, &b.Type, &b.Model, &b.Group, &b.RequestID, &b.UpstreamRequestID, &b.Tokens.Input, &b.Tokens.Output, &b.Tokens.CacheRead, &b.Tokens.CacheWrite, &b.Tokens.Reasoning, &b.ChargedUSD, &raw, &b.Stream, &b.LatencyMS); err != nil {
+		if err = rows.Scan(&b.Origin, &b.KeyID, &b.ID, &at, &b.Type, &b.Model, &b.Group, &b.RequestID, &b.UpstreamRequestID, &b.Tokens.Input, &b.Tokens.Output, &b.Tokens.CacheRead, &b.Tokens.CacheWrite, &b.Tokens.Reasoning, &b.ChargedUSD, &raw, &b.Stream, &b.LatencyMS, &b.CacheWrite1h); err != nil {
 			return nil, err
 		}
 		b.At = relayTime(at)
@@ -249,20 +249,37 @@ func (s *Store) PutRelayDaily(ctx context.Context, days []relay.Daily) error {
 	if len(days) == 0 {
 		return nil
 	}
+	return s.RelayTransaction(ctx, func(tx *sql.Tx) error { return putRelayDaily(ctx, tx, days) })
+}
+
+// ReplaceRelayDaily makes days the whole record of one key for the half-open
+// day range [from,to) ("2006-01-02"): rows the site no longer reports there,
+// such as a day that turned out to have no usage, are removed.
+func (s *Store) ReplaceRelayDaily(ctx context.Context, origin, keyID, from, to string, days []relay.Daily) error {
 	return s.RelayTransaction(ctx, func(tx *sql.Tx) error {
-		stmt, err := tx.PrepareContext(ctx, `INSERT INTO relay_daily VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(origin,key_id,day,model) DO UPDATE SET requests=excluded.requests,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,list_usd=excluded.list_usd,charged_usd=excluded.charged_usd,fetched_at=excluded.fetched_at`)
-		if err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM relay_daily WHERE origin=? AND key_id=? AND day>=? AND day<?`, origin, keyID, from, to); err != nil {
 			return err
 		}
-		defer stmt.Close()
-		now := time.Now().UnixNano()
-		for _, d := range days {
-			if _, err = stmt.ExecContext(ctx, d.Origin, d.KeyID, d.Day, d.Model, d.Requests, d.Tokens.Input, d.Tokens.Output, d.Tokens.CacheRead, d.Tokens.CacheWrite, d.Tokens.Reasoning, d.ListUSD, d.ChargedUSD, now); err != nil {
-				return err
-			}
+		if len(days) == 0 {
+			return nil
 		}
-		return nil
+		return putRelayDaily(ctx, tx, days)
 	})
+}
+
+func putRelayDaily(ctx context.Context, tx *sql.Tx, days []relay.Daily) error {
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO relay_daily VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(origin,key_id,day,model) DO UPDATE SET requests=excluded.requests,input=excluded.input,output=excluded.output,cache_read=excluded.cache_read,cache_write=excluded.cache_write,reasoning=excluded.reasoning,list_usd=excluded.list_usd,charged_usd=excluded.charged_usd,fetched_at=excluded.fetched_at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	now := time.Now().UnixNano()
+	for _, d := range days {
+		if _, err = stmt.ExecContext(ctx, d.Origin, d.KeyID, d.Day, d.Model, d.Requests, d.Tokens.Input, d.Tokens.Output, d.Tokens.CacheRead, d.Tokens.CacheWrite, d.Tokens.Reasoning, d.ListUSD, d.ChargedUSD, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (s *Store) RelayDaily(ctx context.Context, origin, keyID, from, to string) ([]relay.Daily, error) {
 	q := `SELECT origin,key_id,day,model,requests,input,output,cache_read,cache_write,reasoning,list_usd,charged_usd FROM relay_daily WHERE origin=? AND key_id=?`

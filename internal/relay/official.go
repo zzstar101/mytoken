@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/zzstar101/mytoken/internal/source"
@@ -88,23 +91,29 @@ func parseOfficialBalance(kind Kind, site Site, body []byte) (Balance, bool, err
 	case KindDeepSeek:
 		var res struct {
 			BalanceInfos []struct {
-				Currency        string  `json:"currency"`
-				TotalBalance    float64 `json:"total_balance"`
-				GrantedBalance  float64 `json:"granted_balance"`
-				ToppedUpBalance float64 `json:"topped_up_balance"`
+				Currency     string    `json:"currency"`
+				TotalBalance flexFloat `json:"total_balance"`
 			} `json:"balance_infos"`
 		}
 		if err := json.Unmarshal(body, &res); err != nil {
 			return out, false, err
 		}
-		for _, info := range res.BalanceInfos {
-			if info.Currency == "CNY" {
-				continue // the USD row is the one we quote
+		// Prefer the USD row; an account topped up in yuan only has CNY.
+		pick := -1
+		for i, info := range res.BalanceInfos {
+			if pick < 0 || strings.EqualFold(info.Currency, "USD") {
+				pick = i
 			}
-			out.RemainingUSD = remaining(info.TotalBalance)
-			return out, true, nil
 		}
-		return out, false, nil
+		if pick < 0 {
+			return out, false, nil
+		}
+		info := res.BalanceInfos[pick]
+		out.RemainingUSD = remaining(float64(info.TotalBalance))
+		if c := strings.ToUpper(info.Currency); c != "" && c != "USD" {
+			out.Currency = c
+		}
+		return out, true, nil
 	case KindSilicon:
 		var res struct {
 			Data struct {
@@ -124,6 +133,9 @@ func parseOfficialBalance(kind Kind, site Site, body []byte) (Balance, bool, err
 			return out, false, nil
 		}
 		out.RemainingUSD = remaining(total)
+		if strings.HasSuffix(hostOnly(site.Origin), ".cn") {
+			out.Currency = "CNY"
+		}
 		return out, true, nil
 	case KindOpenRouter:
 		var key struct {
@@ -177,6 +189,9 @@ func parseOfficialBalance(kind Kind, site Site, body []byte) (Balance, bool, err
 		if err := json.Unmarshal(body, &res); err != nil {
 			return out, false, err
 		}
+		if strings.HasSuffix(hostOnly(site.Origin), ".cn") {
+			out.Currency = "CNY"
+		}
 		if res.Data.AvailableBalance != nil {
 			out.RemainingUSD = res.Data.AvailableBalance
 			return out, true, nil
@@ -195,4 +210,29 @@ func parseOfficialBalance(kind Kind, site Site, body []byte) (Balance, bool, err
 		return out, true, nil
 	}
 	return out, false, fmt.Errorf("relay: unsupported kind %q", kind)
+}
+
+// flexFloat reads a JSON number or a numeric string ("37.04").
+type flexFloat float64
+
+func (f *flexFloat) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return err
+	}
+	*f = flexFloat(v)
+	return nil
+}
+
+func hostOnly(origin string) string {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
 }

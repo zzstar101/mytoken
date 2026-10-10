@@ -22,6 +22,7 @@ import (
 type fakeClient struct {
 	bills                               []relay.Bill
 	err                                 error
+	ratioErr, balanceErr                error
 	after                               []int64
 	balanceCalls, ratioCalls, billCalls int
 }
@@ -29,10 +30,16 @@ type fakeClient struct {
 func (f *fakeClient) Kind() relay.Kind { return relay.KindNewAPI }
 func (f *fakeClient) Balance(context.Context) (relay.Balance, error) {
 	f.balanceCalls++
+	if f.balanceErr != nil {
+		return relay.Balance{}, f.balanceErr
+	}
 	return relay.Balance{At: time.Now()}, f.err
 }
 func (f *fakeClient) Snapshot(context.Context) (relay.Snapshot, error) {
 	f.ratioCalls++
+	if f.ratioErr != nil {
+		return relay.Snapshot{}, f.ratioErr
+	}
 	return relay.Snapshot{}, f.err
 }
 func (f *fakeClient) Bills(_ context.Context, after int64) ([]relay.Bill, error) {
@@ -193,5 +200,41 @@ func TestServiceDetectErrorAndReflectedResponseAreRedacted(t *testing.T) {
 	failing := NewService(st, func(context.Context) ([]source.Credential, error) { return nil, errors.New(sentinel) }, nil, nil)
 	if _, err = failing.Sites(ctx); err == nil || strings.Contains(err.Error(), sentinel) {
 		t.Fatal("credential lookup error leaked")
+	}
+}
+
+// TestSyncKeepsGoingPastRatioAndBalanceFailures: a site whose pricing page or
+// balance endpoint fails still has its bills fetched; the failure is reported
+// and kept as the site's last error.
+func TestSyncKeepsGoingPastRatioAndBalanceFailures(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cred := source.Credential{Origin: "https://relay.example", KeyID: "k1", Provider: "proxy", Secret: source.NewSecret("sk-x")}
+	creds := func(context.Context) ([]source.Credential, error) { return []source.Credential{cred}, nil }
+	site := relay.Site{Origin: cred.Origin, KeyID: cred.KeyID, Kind: relay.KindNewAPI, Layers: relay.LayerRatio | relay.LayerBalance | relay.LayerBills, Providers: []string{"proxy"}}
+	if err = st.PutRelaySite(ctx, site); err != nil {
+		t.Fatal(err)
+	}
+	client := &fakeClient{
+		bills:      []relay.Bill{{ID: 3, At: time.Now(), Type: "consume", Model: "x", ChargedUSD: .1}},
+		ratioErr:   errors.New("pricing page: bad gateway"),
+		balanceErr: errors.New("balance: bad gateway"),
+	}
+	syncer := NewSyncer(st, creds, func(context.Context, relay.Site, source.Credential) (relay.Client, error) { return client, nil }, &fakeRules{})
+	err = syncer.Sync(ctx, site.Origin, site.KeyID)
+	if err == nil || client.ratioCalls != 1 || client.balanceCalls != 1 || client.billCalls != 1 {
+		t.Fatalf("err=%v calls=%+v", err, client)
+	}
+	bills, err := st.RelayBills(ctx, site.Origin, site.KeyID, time.Time{}, time.Time{})
+	if err != nil || len(bills) != 1 {
+		t.Fatalf("bills not kept past soft failures: %v %v", bills, err)
+	}
+	cur, err := st.RelayCursor(ctx, site.Origin, site.KeyID)
+	if err != nil || cur.LastBillID != 3 || cur.LastError == "" {
+		t.Fatalf("cursor=%+v err=%v", cur, err)
 	}
 }

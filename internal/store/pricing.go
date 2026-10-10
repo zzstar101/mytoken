@@ -61,7 +61,7 @@ func (s *Store) replacePricing(ctx context.Context, settings map[string]string, 
 	var after int64
 	changed := len(settings) > 0
 	for {
-		rows, err := tx.QueryContext(ctx, `SELECT rowid,timestamp,model,resolved_provider,input,output,cache_read,cache_write,reasoning,cost,priced FROM events WHERE rowid>? AND log_cost IS NULL ORDER BY rowid LIMIT 512`, after)
+		rows, err := tx.QueryContext(ctx, `SELECT rowid,timestamp,harness,model,resolved_provider,input,output,cache_read,cache_write,reasoning,cost,priced FROM events WHERE rowid>? AND log_cost IS NULL ORDER BY rowid LIMIT 512`, after)
 		if err != nil {
 			return err
 		}
@@ -72,11 +72,14 @@ func (s *Store) replacePricing(ctx context.Context, settings map[string]string, 
 			var e model.UsageEvent
 			var old float64
 			var priced bool
-			if err = rows.Scan(&id, &timestamp, &e.Model, &e.Provider, &e.Tokens.Input, &e.Tokens.Output, &e.Tokens.CacheRead, &e.Tokens.CacheWrite, &e.Tokens.Reasoning, &old, &priced); err != nil {
+			var harness string
+			if err = rows.Scan(&id, &timestamp, &harness, &e.Model, &e.Provider, &e.Tokens.Input, &e.Tokens.Output, &e.Tokens.CacheRead, &e.Tokens.CacheWrite, &e.Tokens.Reasoning, &old, &priced); err != nil {
 				rows.Close()
 				return err
 			}
 			e.Timestamp = time.Unix(0, timestamp).UTC()
+			// Rules can be scoped to one tool's provider (pricing.Scoped).
+			e.Harness = model.Harness(harness)
 			after = id
 			count++
 			if next, ok := cost(e); next != old || ok != priced {

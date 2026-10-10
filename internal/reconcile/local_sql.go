@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"strings"
 	"time"
 
@@ -43,9 +44,33 @@ func loadEvents(ctx context.Context, st *store.Store, site relay.Site, from, to 
 		selected := map[rollupKey]int{}
 		idGroups := map[int64]rollupKey{}
 		var ids []any
+		// A bare name claims the provider in every harness; "pi/kami" only
+		// in that harness (relay.ScopedProvider).
 		providers := map[string]bool{}
-		for _, p := range site.Providers {
-			providers[p] = true
+		scoped := map[[2]string]bool{}
+		for _, entry := range site.Providers {
+			if h, p := relay.SplitProvider(entry); h != "" {
+				scoped[[2]string{string(h), p}] = true
+			} else {
+				providers[p] = true
+			}
+		}
+		// Other keys at the same site compete for the same provider names.
+		var siblings int
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM relay_sites WHERE origin=? AND key_id<>?", site.Origin, site.KeyID).Scan(&siblings); err != nil {
+			return err
+		}
+		// Attribution names a gateway it only knows by URL after its host;
+		// with several keys the bare host says nothing about which one.
+		if u, err := url.Parse(site.Origin); err == nil && u.Host != "" && siblings == 0 {
+			providers[u.Host] = true
+		}
+		// When reporting, leave out what is not shown to be this key's.
+		var elsewhere map[[2]string]bool
+		if mode == storedMatch {
+			if elsewhere, err = unproven(ctx, tx, site, siblings); err != nil {
+				return err
+			}
 		}
 		for rows.Next() {
 			var id int64
@@ -57,7 +82,10 @@ func loadEvents(ctx context.Context, st *store.Store, site relay.Site, from, to 
 			}
 			counts[k]++
 			origin, ok := source.Origin(url)
-			if !providers[k[2]] && (!ok || origin != site.Origin) {
+			if !providers[k[2]] && !scoped[[2]string{k[0], k[2]}] && (!ok || origin != site.Origin) {
+				continue
+			}
+			if elsewhere[[2]string{k[0], k[2]}] {
 				continue
 			}
 			selected[k]++
@@ -240,4 +268,65 @@ func loadEvents(ctx context.Context, st *store.Store, site relay.Site, from, to 
 		return rows.Err()
 	})
 	return events, totals, aliases, err
+}
+
+// querier is a *sql.DB or *sql.Tx.
+type querier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// matchEvidence lists the (harness, provider) pairs whose requests matched
+// charges of this key (mine), and those that matched only other keys at the
+// site (elsewhere).
+func matchEvidence(ctx context.Context, q querier, origin, keyID string) (mine, elsewhere map[[2]string]bool, err error) {
+	rows, err := q.QueryContext(ctx, `SELECT e.harness, e.resolved_provider, max(b.key_id=?), max(b.key_id<>?)
+		FROM relay_bills b JOIN events e ON e.harness=b.match_harness AND e.dedup_key=b.match_dedup_key
+		WHERE b.origin=? AND b.match_dedup_key<>'' GROUP BY 1,2`, keyID, keyID, origin)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	mine, elsewhere = map[[2]string]bool{}, map[[2]string]bool{}
+	for rows.Next() {
+		var h, p string
+		var m, other bool
+		if err = rows.Scan(&h, &p, &m, &other); err != nil {
+			return nil, nil, err
+		}
+		switch {
+		case m:
+			mine[[2]string{h, p}] = true
+		case other:
+			elsewhere[[2]string{h, p}] = true
+		}
+	}
+	return mine, elsewhere, rows.Err()
+}
+
+// unproven lists the providers a report leaves out for want of evidence: a
+// route's requests may use any key, so on a site with per-request charges
+// they count for this key only once one of them matched its charges; with
+// several keys, so does any provider whose requests matched only another
+// key's. Matching itself still sees every candidate, or a provider that moved
+// to a new key could never be matched there.
+func unproven(ctx context.Context, q querier, site relay.Site, siblings int) (map[[2]string]bool, error) {
+	perRequest := site.Kind == relay.KindNewAPI
+	if siblings == 0 && (len(site.Routes) == 0 || !perRequest) {
+		return nil, nil
+	}
+	mine, elsewhere, err := matchEvidence(ctx, q, site.Origin, site.KeyID)
+	if err != nil {
+		return nil, err
+	}
+	out := elsewhere
+	for _, entry := range site.Routes {
+		h, p := relay.SplitProvider(entry)
+		if h == "" {
+			continue
+		}
+		if k := [2]string{string(h), p}; !mine[k] && (perRequest || siblings > 0) {
+			out[k] = true
+		}
+	}
+	return out, nil
 }

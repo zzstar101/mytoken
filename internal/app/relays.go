@@ -31,12 +31,12 @@ type credentialer interface {
 }
 
 // relayCredentials merges the keys of every source, first source first on
-// the same (origin, key). A source that fails is skipped unless all do.
+// the same (origin, key, provider name). A source that fails is skipped unless all do.
 func relayCredentials(srcs ...credentialer) func(context.Context) ([]source.Credential, error) {
 	return func(ctx context.Context) ([]source.Credential, error) {
 		var out []source.Credential
 		var errs []error
-		seen := map[[2]string]bool{}
+		seen := map[[3]string]bool{}
 		for _, s := range srcs {
 			cs, err := s.Credentials(ctx)
 			if err != nil {
@@ -44,7 +44,7 @@ func relayCredentials(srcs ...credentialer) func(context.Context) ([]source.Cred
 				continue
 			}
 			for _, c := range cs {
-				k := [2]string{c.Origin, c.KeyID}
+				k := [3]string{c.Origin, c.KeyID, c.Provider}
 				if seen[k] {
 					continue
 				}

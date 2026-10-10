@@ -2,9 +2,11 @@ package relay
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math"
 	"net/http"
 	"strconv"
@@ -82,31 +84,63 @@ func (c *newAPIClient) Snapshot(ctx context.Context) (Snapshot, error) {
 	}
 	var res struct {
 		Data []struct {
-			ModelName       string  `json:"model_name"`
-			ModelRatio      float64 `json:"model_ratio"`
-			CompletionRatio float64 `json:"completion_ratio"`
-			CacheRatio      float64 `json:"cache_ratio"`
-			ModelPrice      float64 `json:"model_price"`
+			ModelName        string  `json:"model_name"`
+			QuotaType        int     `json:"quota_type"`
+			ModelRatio       float64 `json:"model_ratio"`
+			CompletionRatio  float64 `json:"completion_ratio"`
+			CacheRatio       float64 `json:"cache_ratio"`
+			CreateCacheRatio float64 `json:"create_cache_ratio"`
+			ModelPrice       float64 `json:"model_price"`
+			BillingMode      string  `json:"billing_mode"`
+			BillingExpr      string  `json:"billing_expr"`
 		} `json:"data"`
+		GroupRatio  map[string]float64 `json:"group_ratio"`
+		UsableGroup map[string]any     `json:"usable_group"`
 	}
 	if err := json.Unmarshal(body.body, &res); err != nil {
 		return Snapshot{}, fmt.Errorf("relay: parse %s/api/pricing: %w", c.site.Origin, err)
 	}
 	out := Snapshot{Ratios: map[string]Ratios{}, At: time.Now().UTC()}
 	for _, m := range res.Data {
-		out.Ratios[m.ModelName] = Ratios{
-			Model:      m.ModelRatio,
-			Completion: ratioOr(m.CompletionRatio, 1),
-			Cache:      ratioOr(m.CacheRatio, 1),
-			FixedPrice: m.ModelPrice,
+		r := Ratios{
+			Model:       m.ModelRatio,
+			Completion:  ratioOr(m.CompletionRatio, 1),
+			Cache:       ratioOr(m.CacheRatio, 1),
+			CacheCreate: ratioOr(m.CreateCacheRatio, 1),
+		}
+		if m.QuotaType == 1 {
+			// billed per call; model_ratio means nothing
+			r.FixedPrice = m.ModelPrice
+			r.Model = 0
+		}
+		if m.BillingMode == "tiered_expr" {
+			r.Expr = m.BillingExpr
+			if r.Expr == "" {
+				continue
+			}
+		}
+		out.Ratios[m.ModelName] = r
+	}
+	// group_ratio lists every group; usable_group the ones this user may
+	// pick. The key bills in one of the latter.
+	if len(res.GroupRatio) > 0 {
+		out.Groups = map[string]float64{}
+		for g, v := range res.GroupRatio {
+			if _, ok := res.UsableGroup[g]; ok || len(res.UsableGroup) == 0 {
+				out.Groups[g] = v
+			}
 		}
 	}
 	return out, nil
 }
 
 // Bills reads the key's most recent logs, newest first, capped at 1000 rows.
-// afterID skips everything at or below that id so repeated polls only fetch
-// new rows.
+//
+// new-api numbers these rows by their position in the response (1 = newest;
+// model/log.go assignDisplayLogIds), not by the database id, so the numbers
+// shift on every new request. Each bill therefore gets an id derived from its
+// own content (see billID) and afterID is ignored: the window is re-read on
+// every poll and the store skips rows it already has unchanged.
 func (c *newAPIClient) Bills(ctx context.Context, afterID int64) ([]Bill, error) {
 	path := "/api/log/token?p=1&page_size=" + strconv.Itoa(maxRecentItems)
 	body, err := c.h.get(ctx, c.site.Origin, path, c.cred, true)
@@ -114,25 +148,80 @@ func (c *newAPIClient) Bills(ctx context.Context, afterID int64) ([]Bill, error)
 		return nil, err
 	}
 	var res struct {
-		Data struct {
-			Items []newAPILog `json:"items"`
-		} `json:"data"`
+		Success *bool           `json:"success"`
+		Data    json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal(body.body, &res); err != nil {
 		return nil, fmt.Errorf("relay: parse %s/api/log/token: %w", c.site.Origin, err)
 	}
-	out := make([]Bill, 0, len(res.Data.Items))
-	for _, l := range res.Data.Items {
-		if l.ID <= afterID {
-			continue
+	if res.Success != nil && !*res.Success {
+		return nil, fmt.Errorf("relay: %s/api/log/token refused the request: %w", c.site.Origin, errRejected)
+	}
+	// Released new-api answers with a bare array; some forks page it.
+	var items []newAPILog
+	if d := strings.TrimSpace(string(res.Data)); d != "" && d != "null" {
+		if d[0] == '[' {
+			err = json.Unmarshal(res.Data, &items)
+		} else {
+			var paged struct {
+				Items []newAPILog `json:"items"`
+			}
+			err = json.Unmarshal(res.Data, &paged)
+			items = paged.Items
 		}
+		if err != nil {
+			return nil, fmt.Errorf("relay: parse %s/api/log/token: %w", c.site.Origin, err)
+		}
+	}
+	out := make([]Bill, 0, len(items))
+	seen := map[int64]int{}
+	for _, l := range items {
 		bill, err := c.billFrom(l)
 		if err != nil {
 			return nil, err
 		}
+		id := c.billID(l)
+		// Two rows identical in every field (same second, model, tokens and
+		// charge, no request id) keep apart by how many came before them.
+		n := seen[id]
+		seen[id] = n + 1
+		if n > 0 {
+			id = mixID(id, uint64(n))
+		}
+		bill.ID = id
 		out = append(out, bill)
 	}
 	return out, nil
+}
+
+// billID is a stable positive id for a log row: the request id when the site
+// records one, else the row's own content. The key id is mixed in because
+// the store keys bills by origin, and one site may hold several keys.
+func (c *newAPIClient) billID(l newAPILog) int64 {
+	h := fnv.New64a()
+	h.Write([]byte(c.site.KeyID))
+	h.Write([]byte{0})
+	if l.RequestID != "" {
+		h.Write([]byte(l.RequestID))
+		h.Write([]byte{0, byte(l.Type)})
+	} else {
+		fmt.Fprintf(h, "%d|%d|%s|%d|%d|%d|%d|%s", l.CreatedAt, l.Type, l.ModelName, l.Quota, l.PromptTokens, l.CompletionTokens, l.UseTime, l.Other)
+	}
+	return positive(h.Sum64())
+}
+
+func mixID(id int64, n uint64) int64 {
+	h := fnv.New64a()
+	fmt.Fprintf(h, "%d#%d", id, n)
+	return positive(h.Sum64())
+}
+
+func positive(v uint64) int64 {
+	v &= math.MaxInt64
+	if v == 0 {
+		v = 1
+	}
+	return int64(v)
 }
 
 // newAPILog is one row of new-api's log table (model/log.go).
@@ -161,15 +250,19 @@ type newAPIOther struct {
 	CacheRatio      *float64 `json:"cache_ratio"`
 	ModelPrice      *float64 `json:"model_price"`
 	UserGroupRatio  *float64 `json:"user_group_ratio"`
+	BillingMode     string   `json:"billing_mode"`
+	ExprB64         string   `json:"expr_b64"`
 
-	CacheTokens         *int64   `json:"cache_tokens"`
-	CacheCreationTokens *int64   `json:"cache_creation_tokens"`
-	CacheWriteTokens    *int64   `json:"cache_write_tokens"`
-	CacheCreationRatio  *float64 `json:"cache_creation_ratio"`
-	UsageSemantic       string   `json:"usage_semantic"`
-	InputTokensTotal    *int64   `json:"input_tokens_total"`
-	ReasoningTokens     *int64   `json:"reasoning_tokens"`
-	ReasoningEffort     string   `json:"reasoning_effort"`
+	CacheTokens          *int64   `json:"cache_tokens"`
+	CacheCreationTokens  *int64   `json:"cache_creation_tokens"`
+	CacheWriteTokens     *int64   `json:"cache_write_tokens"`
+	CacheCreationRatio   *float64 `json:"cache_creation_ratio"`
+	CacheCreation1h      *int64   `json:"cache_creation_tokens_1h"`
+	CacheCreationRatio1h *float64 `json:"cache_creation_ratio_1h"`
+	UsageSemantic        string   `json:"usage_semantic"`
+	InputTokensTotal     *int64   `json:"input_tokens_total"`
+	ReasoningTokens      *int64   `json:"reasoning_tokens"`
+	ReasoningEffort      string   `json:"reasoning_effort"`
 }
 
 // billFrom turns one log row into a Bill, normalizing the token accounting to
@@ -178,7 +271,7 @@ func (c *newAPIClient) billFrom(l newAPILog) (Bill, error) {
 	var other newAPIOther
 	if l.Other != "" {
 		if err := json.Unmarshal([]byte(l.Other), &other); err != nil {
-			return Bill{}, fmt.Errorf("relay: log %d has unreadable other: %w", l.ID, err)
+			return Bill{}, fmt.Errorf("relay: log at %d has unreadable other: %w", l.CreatedAt, err)
 		}
 	}
 	var cacheRead, cacheWrite int64
@@ -189,6 +282,10 @@ func (c *newAPIClient) billFrom(l newAPILog) (Bill, error) {
 		cacheWrite = *other.CacheWriteTokens
 	} else if other.CacheCreationTokens != nil {
 		cacheWrite = *other.CacheCreationTokens
+	}
+	var cacheWrite1h int64
+	if other.CacheCreation1h != nil {
+		cacheWrite1h = min(max(*other.CacheCreation1h, 0), cacheWrite)
 	}
 	input := l.PromptTokens
 	// new-api decides the meaning of prompt_tokens from the request's relay
@@ -206,7 +303,6 @@ func (c *newAPIClient) billFrom(l newAPILog) (Bill, error) {
 	out := Bill{
 		Origin:            c.site.Origin,
 		KeyID:             c.site.KeyID,
-		ID:                l.ID,
 		At:                time.Unix(l.CreatedAt, 0).UTC(),
 		Model:             l.ModelName,
 		Group:             l.Group,
@@ -218,17 +314,27 @@ func (c *newAPIClient) billFrom(l newAPILog) (Bill, error) {
 			CacheRead:  cacheRead,
 			CacheWrite: cacheWrite,
 		},
-		ChargedUSD: c.usd(float64(l.Quota)),
-		Stream:     l.IsStream,
-		LatencyMS:  l.UseTime,
+		CacheWrite1h: cacheWrite1h,
+		ChargedUSD:   c.usd(float64(l.Quota)),
+		Stream:       l.IsStream,
+		LatencyMS:    l.UseTime,
 		Ratios: Ratios{
-			Model:       valueOr(other.ModelRatio, 0),
-			Completion:  ratioOr(valueOr(other.CompletionRatio, 0), 1),
-			Cache:       ratioOr(valueOr(other.CacheRatio, 0), 1),
-			CacheCreate: ratioOr(valueOr(other.CacheCreationRatio, 0), 1),
-			Group:       ratioOr(valueOr(other.GroupRatio, 0), 1),
-			FixedPrice:  valueOr(other.ModelPrice, 0),
+			Model:         valueOr(other.ModelRatio, 0),
+			Completion:    ratioOr(valueOr(other.CompletionRatio, 0), 1),
+			Cache:         ratioOr(valueOr(other.CacheRatio, 0), 1),
+			CacheCreate:   ratioOr(valueOr(other.CacheCreationRatio, 0), 1),
+			Group:         ratioOr(valueOr(other.GroupRatio, 0), 1),
+			FixedPrice:    fixedPrice(other.ModelPrice, other.ModelRatio),
+			CacheCreate1h: valueOr(other.CacheCreationRatio1h, 0),
 		},
+	}
+	if other.BillingMode == "tiered_expr" {
+		// The ratios are zero here; the expression the site used is in the
+		// row itself.
+		out.Ratios.FixedPrice = 0
+		if raw, err := base64.StdEncoding.DecodeString(other.ExprB64); err == nil {
+			out.Ratios.Expr = string(raw)
+		}
 	}
 	switch l.Type {
 	case 2:
@@ -259,4 +365,14 @@ func valueOr(v *float64, def float64) float64 {
 		return def
 	}
 	return *v
+}
+
+// fixedPrice is the per-call price of a row billed per call. new-api logs
+// model_price on every row: -1 (or a stale price) when the model is billed
+// by ratio, in which case model_ratio is set instead.
+func fixedPrice(price, ratio *float64) float64 {
+	if price == nil || *price <= 0 || valueOr(ratio, 0) > 0 {
+		return 0
+	}
+	return *price
 }

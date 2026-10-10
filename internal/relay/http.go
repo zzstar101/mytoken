@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,9 +46,43 @@ type result struct {
 	header http.Header
 }
 
-// get performs the request. path must be absolute; query values are kept out of
-// every error string.
+// errTooLarge marks a response cut off at MaxBody.
+var errTooLarge = errors.New("relay: response too large")
+
+// Waits before the one retry of a rate-limited request (HTTP 429): the site's
+// Retry-After when it gives one, capped, else a short default.
+var (
+	retryWait    = 2 * time.Second
+	maxRetryWait = 20 * time.Second
+)
+
+// get performs the request, retrying once when the site says it is rate
+// limited. path must be absolute; query values are kept out of every error
+// string.
 func (h *HTTP) get(ctx context.Context, origin, path string, cred source.Credential, bearer bool) (result, error) {
+	out, err := h.getOnce(ctx, origin, path, cred, bearer)
+	var se *statusError
+	if !errors.As(err, &se) || se.code != http.StatusTooManyRequests {
+		return out, err
+	}
+	wait := retryWait
+	if v, perr := strconv.Atoi(strings.TrimSpace(out.header.Get("Retry-After"))); perr == nil && v >= 0 {
+		wait = time.Duration(v) * time.Second
+	}
+	if wait > maxRetryWait {
+		return out, err
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return out, ctx.Err()
+	case <-t.C:
+	}
+	return h.getOnce(ctx, origin, path, cred, bearer)
+}
+
+func (h *HTTP) getOnce(ctx context.Context, origin, path string, cred source.Credential, bearer bool) (result, error) {
 	var out result
 	if h == nil {
 		return out, errors.New("relay: http not configured")
@@ -102,7 +137,7 @@ func (h *HTTP) get(ctx context.Context, origin, path string, cred source.Credent
 		return out, fmt.Errorf("relay: read %s: %w", origin, err)
 	}
 	if len(body) > MaxBody {
-		return out, fmt.Errorf("relay: response from %s exceeds %d bytes", origin, MaxBody)
+		return out, fmt.Errorf("relay: response from %s exceeds %d bytes: %w", origin, MaxBody, errTooLarge)
 	}
 	out.body, out.header = body, res.Header
 	if res.StatusCode < 200 || res.StatusCode > 299 {

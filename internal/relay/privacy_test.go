@@ -284,3 +284,35 @@ func TestBearerSentExactlyWhereAsked(t *testing.T) {
 		}
 	}
 }
+
+// TestHTTPRetriesRateLimitOnce waits as long as the site asks (within a cap)
+// and retries a rate-limited request once; a long Retry-After is not waited.
+func TestHTTPRetriesRateLimitOnce(t *testing.T) {
+	ctx := context.Background()
+	calls := 0
+	g := newGateway()
+	g.handle("/busy", func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		jsonBody(w, 200, map[string]any{"ok": true})
+	})
+	g.handle("/slow", func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+	origin, h := g.site(t)
+	if _, err := h.Get(ctx, origin, "/busy", cred(origin), true); err != nil || calls != 2 {
+		t.Fatalf("busy: err=%v calls=%d, want one retry", err, calls)
+	}
+	calls = 0
+	_, err := h.Get(ctx, origin, "/slow", cred(origin), true)
+	if err == nil || calls != 1 || Reason(err) != "rate limited (HTTP 429), try later" {
+		t.Fatalf("slow: err=%v reason=%q calls=%d", err, Reason(err), calls)
+	}
+	forbidErr(t, err)
+}

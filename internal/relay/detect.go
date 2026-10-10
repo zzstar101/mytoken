@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -56,6 +58,9 @@ type statusError struct {
 }
 
 func (e *statusError) Error() string {
+	if e.code == http.StatusTooManyRequests {
+		return "relay: " + e.origin + " is rate limiting requests (HTTP 429); try again later"
+	}
 	return "relay: " + e.origin + " returned " + http.StatusText(e.code)
 }
 
@@ -69,6 +74,48 @@ func (e *statusError) Unwrap() error {
 
 // errKeyRejected means the gateway did not accept the key we sent.
 var errKeyRejected = errors.New("relay: key rejected")
+
+// errRejected means the site answered but refused the request in its body
+// (new-api's {"success": false}).
+var errRejected = errors.New("relay: site refused the request")
+
+// Reason sums up a relay error in words that are safe to store and show: no
+// URL, header, response body or credential, only the kind of failure.
+func Reason(err error) string {
+	var se *statusError
+	var je *json.SyntaxError
+	var te *json.UnmarshalTypeError
+	var ne net.Error
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.As(err, &se):
+		if se.code == http.StatusUnauthorized || se.code == http.StatusForbidden {
+			return fmt.Sprintf("key rejected (HTTP %d)", se.code)
+		}
+		if se.code == http.StatusTooManyRequests {
+			return "rate limited (HTTP 429), try later"
+		}
+		return fmt.Sprintf("HTTP %d", se.code)
+	case errors.Is(err, errRedirect):
+		return "redirect to another site refused"
+	case errors.Is(err, errRejected):
+		return "site refused the request"
+	case errors.Is(err, errTooLarge):
+		return "response too large"
+	case errors.As(err, &je), errors.As(err, &te):
+		return "unexpected response format"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &ne) && ne.Timeout():
+		return "timed out"
+	case errors.As(err, &ne):
+		return "network error"
+	case errors.Is(err, ErrUnsupported):
+		return "not supported by this site"
+	}
+	return "unexpected response"
+}
 
 // detect implements docs/RELAY.md §3: official host first, then sub2api's
 // billing endpoint, then new-api's status endpoint, then unknown.

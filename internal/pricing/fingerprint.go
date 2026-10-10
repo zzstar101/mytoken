@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+// fingerprintVersion changes when Evaluate reads something new: 2 = rules
+// scoped to a tool's provider, so stored costs recomputed without the
+// event's harness are stale.
+const fingerprintVersion = 2
+
 // Fingerprint identifies every input to Evaluate, not refresh timestamps.
 // Rules are hashed with their From instant, so adding or moving a rule's
 // effective time changes the fingerprint and forces a cost recompute.
@@ -39,7 +44,7 @@ func (p *Pricer) Fingerprint() string {
 		Multipliers map[string]float64
 		Rules       []Rule
 		Aliases     []alias
-	}{1, p.prices, p.overrides, p.multipliers, rules, aliases})
+	}{fingerprintVersion, p.prices, p.overrides, p.multipliers, rules, aliases})
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
 }

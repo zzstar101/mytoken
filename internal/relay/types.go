@@ -125,6 +125,10 @@ type Site struct {
 	Layers        Layer   // enabled layers; 0 = off
 	DetectedAt    time.Time
 	Providers     []string // provider names mapped to this (origin,key)
+	// Routes are the Providers known only by route: the tool's config points
+	// at the origin but keeps its key elsewhere, so it may use another key.
+	// Filled from the current configs; not stored.
+	Routes []string
 }
 
 // Ratios are the per-model multipliers a gateway reports. FixedPrice is the
@@ -136,6 +140,13 @@ type Ratios struct {
 	CacheCreate float64
 	Group       float64
 	FixedPrice  float64 // per-call model_price; 0 when billed by tokens
+	// Expr is new-api's billing expression for models billed by one
+	// (billing_mode "tiered_expr"); its coefficients are $/1M tokens and the
+	// ratios above are then unused.
+	Expr string
+	// CacheCreate1h is the ratio for 1-hour cache writes (Claude); 0 means
+	// the site did not say and they cost what 5-minute writes do.
+	CacheCreate1h float64 `json:",omitempty"`
 }
 
 // Balance is a snapshot of one key's quota.
@@ -145,6 +156,10 @@ type Balance struct {
 	RemainingUSD  *float64
 	UsedUSD       *float64
 	Unlimited     bool
+	// Currency is the ISO code the amounts are in when it is not USD: some
+	// official APIs only quote their own (DeepSeek: CNY). MyToken does no
+	// currency conversion.
+	Currency string
 }
 
 // Bill is one per-request charge (new-api).
@@ -157,10 +172,13 @@ type Bill struct {
 	RequestID         string
 	UpstreamRequestID string
 	Tokens            model.Tokens // normalized: Input excludes cache
-	ChargedUSD        float64
-	Ratios            Ratios
-	Stream            bool
-	LatencyMS         int64
+	// CacheWrite1h is the part of Tokens.CacheWrite written with a 1-hour
+	// lifetime, which Claude prices higher.
+	CacheWrite1h int64
+	ChargedUSD   float64
+	Ratios       Ratios
+	Stream       bool
+	LatencyMS    int64
 }
 
 // Daily is one day × model of usage as the relay reports it (sub2api).
@@ -177,9 +195,10 @@ type Daily struct {
 // Snapshot is the L1 data a gateway exposes: per-model ratios, and for sub2api
 // the account-wide multiplier and peak window.
 type Snapshot struct {
-	Ratios     map[string]Ratios // by model, when L1 is available
-	Multiplier *float64          // sub2api effective multiplier
-	Peak       *Peak             // sub2api peak window, nil when none
+	Ratios     map[string]Ratios  // by model, when L1 is available
+	Groups     map[string]float64 // new-api group ratios the key may bill in
+	Multiplier *float64           // sub2api effective multiplier
+	Peak       *Peak              // sub2api peak window, nil when none
 	At         time.Time
 }
 
@@ -204,31 +223,75 @@ type Client interface {
 // ErrUnsupported is returned by a Client capability the site does not offer.
 var ErrUnsupported = errors.New("relay: not supported by this site")
 
-// Sites enumerates the candidate sites offline: every provider a source knows
-// about, normalized to an origin, deduplicated by (origin, keyID), with the
-// cc-switch local proxy filtered out because it is not a site of its own.
+// Candidates enumerates the candidate sites offline: every provider a source
+// knows about, normalized to an origin, deduplicated by (origin, keyID), with
+// the cc-switch local proxy filtered out because it is not a site of its own.
+// A credential without a key (a route: the config names the provider and its
+// URL but keeps the key elsewhere) is not a site; its provider name is added
+// to every site at that origin, because its traffic lands there too.
 func Candidates(creds []source.Credential) []Site {
-	seen := map[string]bool{}
+	seen := map[string]int{}
 	var out []Site
 	for _, c := range creds {
-		if c.Origin == "" || c.KeyID == "" {
-			continue
-		}
-		if isLocalProxy(c.Origin) {
+		if c.Origin == "" || c.KeyID == "" || isLocalProxy(c.Origin) {
 			continue
 		}
 		key := c.Origin + "\x00" + c.KeyID
-		if seen[key] {
+		i, ok := seen[key]
+		if !ok {
+			i = len(out)
+			seen[key] = i
+			out = append(out, Site{Origin: c.Origin, KeyID: c.KeyID})
+		}
+		if p := ScopedProvider(c.Harness, c.Provider); p != "" && !containsStr(out[i].Providers, p) {
+			out[i].Providers = append(out[i].Providers, p)
+		}
+	}
+	for _, c := range creds {
+		if c.KeyID != "" || c.Provider == "" {
 			continue
 		}
-		seen[key] = true
-		out = append(out, Site{Origin: c.Origin, KeyID: c.KeyID, Providers: []string{c.Provider}})
-	}
-	for i := range out {
-		for _, c := range creds {
-			if c.Origin == out[i].Origin && c.KeyID == out[i].KeyID && c.Provider != "" && !containsStr(out[i].Providers, c.Provider) {
-				out[i].Providers = append(out[i].Providers, c.Provider)
+		p := ScopedProvider(c.Harness, c.Provider)
+		for i := range out {
+			if out[i].Origin == c.Origin && !containsStr(out[i].Providers, p) {
+				out[i].Providers = append(out[i].Providers, p)
 			}
+		}
+	}
+	return out
+}
+
+// ScopedProvider names a provider as one harness's ("pi/kami"). Provider
+// names are chosen per tool: the same name can mean different sites in two
+// harnesses, so a credential that knows its harness only claims that
+// harness's events. Without a harness the bare name claims every harness.
+func ScopedProvider(h model.Harness, provider string) string {
+	if provider == "" || !h.Known() {
+		return provider
+	}
+	return string(h) + "/" + provider
+}
+
+// SplitProvider undoes ScopedProvider; harness is "" for a bare name.
+func SplitProvider(entry string) (model.Harness, string) {
+	for i := 0; i < len(entry); i++ {
+		if entry[i] == '/' {
+			if h := model.Harness(entry[:i]); h.Known() {
+				return h, entry[i+1:]
+			}
+			break
+		}
+	}
+	return "", entry
+}
+
+// ProviderNames lists the distinct provider names of a site's entries, in
+// order, without their harness scopes: what a person reads.
+func ProviderNames(entries []string) []string {
+	var out []string
+	for _, e := range entries {
+		if _, p := SplitProvider(e); p != "" && !containsStr(out, p) {
+			out = append(out, p)
 		}
 	}
 	return out

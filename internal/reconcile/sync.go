@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -78,8 +79,12 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 	}
 	// Raw transport/source/SQL errors are deliberately never surfaced. They may
 	// contain a server-reflected credential, URL query, or SQL parameter value.
-	fail := func(stage string) error {
+	fail := func(stage string, cause ...error) error {
 		e := fmt.Errorf("reconcile: sync failed during %s", stage)
+		if len(cause) > 0 && cause[0] != nil {
+			// relay.Reason names only the kind of failure, never its text.
+			e = fmt.Errorf("reconcile: sync failed during %s: %s", stage, relay.Reason(cause[0]))
+		}
 		cursor.LastSync = s.now()
 		cursor.LastError = e.Error()
 		_ = s.st.PutRelayCursor(ctx, cursor)
@@ -107,6 +112,11 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 	if !found || cred.Secret.Reveal() == "" {
 		return fail("credential lookup")
 	}
+	if addProviders(&site, creds) {
+		if err = s.st.PutRelaySite(ctx, site); err != nil {
+			return fail("site persistence")
+		}
+	}
 	client, err := s.factory(ctx, site, cred)
 	if err != nil {
 		return fail("client setup")
@@ -119,25 +129,42 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 		return err == nil && !strings.Contains(string(raw), secretNeedle)
 	}
 	var rules []pricing.Rule
+	var snap *relay.Snapshot
+	// A price list or balance that fails to load does not hold up the
+	// charges: the sync goes on and reports the first such failure.
+	var warn error
+	soft := func(stage string, cause error) {
+		if warn == nil {
+			warn = fmt.Errorf("reconcile: sync failed during %s: %s", stage, relay.Reason(cause))
+		}
+	}
 	if site.Layers.Has(relay.LayerRatio) {
-		snap, err := client.Snapshot(ctx)
+		got, err := client.Snapshot(ctx)
 		if err != nil && !errors.Is(err, relay.ErrUnsupported) {
-			return fail("ratio fetch")
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			soft("ratio fetch", err)
+			err = relay.ErrUnsupported
 		}
 		if err == nil {
-			if !safe(snap) {
+			if !safe(got) {
 				return fail("response validation")
 			}
-			if snap.At.IsZero() {
-				snap.At = s.now()
+			if got.At.IsZero() {
+				got.At = s.now()
 			}
-			rules = append(rules, relay.RulesFromSnapshot(site, snap)...)
+			snap = &got
 		}
 	}
 	if site.Layers.Has(relay.LayerBalance) {
 		balance, err := client.Balance(ctx)
 		if err != nil && !errors.Is(err, relay.ErrUnsupported) {
-			return fail("balance fetch")
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			soft("balance fetch", err)
+			err = relay.ErrUnsupported
 		}
 		if err == nil {
 			balance.Origin = origin
@@ -157,7 +184,7 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 	if site.Layers.Has(relay.LayerBills) {
 		bills, err := client.Bills(ctx, cursor.LastBillID)
 		if err != nil && !errors.Is(err, relay.ErrUnsupported) {
-			return fail("bill fetch")
+			return fail("bill fetch", err)
 		}
 		if err == nil {
 			for i := range bills {
@@ -173,14 +200,12 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 			if err = s.st.PutRelayBills(ctx, bills); err != nil {
 				return fail("bill persistence")
 			}
-			if site.Layers.Has(relay.LayerRatio) {
-				rules = append(rules, relay.RulesFromBills(site, bills)...)
-			}
 		} else {
 			now := s.now()
-			days, e := client.Daily(ctx, floorDay(now).AddDate(0, 0, -30), floorDay(now).AddDate(0, 0, 1), time.Local)
+			dayFrom, dayTo := floorDay(now).AddDate(0, 0, -30), floorDay(now).AddDate(0, 0, 1)
+			days, e := client.Daily(ctx, dayFrom, dayTo, time.Local)
 			if e != nil && !errors.Is(e, relay.ErrUnsupported) {
-				return fail("daily fetch")
+				return fail("daily fetch", e)
 			}
 			if e == nil {
 				for i := range days {
@@ -190,11 +215,40 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 				if !safe(days) {
 					return fail("response validation")
 				}
-				if e = s.st.PutRelayDaily(ctx, days); e != nil {
+				if e = s.st.ReplaceRelayDaily(ctx, origin, keyID, dayFrom.Format("2006-01-02"), dayTo.Format("2006-01-02"), days); e != nil {
 					return fail("daily persistence")
 				}
 			}
 		}
+	}
+	if site.Layers.Has(relay.LayerBills) {
+		if err = s.reconcile(ctx, site); err != nil {
+			return fail("reconciliation")
+		}
+	}
+	// Prices are derived after matching, so the charges just matched tell
+	// which of the site's providers this key really serves.
+	// They come from the stored charges of the last 30 days, not only the
+	// ones just fetched, so a sync whose price list failed, or that fetched
+	// nothing new, still prices with what the key was actually charged.
+	if site.Layers.Has(relay.LayerRatio) && (snap != nil || site.Layers.Has(relay.LayerBills)) {
+		var recent []relay.Bill
+		if site.Layers.Has(relay.LayerBills) {
+			recent, err = s.st.RelayBills(ctx, origin, keyID, s.now().AddDate(0, 0, -30), time.Time{})
+			if err != nil {
+				return fail("price-rule update")
+			}
+		}
+		priced, err := ruleSite(ctx, s.st, site)
+		if err != nil {
+			return fail("price-rule update")
+		}
+		if snap != nil {
+			// The key's group decides which of the site's group ratios applies.
+			rules = append(rules, relay.RulesFromSnapshot(priced, *snap, relay.KeyGroup(recent))...)
+		}
+		// What the site actually charged beats its price list.
+		rules = append(rules, relay.RulesFromBills(priced, recent)...)
 	}
 	if len(rules) > 0 {
 		if s.rules == nil {
@@ -204,18 +258,16 @@ func (s *Syncer) sync(ctx context.Context, origin, keyID string) error {
 			return fail("price-rule update")
 		}
 	}
-	if site.Layers.Has(relay.LayerBills) {
-		if err = s.reconcile(ctx, site); err != nil {
-			return fail("reconciliation")
-		}
-	}
 	cursor.LastBillID = maxID
 	cursor.LastSync = s.now()
 	cursor.LastError = ""
+	if warn != nil {
+		cursor.LastError = warn.Error()
+	}
 	if err = s.st.PutRelayCursor(ctx, cursor); err != nil {
 		return fail("cursor persistence")
 	}
-	return nil
+	return warn
 }
 
 // Run checks once immediately, then every minute, respecting per-account
@@ -318,23 +370,13 @@ func (s *Service) Sites(ctx context.Context) ([]SiteStatus, error) {
 	}
 	for _, site := range persisted {
 		key := [2]string{site.Origin, site.KeyID}
-		p := map[string]bool{}
-		for _, v := range sites[key].Providers {
-			p[v] = true
-		}
-		for _, v := range site.Providers {
-			p[v] = true
-		}
-		site.Providers = nil
-		for v := range p {
-			site.Providers = append(site.Providers, v)
-		}
+		addProviders(&site, creds)
 		sort.Strings(site.Providers)
 		sites[key] = site
 	}
 	out := make([]SiteStatus, 0, len(sites))
 	for key, site := range sites {
-		v := SiteStatus{Site: site, Providers: site.Providers, HasKey: has[key]}
+		v := SiteStatus{Site: site, Providers: relay.ProviderNames(site.Providers), HasKey: has[key]}
 		v.Balance, err = s.st.LatestRelayBalance(ctx, site.Origin, site.KeyID)
 		if err != nil {
 			return nil, errors.New("reconcile: could not read balance")
@@ -390,7 +432,7 @@ func (s *Service) Enable(ctx context.Context, origin, keyID string, layers relay
 	if errors.Is(err, store.ErrNotFound) || site.Kind == "" || site.Kind == relay.KindUnknown {
 		site, err = relay.Detect(ctx, s.http, origin, cred)
 		if err != nil {
-			return SiteStatus{}, errors.New("reconcile: site detection failed")
+			return SiteStatus{}, fmt.Errorf("reconcile: site detection failed: %s", relay.Reason(err))
 		}
 		// Nothing to sync from a site we cannot read: leave it off rather
 		// than store an enabled site that fails every five minutes.
@@ -401,11 +443,7 @@ func (s *Service) Enable(ctx context.Context, origin, keyID string, layers relay
 	site.Origin = origin
 	site.KeyID = keyID
 	site.Layers = layers
-	for _, candidate := range relay.Candidates(creds) {
-		if candidate.Origin == origin && candidate.KeyID == keyID {
-			site.Providers = candidate.Providers
-		}
-	}
+	addProviders(&site, creds)
 	if err = s.st.PutRelaySite(ctx, site); err != nil {
 		return SiteStatus{}, errors.New("reconcile: could not persist site")
 	}
@@ -441,5 +479,93 @@ func (s *Service) Report(ctx context.Context, origin, keyID string, from, to tim
 	if err != nil {
 		return Report{}, errors.New("reconcile: site is not configured")
 	}
+	if s.creds != nil {
+		// Offline: provider names a config gained since the last sync count
+		// as this site's traffic too. Nothing is written.
+		if creds, err := s.creds(ctx); err == nil {
+			addProviders(&site, creds)
+		}
+	}
 	return StoredReport(ctx, s.st, site, from, to)
+}
+
+// addProviders adds the provider names the current configs route to this
+// site (see relay.Candidates). Names are only ever added: events attributed
+// under a name the user has since renamed still belong to the site. Routes
+// is refilled each time: the entries no credential of this key names.
+func addProviders(site *relay.Site, creds []source.Credential) bool {
+	changed := false
+	for _, c := range relay.Candidates(creds) {
+		if c.Origin != site.Origin || c.KeyID != site.KeyID {
+			continue
+		}
+		for _, p := range c.Providers {
+			if !slices.Contains(site.Providers, p) {
+				site.Providers = append(site.Providers, p)
+				changed = true
+			}
+			// A bare name stored before names were scoped by harness would
+			// keep claiming every harness's events: the scoped one replaces it.
+			if h, name := relay.SplitProvider(p); h != "" {
+				if i := slices.Index(site.Providers, name); i >= 0 {
+					site.Providers = slices.Delete(site.Providers, i, i+1)
+					changed = true
+				}
+			}
+		}
+	}
+	keyed := map[string]bool{}
+	for _, c := range creds {
+		if c.Origin == site.Origin && c.KeyID == site.KeyID {
+			keyed[relay.ScopedProvider(c.Harness, c.Provider)] = true
+		}
+	}
+	site.Routes = nil
+	for _, c := range creds {
+		p := relay.ScopedProvider(c.Harness, c.Provider)
+		if c.Origin == site.Origin && c.KeyID == "" && p != "" && !keyed[p] && slices.Contains(site.Providers, p) && !slices.Contains(site.Routes, p) {
+			site.Routes = append(site.Routes, p)
+		}
+	}
+	return changed
+}
+
+// ruleSite narrows the site to the providers whose prices this key decides:
+// the same set a report counts (see unproven). A provider known only by
+// route, or claimed by several keys, is priced by the key whose charges its
+// requests matched, and left alone until some key's do.
+func ruleSite(ctx context.Context, st *store.Store, site relay.Site) (relay.Site, error) {
+	var siblings int
+	if err := st.DB().QueryRowContext(ctx, "SELECT count(*) FROM relay_sites WHERE origin=? AND key_id<>?", site.Origin, site.KeyID).Scan(&siblings); err != nil {
+		return site, err
+	}
+	skip, err := unproven(ctx, st.DB(), site, siblings)
+	if err != nil || len(skip) == 0 && siblings == 0 {
+		return site, err
+	}
+	mine, _, err := matchEvidence(ctx, st.DB(), site.Origin, site.KeyID)
+	if err != nil {
+		return site, err
+	}
+	out := site
+	out.Providers = nil
+	for _, entry := range site.Providers {
+		h, name := relay.SplitProvider(entry)
+		ok := !skip[[2]string{string(h), name}]
+		if h == "" {
+			// a bare name: this key's only if some harness's requests under
+			// it matched this key's charges
+			ok = false
+			for k := range mine {
+				if k[1] == name {
+					ok = true
+					break
+				}
+			}
+		}
+		if ok {
+			out.Providers = append(out.Providers, entry)
+		}
+	}
+	return out, nil
 }

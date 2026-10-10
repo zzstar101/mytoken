@@ -253,7 +253,7 @@ func indexCatalog(prices map[string]Price) map[string]Price {
 func (p *Pricer) HasPrice(provider, name string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	_, ok, _ := p.effective(provider, name, time.Now())
+	_, ok, _ := p.effective("", provider, name, time.Now())
 	return ok
 }
 func (p *Pricer) SetMultiplier(provider string, multiplier float64) {

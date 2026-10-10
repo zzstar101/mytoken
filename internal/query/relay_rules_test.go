@@ -31,7 +31,7 @@ func TestRelayRulesRoundTrip(t *testing.T) {
 	if err = s.SetPriceRules(ctx, []PriceRule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &user, Source: "user"}}); err != nil {
 		t.Fatal(err)
 	}
-	rules := []pricing.Rule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &user, Source: relay.RuleSource(origin), From: at}}
+	rules := []pricing.Rule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &user, Source: relay.RuleSource(origin, "k1"), From: at}}
 	if err = s.AppendRelayRules(ctx, rules); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,8 @@ func TestRelayRulesRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(relayOnly) != 1 || relayOnly[0].Source != relay.RuleSource(origin) || !relayOnly[0].From.Equal(at) {
+	// The first rule a site gives prices the history before it, too.
+	if len(relayOnly) != 1 || relayOnly[0].Source != relay.RuleSource(origin, "k1") || !relayOnly[0].From.IsZero() {
 		t.Fatalf("relay rules=%+v", relayOnly)
 	}
 	// Appending the same prices again keeps the stored rule as it was.
@@ -58,25 +59,37 @@ func TestRelayRulesRoundTrip(t *testing.T) {
 			t.Fatalf("user rule clobbered: %+v", r)
 		}
 	}
-	// A real ratio move replaces the gateway rule and leaves the user's alone.
-	moved := 2.08
-	if err = s.AppendRelayRules(ctx, []pricing.Rule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &moved, Source: relay.RuleSource(origin), From: at}}); err != nil {
+	// A real ratio move is dated from when it was seen: the old gateway rule
+	// keeps pricing the time before, and the user's rule is left alone.
+	moved, later := 2.08, at.AddDate(0, 1, 0)
+	if err = s.AppendRelayRules(ctx, []pricing.Rule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &moved, Source: relay.RuleSource(origin, "k1"), From: later}}); err != nil {
 		t.Fatal(err)
 	}
 	all, err = s.PriceRules(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 2 {
+	if len(all) != 3 {
 		t.Fatalf("rules=%+v", all)
 	}
+	var sawOld, sawNew bool
 	for _, r := range all {
 		if r.Source == "user" && *r.Input != user {
 			t.Fatalf("user rule changed: %+v", r)
 		}
-		if r.Source == relay.RuleSource(origin) && *r.Input != moved {
-			t.Fatalf("gateway rule not updated: %+v", r)
+		if r.Source == relay.RuleSource(origin, "k1") {
+			switch {
+			case r.From.IsZero() && *r.Input == user:
+				sawOld = true
+			case r.From.Equal(later) && *r.Input == moved:
+				sawNew = true
+			default:
+				t.Fatalf("unexpected gateway rule: %+v", r)
+			}
 		}
+	}
+	if !sawOld || !sawNew {
+		t.Fatalf("want the old rule kept and the move appended: %+v", all)
 	}
 }
 
@@ -102,7 +115,7 @@ func TestRelayRuleBeatsCCSwitchImport(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.AppendRelayRules(ctx, []pricing.Rule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &relayPrice, Source: relay.RuleSource(origin), From: at}}); err != nil {
+	if err = s.AppendRelayRules(ctx, []pricing.Rule{{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &relayPrice, Source: relay.RuleSource(origin, "k1"), From: at}}); err != nil {
 		t.Fatal(err)
 	}
 	if cost, ok := p.Evaluate(event); !ok || cost != relayPrice {
@@ -112,7 +125,7 @@ func TestRelayRuleBeatsCCSwitchImport(t *testing.T) {
 	if err = s.SetPriceRules(ctx, []PriceRule{
 		{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &user, Source: "user"},
 		{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &ccPrice, Source: "cc-switch"},
-		{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &relayPrice, Source: relay.RuleSource(origin), From: at},
+		{Provider: "XLAB", Model: "claude-sonnet-4-5", Input: &relayPrice, Source: relay.RuleSource(origin, "k1"), From: at},
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -71,9 +71,20 @@ func (h Harness) DisplayName() string {
 		return "CodeBuddy"
 	case Hermes:
 		return "Hermes"
+	case ClaudeDesktop:
+		return "Claude Desktop"
+	case Qwen:
+		return "Qwen Code"
+	case Kimi:
+		return "Kimi CLI"
+	case OpenClaude:
+		return "OpenClaude"
 	}
 	return string(h)
 }
+
+// Known reports whether h is one of the harnesses MyToken reads.
+func (h Harness) Known() bool { return h != "" && h.DisplayName() != string(h) }
 
 // Tokens are the five token classes. Parsers must not double count:
 // if a log's output already includes reasoning, Output must exclude it.

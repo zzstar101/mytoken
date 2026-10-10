@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/zzstar101/mytoken/internal/model"
@@ -135,22 +138,38 @@ type sub2apiModelStat struct {
 	ActualCost          float64 `json:"actual_cost"`
 }
 
-// Daily reads the site's per-day and per-model usage. The day boundary follows
-// the caller's time zone so it lines up with the user's own records.
+// Daily reads the site's per-day usage for the key. sub2api serves the last
+// n days ending today in the requested zone (handler/usage_handler.go
+// apiKeyDailyUsageRange, at most 90) and lists only days with usage, so the
+// window is widened to reach from and every day of [from,to) the site said
+// nothing about is returned as zero: "charged nothing" is an answer, and the
+// caller replaces its stored days with this list. model_stats is left out:
+// it covers a range in the server's own zone and cannot be split by day.
 func (c *sub2APIClient) Daily(ctx context.Context, from, to time.Time, loc *time.Location) ([]Daily, error) {
 	if loc == nil {
 		loc = time.UTC
 	}
-	// sub2api takes whole dates in the requested zone; the range is half-open.
-	q := url.Values{}
-	q.Set("days", strconv.Itoa(daysBetween(from.In(loc), to.In(loc))))
-	q.Set("timezone", loc.String())
-	if !from.IsZero() {
-		q.Set("start_date", from.In(loc).Format("2006-01-02"))
+	zone := zoneName(loc)
+	if zone == "" {
+		// the server would fall back to its own zone: use one we can name
+		loc, zone = time.UTC, "UTC"
 	}
+	today := dayStart(time.Now().In(loc))
+	first := dayStart(from.In(loc))
+	end := today.AddDate(0, 0, 1)
 	if !to.IsZero() {
-		q.Set("end_date", to.In(loc).AddDate(0, 0, -1).Format("2006-01-02"))
+		if t := dayStart(to.In(loc)); t.Before(end) {
+			end = t
+		}
 	}
+	days := daysBetween(first, today.AddDate(0, 0, 1))
+	if days > 90 {
+		days = 90
+		first = today.AddDate(0, 0, -89)
+	}
+	q := url.Values{}
+	q.Set("days", strconv.Itoa(days))
+	q.Set("timezone", zone)
 	body, err := c.h.get(ctx, c.site.Origin, "/v1/usage?"+q.Encode(), c.cred, true)
 	if err != nil {
 		return nil, err
@@ -159,31 +178,67 @@ func (c *sub2APIClient) Daily(ctx context.Context, from, to time.Time, loc *time
 	if err := json.Unmarshal(body.body, &res); err != nil {
 		return nil, fmt.Errorf("relay: parse %s/v1/usage: %w", c.site.Origin, err)
 	}
-	var out []Daily
+	got := map[string]sub2apiDaily{}
 	for _, d := range res.DailyUsage {
+		got[d.Date] = d
+	}
+	var out []Daily
+	for day := first; day.Before(end); day = day.AddDate(0, 0, 1) {
+		key := day.Format("2006-01-02")
+		d := got[key]
 		out = append(out, Daily{
 			Origin:     c.site.Origin,
 			KeyID:      c.site.KeyID,
-			Day:        d.Date,
+			Day:        key,
 			Requests:   d.Requests,
 			Tokens:     model.Tokens{Input: d.InputTokens, Output: d.OutputTokens, CacheRead: d.CacheReadTokens, CacheWrite: d.CacheWriteTokens},
 			ListUSD:    d.Cost,
 			ChargedUSD: d.ActualCost,
 		})
 	}
-	for _, m := range res.ModelStats {
-		out = append(out, Daily{
-			Origin:     c.site.Origin,
-			KeyID:      c.site.KeyID,
-			Day:        from.In(loc).Format("2006-01-02"),
-			Model:      m.Model,
-			Requests:   m.Requests,
-			Tokens:     model.Tokens{Input: m.InputTokens, Output: m.OutputTokens, CacheRead: m.CacheReadTokens, CacheWrite: m.CacheCreationTokens},
-			ListUSD:    m.Cost,
-			ChargedUSD: m.ActualCost,
-		})
-	}
 	return out, nil
+}
+
+func dayStart(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+// zoneName is the IANA name of loc. time.Local is called "Local", which no
+// server understands: it is resolved from $TZ or the /etc/localtime link, or
+// failing that (Windows) from a whole-hour offset as Etc/GMT±N. "" when the
+// zone cannot be named.
+func zoneName(loc *time.Location) string {
+	if loc != time.Local {
+		return loc.String()
+	}
+	if tz := strings.TrimPrefix(os.Getenv("TZ"), ":"); tz != "" {
+		if _, err := time.LoadLocation(tz); err == nil {
+			return tz
+		}
+	}
+	if link, err := os.Readlink("/etc/localtime"); err == nil {
+		if i := strings.Index(link, "zoneinfo/"); i >= 0 {
+			name := link[i+len("zoneinfo/"):]
+			if _, err := time.LoadLocation(name); err == nil {
+				return name
+			}
+		}
+	}
+	// a zone without daylight saving: the same offset in January and July
+	_, jan := time.Date(time.Now().Year(), 1, 1, 0, 0, 0, 0, time.Local).Zone()
+	_, jul := time.Date(time.Now().Year(), 7, 1, 0, 0, 0, 0, time.Local).Zone()
+	if jan == jul && jan%3600 == 0 {
+		h := jan / 3600
+		switch {
+		case h == 0:
+			return "UTC"
+		case h > 0:
+			return fmt.Sprintf("Etc/GMT-%d", h) // POSIX signs are inverted
+		default:
+			return fmt.Sprintf("Etc/GMT+%d", -h)
+		}
+	}
+	return ""
 }
 
 // Bills is not available on sub2api: it aggregates instead of logging.
@@ -191,12 +246,10 @@ func (c *sub2APIClient) Bills(ctx context.Context, afterID int64) ([]Bill, error
 	return nil, ErrUnsupported
 }
 
-// daysBetween is the number of days in [from,to), at least 1.
+// daysBetween is the number of whole days in [from,to), at least 1. Rounding
+// absorbs the 23- and 25-hour days of a daylight-saving change.
 func daysBetween(from, to time.Time) int {
-	if to.Before(from) || to.Equal(from) {
-		return 1
-	}
-	d := int(to.Sub(from).Hours()/24) + 1
+	d := int(math.Round(to.Sub(from).Hours() / 24))
 	if d < 1 {
 		return 1
 	}

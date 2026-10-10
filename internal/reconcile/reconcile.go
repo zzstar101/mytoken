@@ -32,7 +32,11 @@ type Line struct {
 	Category                         Category
 	Count                            int64
 	LocalUSD, FormulaUSD, ChargedUSD float64
-	Note                             string
+	// FormulaMissing counts the charges whose list cost could not be
+	// computed (an unsupported ratio expression, or no list cost in daily
+	// usage); FormulaUSD leaves them out.
+	FormulaMissing int64
+	Note           string
 }
 type ModelLine struct {
 	Model                            string
@@ -110,16 +114,12 @@ func catalogCost(d *dimension, t model.Tokens) float64 {
 	}
 	return (float64(t.Input)*p.Input + float64(t.Output)*p.Output + float64(t.CacheRead)*p.CacheRead + float64(t.CacheWrite)*p.CacheWrite + float64(t.Reasoning)*r) / 1e6
 }
-func formula(b relay.Bill) float64 {
-	r := b.Ratios
-	v := r.FixedPrice * r.Group
-	if r.FixedPrice == 0 {
-		v = 2 * r.Model * r.Group * (float64(b.Tokens.Input) + float64(b.Tokens.Output)*r.Completion + float64(b.Tokens.CacheRead)*r.Cache + float64(b.Tokens.CacheWrite)*r.CacheCreate) / 1e6
-	}
+func formula(b relay.Bill) (float64, bool) {
+	v, ok := b.Formula()
 	if b.Type == "refund" {
-		return -math.Abs(v)
+		return -math.Abs(v), ok
 	}
-	return v
+	return v, ok
 }
 func closeMoney(a, b float64) bool { return math.Abs(a-b) <= math.Max(.0005, math.Abs(b)*.02) }
 func floorDay(at time.Time) time.Time {
@@ -217,7 +217,7 @@ func (b *reportBuilder) finish() Report {
 	for _, c := range []Category{Matched, PriceDiff, TokenSemantics, BillOnly, EventOnly, Refund} {
 		if l := b.lines[c]; l != nil {
 			if c == EventOnly {
-				l.Note = "may precede the held log window, belong to another key, or be free"
+				l.Note = "may belong to another key or tool, or be free"
 			}
 			if c == BillOnly {
 				l.Note = "may be a shared key, another device, or an untracked request"
@@ -284,23 +284,58 @@ func reconcile(ctx context.Context, st *store.Store, site relay.Site, from, to t
 			return Report{}, err
 		}
 	}
-	events, totals, aliases, err := loadEvents(ctx, st, site, from, to, bills, mode, persisted)
+	// Local requests from before the oldest charge the site has given us
+	// cannot be checked: new-api only serves a key's latest 1000 log rows,
+	// sub2api a bounded number of days. They are left out instead of being
+	// reported as charges the site never made.
+	evFrom, evTo := from, to
+	covered := false
+	if site.Kind == relay.KindSub2API {
+		var day sql.NullString
+		if err = st.DB().QueryRowContext(ctx, "SELECT min(day) FROM relay_daily WHERE origin=? AND key_id=?", site.Origin, site.KeyID).Scan(&day); err != nil {
+			return Report{}, err
+		}
+		if day.Valid {
+			covered = true
+			if at, err := time.ParseInLocation("2006-01-02", day.String, time.Local); err == nil {
+				b.r.Coverage = at.UTC()
+				if at.After(evFrom) {
+					evFrom = at
+				}
+			}
+		}
+	} else {
+		var coverage sql.NullInt64
+		if err = st.DB().QueryRowContext(ctx, "SELECT min(at) FROM relay_bills WHERE origin=? AND key_id=?", site.Origin, site.KeyID).Scan(&coverage); err != nil {
+			return Report{}, err
+		}
+		if coverage.Valid {
+			covered = true
+			b.r.Coverage = time.Unix(0, coverage.Int64).UTC()
+			// the matching window reaches 120 s before a charge
+			if at := b.r.Coverage.Add(-120 * time.Second); at.After(evFrom) {
+				evFrom = at
+			}
+		}
+	}
+	if !to.IsZero() && !evFrom.Before(to) {
+		evFrom = to
+	}
+	if !covered {
+		// Nothing charged yet (the key was rejected, the site keeps no
+		// usage, or it was never synced): there is no window to check.
+		evFrom, evTo = time.Unix(1, 0), time.Unix(1, 0)
+	}
+	events, totals, aliases, err := loadEvents(ctx, st, site, evFrom, evTo, bills, mode, persisted)
 	if err != nil {
 		return Report{}, err
 	}
 	if site.Kind == relay.KindSub2API {
 		return dailyReport(ctx, st, site, b, totals, aliases)
 	}
-	var coverage sql.NullInt64
-	if err = st.DB().QueryRowContext(ctx, "SELECT min(at) FROM relay_bills WHERE origin=? AND key_id=?", site.Origin, site.KeyID).Scan(&coverage); err != nil {
-		return Report{}, err
-	}
-	if coverage.Valid {
-		b.r.Coverage = time.Unix(0, coverage.Int64).UTC()
-	}
 	provider := ""
-	if len(site.Providers) > 0 {
-		provider = site.Providers[0]
+	if names := relay.ProviderNames(site.Providers); len(names) > 0 {
+		provider = names[0]
 	}
 	matched := make([]int, len(bills))
 	modes := make([]int, len(bills))
@@ -370,7 +405,7 @@ func reconcile(ctx context.Context, st *store.Store, site relay.Site, from, to t
 				continue
 			}
 			names := map[string]bool{normalize(bill.Model, "", aliases): true}
-			for _, p := range site.Providers {
+			for _, p := range relay.ProviderNames(site.Providers) {
 				names[normalize(bill.Model, p, aliases)] = true
 			}
 			best := -1
@@ -447,7 +482,11 @@ func reconcile(ctx context.Context, st *store.Store, site relay.Site, from, to t
 		}
 		m.Kind = string(cat)
 		matches = append(matches, m)
-		b.add(cat, name, bill.At, 1, local, formula(bill), bill.ChargedUSD)
+		form, ok := formula(bill)
+		b.add(cat, name, bill.At, 1, local, form, bill.ChargedUSD)
+		if !ok {
+			b.lines[cat].FormulaMissing++
+		}
 	}
 	type totalKey struct {
 		dim *dimension
@@ -529,8 +568,8 @@ func dailyReport(ctx context.Context, st *store.Store, site relay.Site, b *repor
 		}
 	}
 	provider := ""
-	if len(site.Providers) > 0 {
-		provider = site.Providers[0]
+	if names := relay.ProviderNames(site.Providers); len(names) > 0 {
+		provider = names[0]
 	}
 	usedModels := map[key]bool{}
 	usedDays := map[string]bool{}
@@ -559,11 +598,10 @@ func dailyReport(ctx context.Context, st *store.Store, site relay.Site, b *repor
 		} else {
 			usedModels[key{d.Day, name}] = true
 		}
-		cat := Matched
-		if !closeMoney(d.ChargedUSD, t.local) {
-			cat = PriceDiff
+		if d.Requests == 0 && d.ChargedUSD == 0 && d.ListUSD == 0 && t.count == 0 {
+			continue // a zero-filled day: nothing on either side
 		}
-		b.add(cat, name, at, d.Requests, t.local, d.ListUSD, d.ChargedUSD)
+		addDaily(b, name, at, d, t.count, t.local)
 		line := b.days[at.Unix()]
 		if t.unknown || d.ListUSD <= 0 {
 			line.Unpriced = true
@@ -601,4 +639,45 @@ func dailyReport(ctx context.Context, st *store.Store, site relay.Site, b *repor
 		}
 	}
 	return b.finish(), nil
+}
+
+// addDaily splits one day (or day × model) of daily usage into categories.
+// Daily totals carry no request identity, so when the request counts
+// disagree the surplus is split off pro rata: the site's extra requests are
+// bill-only, extra local ones event-only, and the rest is compared as money.
+func addDaily(b *reportBuilder, name string, at time.Time, d relay.Daily, count int64, local float64) {
+	site := d.Requests
+	switch {
+	case count == 0:
+		b.add(BillOnly, name, at, site, 0, d.ListUSD, d.ChargedUSD)
+		b.noList(BillOnly, d, site)
+		return
+	case site == 0 && d.ChargedUSD == 0:
+		b.add(EventOnly, name, at, count, local, 0, 0)
+		return
+	}
+	list, charged := d.ListUSD, d.ChargedUSD
+	if site > 0 && float64(site) > float64(count)*1.1+1 {
+		f := float64(site-count) / float64(site)
+		b.add(BillOnly, name, at, site-count, 0, list*f, charged*f)
+		b.noList(BillOnly, d, site-count)
+		list, charged, site = list*(1-f), charged*(1-f), count
+	} else if site > 0 && float64(count) > float64(site)*1.1+1 {
+		f := float64(count-site) / float64(count)
+		b.add(EventOnly, name, at, count-site, local*f, 0, 0)
+		local, count = local*(1-f), site
+	}
+	cat := Matched
+	if !closeMoney(charged, local) {
+		cat = PriceDiff
+	}
+	b.add(cat, name, at, site, local, list, charged)
+	b.noList(cat, d, site)
+}
+
+// noList marks daily requests that came without the site's list cost.
+func (b *reportBuilder) noList(cat Category, d relay.Daily, n int64) {
+	if d.ListUSD <= 0 && n > 0 {
+		b.lines[cat].FormulaMissing += n
+	}
 }

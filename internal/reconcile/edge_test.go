@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"path/filepath"
 	"testing"
@@ -116,5 +117,45 @@ func TestMixedOriginRollupsCannotAttributeOtherSites(t *testing.T) {
 	r, err := Reconcile(ctx, st, site, time.Time{}, time.Time{})
 	if err != nil || r.LocalUSD != 3 {
 		t.Fatal("mixed-origin summary leaked or double-counted", r, err)
+	}
+}
+
+func TestDailyRequestCountSplit(t *testing.T) {
+	at := time.Date(2026, 10, 5, 0, 0, 0, 0, time.Local)
+	sum := func(r Report) (local, charged float64) {
+		for _, l := range r.Lines {
+			local += l.LocalUSD
+			charged += l.ChargedUSD
+		}
+		return
+	}
+	cases := []struct {
+		name   string
+		d      relay.Daily
+		count  int64
+		local  float64
+		counts map[Category]int64
+	}{
+		{"site only", relay.Daily{Requests: 5, ListUSD: 2, ChargedUSD: 1}, 0, 0, map[Category]int64{BillOnly: 5}},
+		{"local only", relay.Daily{}, 4, 1, map[Category]int64{EventOnly: 4}},
+		{"site surplus", relay.Daily{Requests: 300, ListUSD: 60, ChargedUSD: 30}, 10, 1, map[Category]int64{BillOnly: 290, Matched: 10}},
+		{"local surplus", relay.Daily{Requests: 10, ListUSD: 2, ChargedUSD: 1}, 100, 10, map[Category]int64{EventOnly: 90, Matched: 10}},
+		{"close counts", relay.Daily{Requests: 10, ListUSD: 2, ChargedUSD: 1.5}, 11, 1, map[Category]int64{PriceDiff: 10}},
+	}
+	for _, c := range cases {
+		b := newBuilder(relay.Site{}, at, at.AddDate(0, 0, 1))
+		addDaily(b, "m", at, c.d, c.count, c.local)
+		r := b.finish()
+		got := map[Category]int64{}
+		for _, l := range r.Lines {
+			got[l.Category] = l.Count
+		}
+		if fmt.Sprint(got) != fmt.Sprint(c.counts) {
+			t.Errorf("%s: categories %v, want %v", c.name, got, c.counts)
+		}
+		// money is split, never created or lost
+		if l, ch := sum(r); math.Abs(l-c.local) > 1e-9 || math.Abs(ch-c.d.ChargedUSD) > 1e-9 {
+			t.Errorf("%s: local %v charged %v, want %v %v", c.name, l, ch, c.local, c.d.ChargedUSD)
+		}
 	}
 }
