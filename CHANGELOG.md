@@ -3,6 +3,18 @@
 The section of each version is also what the app's update window shows, so
 every release needs one here (`## 0.2.1`), written for the people updating.
 
+## Unreleased
+
+- **Fixed: no data and failing update checks on a fresh install.** MyToken
+  watched every folder under each tool's home for changes, including whole
+  programs installed there (Hermes keeps its own code in `~/.hermes`). On
+  macOS that held tens of thousands of files open until the system refused
+  to open more, so logs could not be read and the update check could not
+  connect. It now watches only the folders that hold logs.
+- Settings › Sources lists only the tools that have data, with their request
+  counts, and counts the other supported tools in one line.
+- WorkBuddy shows its own logo.
+
 ## 0.2.1
 
 - **Automatic updates.** MyToken checks github.com once a day and offers new

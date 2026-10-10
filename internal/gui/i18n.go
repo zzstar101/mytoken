@@ -144,6 +144,8 @@ var strs = map[string][2]string{ // key: {zh, en}
 	"rebuildSub":       {"重新扫描全部日志（历史永久保留在本地数据库中）", "Rescan every log (history stays in the local database)"},
 	"dataDir":          {"数据目录", "Data folder"},
 	"sources":          {"数据来源", "Sources"},
+	"sourceRequests":   {"%s 次请求", "%s requests"},
+	"sourcesIdle":      {"另外 %d 个支持的工具没有发现数据", "%d other supported tools have no data here"},
 	"sourcesSub":       {"只读本地日志，从不上传；仅价格表会联网更新", "Reads local logs only; only the price list goes online"},
 	"about":            {"关于", "About"},
 	"sessionsN":        {"%d 个会话", "%d sessions"},

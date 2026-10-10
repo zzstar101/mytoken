@@ -24,3 +24,7 @@ to identify each tool.
 | grok.svg | Grok CLI |
 | openclaw-color.svg | OpenClaw |
 | goose.svg | Goose |
+
+`workbuddy-color.svg` is WorkBuddy's own logo from its app bundle
+(`renderer/assets/logo-workbuddy-*.svg`), not in @lobehub/icons: MyGo draws
+no SVG filters, so its blurred glow is a radial gradient here.

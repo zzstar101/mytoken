@@ -81,7 +81,9 @@ func harnessColor(h model.Harness) ui.Color {
 		return ui.Hex("#EE6018")
 	case model.Forge:
 		return ui.Hex("#B5651D")
-	case model.WorkBuddy, model.CodeBuddy:
+	case model.WorkBuddy:
+		return ui.Hex("#00C885")
+	case model.CodeBuddy:
 		return ui.Hex("#6C5CE7")
 	case model.Hermes:
 		return ui.Hex("#C9A227")
@@ -130,8 +132,8 @@ var harnessIcons = func() map[model.Harness]brandMark {
 		model.Grok:          {load("grok"), false, false},
 		model.OpenClaw:      {load("openclaw-color"), true, false},
 		model.Goose:         {load("goose"), false, false},
+		model.WorkBuddy:     {load("workbuddy-color"), true, true},
 		// No published marks for these: drawn in the app's line style.
-		model.WorkBuddy:  {icon(`<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3.5 12.5h17"/>`), false, false},
 		model.Droid:      {icon(`<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4.5M9.5 13h.01M14.5 13h.01M9.5 16.5h5"/>`), false, false},
 		model.Forge:      {icon(`<path d="M4 9h12l4-3v4l-4 2H8M8 12v3M14 12v3M6.5 19h11M9 15h6l1 4H8z"/>`), false, false},
 		model.OpenClaude: {icon(`<path d="M8 5 3.5 12 8 19M16 5l4.5 7-4.5 7M12 8v8M8.5 10l7 4M15.5 10l-7 4"/>`), false, false},

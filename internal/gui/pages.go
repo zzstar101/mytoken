@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/zzstar101/mytoken/internal/harness"
 	"github.com/zzstar101/mytoken/internal/model"
 	"github.com/zzstar101/mytoken/internal/query"
 )
@@ -219,33 +218,7 @@ func (s *State) settingsPage(c *ui.Context, pal palette) {
 				s.pricingCards(c, pal)
 			})
 			ui.Column(c).Width(360).Shrink(0).Gap(14).Children(func() {
-				card(c, pal, tr("sources"), nil, func() {
-					ui.Text(c, tr("sourcesSub")).FontSize(12).TextColor(pal.muted)
-					for _, p := range harness.All() {
-						h := p.Harness()
-						ui.Row(c.Key(string(h))).Gap(10).Padding(6, 0).AlignItems(ui.Center).Children(func() {
-							harnessMark(c, h, 16)
-							ui.Text(c, h.DisplayName()).FontSize(13).FontWeight(650).TextColor(pal.ink).Width(118)
-							ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
-								for _, r := range p.Roots() {
-									ok := exists(r)
-									col := pal.muted
-									if !ok {
-										col = pal.muted.Alpha(0.5)
-									}
-									ui.Row(c.Key(r)).Gap(6).AlignItems(ui.Center).Children(func() {
-										if ok {
-											dot(c, Rana, 6)
-										} else {
-											dot(c, pal.faint, 6)
-										}
-										ui.Text(c, shortPath(r)).FontSize(11.5).TextColor(col).SingleLine().Ellipsis("…")
-									})
-								}
-							})
-						})
-					}
-				})
+				s.sourcesCard(c, pal)
 				// Liner notes.
 				pane(c, pal).Clip().Padding(22, 22, 20, 22).Gap(10).Draw(func(p *ui.Painter, r ui.Rect) {
 					softGlow(p, r.X+r.W*0.85, r.Y+r.H*0.1, r.W*0.5, Tomori.Alpha(0.14))
@@ -258,7 +231,7 @@ func (s *State) settingsPage(c *ui.Context, pal palette) {
 				}).Children(func() {
 					kicker(c, pal, tr("about"))
 					logo(c, pal, 30)
-					ui.Text(c, "v0.1 · MIT").FontSize(12).TextColor(pal.muted).FontFeatures("tnum")
+					ui.Text(c, aboutVersion(s.Hooks.Version)+" · MIT").FontSize(12).TextColor(pal.muted).FontFeatures("tnum")
 					ui.Text(c, "春日影は、もう演奏しない").FontSize(13.5).FontWeight(600).TextColor(pal.ink.Alpha(0.8))
 					ui.Text(c, "Built with MyGo").FontSize(11).TextColor(pal.muted)
 				})
